@@ -10,6 +10,7 @@ public class User {
     private List<String> mainLanguage; // User Main Language;
     private List<Map<String,Integer>> subjectLevels; // User의 각 과목 Level
     private List<Integer> exercises; // User가 지금까지 받은 문제 번호 목록
+    private List<Integer> blacklist;
 
     public String getName() {
         return name;
@@ -57,5 +58,13 @@ public class User {
 
     public void setExercises(List<Integer> exercises) {
         this.exercises = exercises;
+    }
+
+    public List<Integer> getBlacklist() {
+        return blacklist;
+    }
+
+    public void setBlacklist(List<Integer> blacklist) {
+        this.blacklist = blacklist;
     }
 }
