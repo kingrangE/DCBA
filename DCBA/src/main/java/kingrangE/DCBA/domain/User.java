@@ -5,9 +5,35 @@ import java.util.Map;
 
 public class User {
     private String id; // User Slack ID;
+    private String name; // 로그인을 위해 사용할 이름
+    private String password; // 나중에 보안 되도록 변경해야 한다. (로그인해서 할 수 있는게 조회뿐이므로 일단은 그냥 생으로 저장)
     private List<String> mainLanguage; // User Main Language;
     private List<Map<String,Integer>> subjectLevels; // User의 각 과목 Level
     private List<Integer> exercises; // User가 지금까지 받은 문제 번호 목록
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public List<Map<String, Integer>> getSubjectLevels() {
+        return subjectLevels;
+    }
+
+    public void setSubjectLevels(List<Map<String, Integer>> subjectLevels) {
+        this.subjectLevels = subjectLevels;
+    }
 
     public String getId() {
         return id;
@@ -23,14 +49,6 @@ public class User {
 
     public void setMainLanguage(List<String> mainLanguage) {
         this.mainLanguage = mainLanguage;
-    }
-
-    public List<Map<String, Integer>> getLevels() {
-        return subjectLevels;
-    }
-
-    public void setLevels(List<Map<String, Integer>> subjectLevels) {
-        this.subjectLevels = subjectLevels;
     }
 
     public List<Integer> getExercises() {
