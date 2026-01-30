@@ -3,6 +3,7 @@ package kingrangE.DCBA.repository;
 import kingrangE.DCBA.domain.Exercise;
 import kingrangE.DCBA.domain.Level;
 import kingrangE.DCBA.domain.Subject;
+import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Repository
 public class MemoryExerciseRepository implements  ExerciseRepository{
     ConcurrentHashMap<Integer,Exercise> repo = new ConcurrentHashMap<>();
     Integer id = 0;
