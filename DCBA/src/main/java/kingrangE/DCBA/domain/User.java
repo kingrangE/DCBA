@@ -7,7 +7,7 @@ public class User {
     private String id; // User Slack ID;
     private String name; // 로그인을 위해 사용할 이름
     private String password; // 나중에 보안 되도록 변경해야 한다. (로그인해서 할 수 있는게 조회뿐이므로 일단은 그냥 생으로 저장)
-    private List<String> mainLanguage; // User Main Language;
+    private List<String> mainLanguages; // User Main Language;
     private List<Map<String,Integer>> subjectLevels; // User의 각 과목 Level
     private List<Integer> exercises; // User가 지금까지 받은 문제 번호 목록
     private List<Integer> blacklist;
@@ -44,12 +44,12 @@ public class User {
         this.id = id;
     }
 
-    public List<String> getMainLanguage() {
-        return mainLanguage;
+    public List<String> getMainLanguages() {
+        return mainLanguages;
     }
 
-    public void setMainLanguage(List<String> mainLanguage) {
-        this.mainLanguage = mainLanguage;
+    public void setMainLanguages(List<String> mainLanguage) {
+        this.mainLanguages = mainLanguage;
     }
 
     public List<Integer> getExercises() {
