@@ -1,17 +1,17 @@
 package kingrangE.DCBA.domain;
 
 public class Exercise {
-    private Long num;
+    private Integer num;
     private String title;
     private String best_answer;
     private Subject subject;
     private Level level;
 
-    public Long getNum() {
+    public Integer getNum() {
         return num;
     }
 
-    public void setNum(Long num) {
+    public void setNum(Integer num) {
         this.num = num;
     }
 
