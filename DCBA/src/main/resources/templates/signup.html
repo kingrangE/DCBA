@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>DCBA - 회원가입</title>
+    <style>
+        .error-msg { color: red; font-size: 0.9em; }
+        .lang-input { margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+<h2>회원가입</h2>
+
+<div th:if="${errorMessage}" class="error-msg">
+    <p th:text="${errorMessage}"></p>
+</div>
+
+<form th:action="@{/signup}" th:object="${signUpForm}" method="post">
+    <div>
+        <label>Slack ID:</label>
+        <input type="text" th:field="*{id}" placeholder="아이디로 사용할 Slack ID" required>
+    </div>
+    <div>
+        <label>Nickname:</label>
+        <input type="text" th:field="*{name}" placeholder="사용할 닉네임" required>
+    </div>
+    <div>
+        <label>Password:</label>
+        <input type="password" th:field="*{password}" required>
+    </div>
+
+    <div id="language-section">
+        <label>주요 사용 언어:</label>
+        <div class="lang-input">
+            <input type="text" name="mainLanguages" placeholder="예: Java">
+            <button type="button" onclick="addLanguageField()">+</button>
+        </div>
+    </div>
+
+    <hr>
+    <button type="submit">가입하기</button>
+    <a href="/">취소</a>
+</form>
+
+<script>
+    function addLanguageField() {
+        const section = document.getElementById('language-section');
+        const div = document.createElement('div');
+        div.className = 'lang-input';
+        div.innerHTML = `
+                <input type="text" name="mainLanguages" placeholder="추가 언어">
+                <button type="button" onclick="this.parentElement.remove()">-</button>
+            `;
+        section.appendChild(div);
+    }
+</script>
+</body>
+</html>
