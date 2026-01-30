@@ -1,11 +1,13 @@
 package kingrangE.DCBA.repository;
 
 import kingrangE.DCBA.domain.User;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Repository
 public class MemoryUserRepository implements UserRepository{
     private ConcurrentHashMap<String,User> repo = new ConcurrentHashMap<>();
 
