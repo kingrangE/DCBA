@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>DCBA - Login</title>
+</head>
+<body>
+<h2>로그인</h2>
+
+<form th:action="@{/login}" th:object="${loginForm}" method="post">
+    <div>
+        <label>Nickname:</label>
+        <input type="text" th:field="*{name}" placeholder="닉네임을 입력하세요" required>
+    </div>
+    <div>
+        <label>Password:</label>
+        <input type="password" th:field="*{password}" required>
+    </div>
+
+    <div th:if="${param.error}" style="color: red;">
+        아이디 또는 비밀번호가 틀렸습니다.
+    </div>
+
+    <button type="submit">로그인</button>
+</form>
+
+<br>
+<a href="/signup">계정이 없으신가요? 회원가입 하러가기</a>
+</body>
+</html>
