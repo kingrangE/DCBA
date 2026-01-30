@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ExerciseRepository {
-    String save(Exercise exercise); //문제 정보 받아 저장
+    Integer save(Exercise exercise); //문제 정보 받아 저장
     Optional<Exercise> findByExerciseNumber(Integer exerciseNumber); // 문제 번호를 전달 받아 문제 조회
     Optional<List<Exercise>> findAllExercises(); // 모든 문제 조회
     Optional<List<Exercise>> findExercisesBySubject(Subject subject); // 과목을 선택해서 조회
