@@ -7,6 +7,14 @@ public class Exercise {
     private Subject subject;
     private Level level;
 
+    public Exercise(Integer num, String title, String best_answer, Subject subject, Level level) {
+        this.num = num;
+        this.title = title;
+        this.best_answer = best_answer;
+        this.subject = subject;
+        this.level = level;
+    }
+
     public Integer getNum() {
         return num;
     }
