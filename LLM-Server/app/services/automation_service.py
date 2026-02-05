@@ -108,26 +108,22 @@ class AutomationService:
                         content = await loop.run_in_executor(None, exercise_service.generate_exercise, task['subject'], task['level'])
                         
                         # 파싱
-                        title = ""
-                        best_answer = ""
-                        for line in content.split("\n"):
-                            processed_line = line.strip()
-                            if processed_line.startswith("Q:"):
-                                title = processed_line.replace("Q:", "").strip()
-                            elif processed_line.startswith("A:"):
-                                best_answer = processed_line.replace("A:", "").strip()
+                        parsed_data = exercise_service.parse_content(content)
+                        question = parsed_data["question"]
+                        answer = parsed_data["answer"]
                         
                         # 결과 잘 있으면 저장
-                        if title and best_answer:
+                        if question and answer:
                             saved_exercise = await loop.run_in_executor(
                                 None, 
                                 exercise_repository.save_exercise, 
                                 task['subject'], 
                                 task['level'], 
-                                title, 
-                                best_answer
+                                question, 
+                                answer
                             )
-                            print(f"[Consumer] Saved : {saved_exercise.title} (ID : {saved_exercise.num})")
+                            print(f"[Consumer] Saved : {saved_exercise.question} (ID : {saved_exercise.num})")
+                            
                         else: # 결과 잘 없으면 로그찍고 저장없이 다음
                             print(f"[Consumer] Failed to parse content: {content[:50]}...")
 

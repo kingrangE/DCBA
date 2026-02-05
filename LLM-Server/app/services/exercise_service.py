@@ -29,6 +29,18 @@ class ExerciseService:
             return ""
 
     
+    # 파싱 전용 함수 
+    def parse_content(self, content: str) -> dict:
+        question = ""
+        answer = ""
+        for line in content.split("\n"):
+            processed_line = line.strip()
+            if processed_line.startswith("Q:"):
+                question = processed_line.replace("Q:", "").strip()
+            elif processed_line.startswith("A:"):
+                answer = processed_line.replace("A:", "").strip()
+        return {"question": question, "answer": answer}
+
     # 문제 생성
     def generate_exercise(self, subject: str, level: str) -> str:
         from app.services.deduplication_service import deduplication_service
@@ -64,9 +76,16 @@ class ExerciseService:
                 # 응답에서 content 꺼냄
                 content = completion.choices[0].message.content
                 
-
+                # 생성된 내용 파싱
+                parsed_data = self.parse_content(content)
+                question = parsed_data["question"]
+                
+                if not question: # 질문이 없으면 실패로 간주하고 재시도
+                     print(f"[Retry] Failed to parse question (Attempt {attempt+1}/{max_retries})")
+                     continue
+                    
                 # 중복 검사 (중복되면 다시)
-                if deduplication_service.is_duplicate(subject, level, content):
+                if deduplication_service.is_duplicate(subject, level, question):
                     print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
                     continue
                 
