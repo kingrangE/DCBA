@@ -1,58 +1,191 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
     <meta charset="UTF-8">
-    <title>DCBA - 회원가입</title>
+    <title>DCBA - Sign Up</title>
+    <!-- Check for Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .error-msg { color: red; font-size: 0.9em; }
-        .lang-input { margin-bottom: 5px; }
+        :root {
+            --primary-color: #4F46E5;
+            --primary-hover: #4338ca;
+            --background-start: #EEF2FF;
+            --background-end: #E0E7FF;
+            --text-color: #1F2937;
+            --text-secondary: #6B7280;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--background-start) 0%, var(--background-end) 100%);
+        }
+
+        .signup-container {
+            background-color: white;
+            padding: 2.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05), 0 4px 6px rgba(0, 0, 0, 0.02);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .signup-container h2 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+            font-weight: 700;
+            font-size: 1.75rem;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 0.875rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .lang-input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .lang-input-group button {
+            width: auto;
+            padding: 0.5rem 1rem;
+            background-color: #E5E7EB;
+            color: #374151;
+            margin-top: 0;
+        }
+
+        .lang-input-group button:hover {
+            background-color: #D1D5DB;
+        }
+
+        .error-msg {
+            background-color: #FEF2F2;
+            color: #DC2626;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+            text-align: left;
+            border: 1px solid #FEE2E2;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .cancel-link {
+            display: block;
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+
+        .cancel-link:hover {
+            color: var(--text-color);
+        }
+
+        hr {
+            margin: 1.5rem 0;
+            border: none;
+            border-top: 1px solid #E5E7EB;
+        }
     </style>
 </head>
+
 <body>
-<h2>회원가입</h2>
+    <div class="signup-container">
+        <h2>Create Account</h2>
+        <p class="subtitle">Join DCBA to start your learning journey.</p>
 
-<div th:if="${errorMessage}" class="error-msg">
-    <p th:text="${errorMessage}"></p>
-</div>
-
-<form th:action="@{/signup}" th:object="${signUpForm}" method="post">
-    <div>
-        <label>Slack ID:</label>
-        <input type="text" th:field="*{id}" placeholder="아이디로 사용할 Slack ID" required>
-    </div>
-    <div>
-        <label>Nickname:</label>
-        <input type="text" th:field="*{name}" placeholder="사용할 닉네임" required>
-    </div>
-    <div>
-        <label>Password:</label>
-        <input type="password" th:field="*{password}" required>
-    </div>
-
-    <div id="language-section">
-        <label>주요 사용 언어:</label>
-        <div class="lang-input">
-            <input type="text" name="mainLanguages" placeholder="예: Java">
-            <button type="button" onclick="addLanguageField()">+</button>
+        <div th:if="${errorMessage}" class="error-msg">
+            <p th:text="${errorMessage}" style="margin: 0;"></p>
         </div>
+
+        <form th:action="@{/signup}" th:object="${signUpForm}" method="post">
+            <div class="form-group">
+                <label for="nickname">Nickname</label>
+                <input type="text" id="nickname" th:field="*{name}" placeholder="Choose a nickname" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" th:field="*{password}" placeholder="Create a password" required>
+            </div>
+
+            <hr>
+            <button type="submit" class="btn-primary">Sign Up</button>
+            <a href="/" class="cancel-link">Cancel</a>
+        </form>
     </div>
 
-    <hr>
-    <button type="submit">가입하기</button>
-    <a href="/">취소</a>
-</form>
-
-<script>
-    function addLanguageField() {
-        const section = document.getElementById('language-section');
-        const div = document.createElement('div');
-        div.className = 'lang-input';
-        div.innerHTML = `
-                <input type="text" name="mainLanguages" placeholder="추가 언어">
-                <button type="button" onclick="this.parentElement.remove()">-</button>
-            `;
-        section.appendChild(div);
-    }
-</script>
+    <script>
+        function addLanguageField() {
+            const section = document.getElementById('language-section');
+            const div = document.createElement('div');
+            div.className = 'lang-input-group';
+            div.innerHTML = `
+                    <input type="text" name="mainLanguages" placeholder="Additional Language">
+                    <button type="button" onclick="this.parentElement.remove()">-</button>
+                `;
+            section.appendChild(div);
+        }
+    </script>
 </body>
+
 </html>
