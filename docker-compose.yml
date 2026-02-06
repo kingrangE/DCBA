@@ -75,7 +75,7 @@ services:
     restart: always
 
 volumes:
-  redis_tokens:
+  redis_data:
   mariadb_data:
 
 networks:
