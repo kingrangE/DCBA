@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>DCBA - Dashboard</title>
+    <!-- Check for Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4F46E5;
+            --primary-hover: #4338ca;
+            --background-color: #F3F4F6;
+            --text-color: #1F2937;
+            --text-secondary: #6B7280;
+            --card-bg: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
+            color: var(--text-color);
+        }
+
+        .navbar {
+            background-color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .navbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .navbar .logout-btn {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+        }
+
+        .navbar .logout-btn:hover {
+            background-color: #F3F4F6;
+            color: var(--text-color);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .header-section {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .header-section h2 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .header-section p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 2rem;
+            /* Increased gap to prevent overlap */
+            padding-bottom: 2rem;
+        }
+
+        /* Flip Card Container */
+        .flip-card {
+            background-color: transparent;
+            height: 350px;
+            /* Fixed height for consistent flip effect */
+            perspective: 1000px;
+            /* Remove 3D effect context */
+            cursor: pointer;
+        }
+
+        /* Inner Container: Holds Front and Back */
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: left;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Flip Action */
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+
+        /* Common Styles for Front and Back */
+        .flip-card-front,
+        .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-sizing: border-box;
+            background-color: var(--card-bg);
+            border: 1px solid #E5E7EB;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Front specific */
+        .flip-card-front {
+            z-index: 2;
+        }
+
+        /* Back specific */
+        .flip-card-back {
+            transform: rotateY(180deg);
+            background-color: #F9FAFB;
+            overflow: hidden;
+            /* Hide overflow of container */
+        }
+
+        /* Front Content */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-subject {
+            background-color: #EEF2FF;
+            color: #4F46E5;
+        }
+
+        .badge-level {
+            background-color: #F3F4F6;
+            color: #374151;
+            margin-left: 0.5rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1.5;
+            color: var(--text-color);
+            overflow-y: auto;
+            flex-grow: 1;
+            /* Generate scroll if question is too long */
+        }
+
+        .card-hint {
+            margin-top: auto;
+            text-align: center;
+            font-size: 0.875rem;
+            color: #9CA3AF;
+            padding-top: 1rem;
+        }
+
+        /* Back Content */
+        .answer-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #E5E7EB;
+            padding-bottom: 0.5rem;
+        }
+
+        .answer-content {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #374151;
+            overflow-y: auto;
+            /* Scrollable if answer is long */
+            flex-grow: 1;
+            white-space: pre-wrap;
+            /* Preserve formatting */
+            padding-right: 0.5rem;
+            /* Space for scrollbar */
+        }
+
+        /* Custom Scrollbar for better look */
+        .answer-content::-webkit-scrollbar,
+        .card-title::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .answer-content::-webkit-scrollbar-track,
+        .card-title::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .answer-content::-webkit-scrollbar-thumb,
+        .card-title::-webkit-scrollbar-thumb {
+            background: #D1D5DB;
+            border-radius: 3px;
+        }
+
+        .answer-content::-webkit-scrollbar-thumb:hover,
+        .card-title::-webkit-scrollbar-thumb:hover {
+            background: #9CA3AF;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 0;
+            color: var(--text-secondary);
+        }
+
+        /* Filter Form */
+        .filter-form {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-form select {
+            padding: 0.5rem 1rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.5rem;
+            background-color: white;
+            font-size: 1rem;
+            min-width: 150px;
+        }
+
+        .filter-form button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .filter-form button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        .page-link {
+            padding: 0.5rem 1rem;
+            border: 1px solid #D1D5DB;
+            background-color: white;
+            color: var(--text-color);
+            text-decoration: none;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+
+        .page-link:hover:not(.disabled):not(.active) {
+            background-color: #F3F4F6;
+            border-color: #9CA3AF;
+        }
+
+        .page-link.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .page-link.disabled {
+            color: #9CA3AF;
+            pointer-events: none;
+            background-color: #F9FAFB;
+        }
+
+        /* Markdown Content Styling */
+        .card-title-content p,
+        .answer-content p {
+            margin: 0 0 0.5rem 0;
+        }
+
+        .card-title-content p:last-child,
+        .answer-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .card-title-content code,
+        .answer-content code {
+            background-color: #f3f4f6;
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.2rem;
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #d63384;
+        }
+
+        .card-title-content pre,
+        .answer-content pre {
+            background-color: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 0.4rem;
+            overflow-x: auto;
+            border: 1px solid #e9ecef;
+        }
+
+        .card-title-content ul,
+        .answer-content ul,
+        .card-title-content ol,
+        .answer-content ol {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+
+        /* Card Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-save {
+            color: #10B981;
+        }
+
+        .btn-save:hover {
+            background-color: #ECFDF5;
+        }
+
+        .btn-ban {
+            color: #EF4444;
+        }
+
+        .btn-ban:hover {
+            background-color: #FEF2F2;
+        }
+
+        /* Navbar Links */
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-links a.active {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 2rem;">
+            <h1><a href="/dashboard" style="text-decoration: none; color: inherit;">DCBA</a></h1>
+            <div class="nav-links">
+                <a href="/dashboard" th:classappend="${viewType == 'all'} ? 'active'">All Exercises</a>
+                <a href="/dashboard/selected" th:classappend="${viewType == 'selected'} ? 'active'">Saved</a>
+                <a href="/dashboard/banned" th:classappend="${viewType == 'banned'} ? 'active'">Trash</a>
+            </div>
+        </div>
+        <div class="user-info">
+            <a href="/logout" class="logout-btn">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header-section">
+            <h2>Your Exercises</h2>
+            <p>Click on a card to reveal the answer.</p>
+        </div>
+
+        <!-- Filter Form -->
+        <form action="/dashboard" method="get" class="filter-form">
+            <select name="subject">
+                <option value="">All Subjects</option>
+                <option th:each="sub : ${subjects}" th:value="${sub}" th:text="${sub.subjectName}"
+                    th:selected="${sub == currentSubject}"></option>
+            </select>
+
+            <select name="level">
+                <option value="">All Levels</option>
+                <option th:each="lvl : ${levels}" th:value="${lvl}" th:text="|Level ${lvl.level}|"
+                    th:selected="${lvl == currentLevel}"></option>
+            </select>
+
+            <button type="submit">Search</button>
+        </form>
+
+        <!-- Exercise Grid -->
+        <div class="grid" th:if="${not #lists.isEmpty(exercises)}">
+            <div class="flip-card" th:each="exercise : ${exercises}" onclick="this.classList.toggle('flipped')">
+                <div class="flip-card-inner">
+                    <!-- Front Side -->
+                    <div class="flip-card-front">
+                        <div class="card-header">
+                            <div>
+                                <span class="badge badge-subject" th:text="${exercise.subject}">Subject</span>
+                                <span class="badge badge-level" th:text="${exercise.level}">Level</span>
+                            </div>
+                            <div class="action-buttons">
+                                <!-- Save / Unsave -->
+                                <form th:if="${savedIds != null and savedIds.contains(exercise.id)}"
+                                    action="/exercise/save/cancel" method="post" onclick="event.stopPropagation()">
+                                    <input type="hidden" name="exerciseId" th:value="${exercise.id}">
+                                    <button type="submit" class="btn-icon btn-save" title="Unsave (Remove from Saved)"
+                                        style="color: #059669;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                            fill="currentColor" viewBox="0 0 16 16">
+                                            <path d="M2 2v13.5l5-5 5 5V2z" />
+                                        </svg>
+                                    </button>
+                                </form>
+                                <form th:unless="${savedIds != null and savedIds.contains(exercise.id)}"
+                                    action="/exercise/save" method="post" onclick="event.stopPropagation()">
+                                    <input type="hidden" name="exerciseId" th:value="${exercise.id}">
+                                    <button type="submit" class="btn-icon btn-save" title="Save Exercise">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                            fill="currentColor" viewBox="0 0 16 16">
+                                            <path
+                                                d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1H4z" />
+                                        </svg>
+                                    </button>
+                                </form>
+
+                                <!-- Ban / Unban -->
+                                <form th:if="${bannedIds != null and bannedIds.contains(exercise.id)}"
+                                    action="/exercise/ban/cancel" method="post" onclick="event.stopPropagation()">
+                                    <input type="hidden" name="exerciseId" th:value="${exercise.id}">
+                                    <button type="submit" class="btn-icon btn-ban" title="Unban (Restore from Trash)"
+                                        style="color: #DC2626;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                            fill="currentColor" viewBox="0 0 16 16">
+                                            <path
+                                                d="M11 1.5v1h3.5a.5.5 0 0 1 0 1h-.538l-.853 10.66A2 2 0 0 1 11.115 16h-6.23a2 2 0 0 1-1.994-1.84L2.038 3.5H1.5a.5.5 0 0 1 0-1H5v-1A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5z" />
+                                        </svg>
+                                    </button>
+                                </form>
+                                <form th:unless="${bannedIds != null and bannedIds.contains(exercise.id)}"
+                                    action="/exercise/ban" method="post" onclick="event.stopPropagation()">
+                                    <input type="hidden" name="exerciseId" th:value="${exercise.id}">
+                                    <button type="submit" class="btn-icon btn-ban" title="Ban (Move to Trash)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                            fill="currentColor" viewBox="0 0 16 16">
+                                            <path
+                                                d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                                            <path fill-rule="evenodd"
+                                                d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <h3 class="card-title">
+                            <div class="card-title-content" th:attr="data-markdown=${exercise.question}"></div>
+                        </h3>
+                        <div class="card-hint">
+                            Tap to see answer
+                        </div>
+                    </div>
+
+                    <!-- Back Side -->
+                    <div class="flip-card-back">
+                        <div class="answer-title">Answer</div>
+                        <div class="answer-content" th:attr="data-markdown=${exercise.answer}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" th:if="${#lists.isEmpty(exercises)}">
+            <h3>No exercises found</h3>
+            <p>You haven't been assigned any exercises matching your criteria.</p>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" th:if="${page.totalPages > 0}">
+            <a th:href="@{/dashboard(page=${page.number - 1}, subject=${currentSubject}, level=${currentLevel})}"
+                th:classappend="${page.first} ? 'disabled'" class="page-link">&laquo; Prev</a>
+
+            <span th:each="i : ${#numbers.sequence(0, page.totalPages - 1)}">
+                <a th:href="@{/dashboard(page=${i}, subject=${currentSubject}, level=${currentLevel})}"
+                    th:text="${i + 1}" th:classappend="${i == page.number} ? 'active'" class="page-link">1</a>
+            </span>
+
+            <a th:href="@{/dashboard(page=${page.number + 1}, subject=${currentSubject}, level=${currentLevel})}"
+                th:classappend="${page.last} ? 'disabled'" class="page-link">Next &raquo;</a>
+        </div>
+    </div>
+
+    <!-- Marked Library for Markdown Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Render Markdown for Questions
+            document.querySelectorAll('.card-title-content').forEach(el => {
+                const rawDetails = el.getAttribute('data-markdown');
+                if (rawDetails) {
+                    el.innerHTML = marked.parse(rawDetails);
+                }
+            });
+
+            // Render Markdown for Answers
+            document.querySelectorAll('.answer-content').forEach(el => {
+                const rawAnswer = el.getAttribute('data-markdown');
+                if (rawAnswer) {
+                    el.innerHTML = marked.parse(rawAnswer);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
