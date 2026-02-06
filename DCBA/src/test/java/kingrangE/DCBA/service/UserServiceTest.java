@@ -1,22 +1,24 @@
 package kingrangE.DCBA.service;
 
 import kingrangE.DCBA.domain.User;
-import kingrangE.DCBA.repository.MemoryUserRepository;
 import kingrangE.DCBA.repository.UserRepository;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
 import java.util.List;
 
+@DataJpaTest
 public class UserServiceTest {
     UserService userService;
+    @Autowired
     UserRepository userRepository;
 
     @BeforeEach
     void setup() {
-        userRepository = new MemoryUserRepository();
         userService = new UserService(userRepository);
     }
 
@@ -25,9 +27,9 @@ public class UserServiceTest {
     void signUpSuccess() {
         // given
         // when
-        userService.signUp("1", "길원", "1", List.of("x"));
+        userService.signUp("길원", "1");
         // then
-        User findedUser = userRepository.findById("1").orElse(null); // 조회
+        User findedUser = userRepository.findByName("길원").orElse(null); // 조회
         Assertions.assertThat(findedUser).isNotNull(); // 있으면 성공
     }
 
@@ -35,10 +37,10 @@ public class UserServiceTest {
     @DisplayName("회원가입 - ID 중복 실패")
     void signUpIdDuplicated() {
         // given
-        userService.signUp("1", "길원", "1", List.of("x"));
+        userService.signUp("길원", "1");
         // when
         // then
-        Assertions.assertThatThrownBy(() -> userService.signUp("1", "길원1", "1", List.of("x")))
+        Assertions.assertThatThrownBy(() -> userService.signUp("길원1", "1"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("해당 ID로 가입한 유저가 존재합니다.");
     }
@@ -47,10 +49,10 @@ public class UserServiceTest {
     @DisplayName("회원가입 - 닉네임 중복 실패")
     void signUpNameDuplicated() {
         // given
-        userService.signUp("1", "길원", "1", List.of("x"));
+        userService.signUp("길원", "1");
         // when
         // then
-        Assertions.assertThatThrownBy(() -> userService.signUp("2", "길원", "1", List.of("x")))
+        Assertions.assertThatThrownBy(() -> userService.signUp("길원", "1"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("해당 닉네임을 사용하는 유저가 존재합니다.");
     }
@@ -59,7 +61,7 @@ public class UserServiceTest {
     @DisplayName("로그인 - 성공")
     void loginSuccess() {
         // given
-        userService.signUp("1", "길원", "1", List.of("x"));
+        userService.signUp("길원", "1");
         // when
         User loginnedUser = userService.login("길원", "1");
         // then
@@ -70,7 +72,7 @@ public class UserServiceTest {
     @DisplayName("로그인 - 존재하지 않는 닉네임")
     void loginNoSuchName() {
         // given
-        userService.signUp("1", "길원", "1", List.of("x"));
+        userService.signUp("길원", "1");
         // when
         // then
         Assertions.assertThatThrownBy(() -> userService.login("길1", "1"))
@@ -82,7 +84,7 @@ public class UserServiceTest {
     @DisplayName("로그인 - 비밀번호 틀림")
     void loginWrongPassword() {
         // given
-        userService.signUp("1", "길원", "1", List.of("x"));
+        userService.signUp("길원", "1");
         // when
         // then
         Assertions.assertThatThrownBy(() -> userService.login("길원", "2"))
