@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 
 class ExerciseBase(BaseModel):
     subject: str
@@ -8,6 +9,7 @@ class ExerciseRequest(ExerciseBase):
     pass
 
 class Exercise(ExerciseBase):
-    num: int
-    title: str
-    best_answer: str
+    id: int
+    question: str
+    answer: str
+    created_at : datetime = None
