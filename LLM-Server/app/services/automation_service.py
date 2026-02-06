@@ -46,6 +46,21 @@ class AutomationService:
 
         # 현재 scheduler 실행 여부 상태
         self.is_running = False
+        
+        self.subject_map = {
+            "COMPUTER_ARCHITECTURE": "컴퓨터 구조",
+            "OPERATING_SYSTEM": "운영체제",
+            "COMPUTER_NETWORK": "컴퓨터 네트워크",
+            "DATA_STRUCTURE": "자료구조",
+            "ALGORITHM": "알고리즘",
+            "DATABASE": "데이터베이스"
+        }
+        
+        self.level_map = {
+            "EASY": "난이도 1 (기초)",
+            "MEDIUM": "난이도 2 (기본)",
+            "HARD": "난이도 3 (심화)"
+        }
 
     def start_producer(self):
         # 아직 안돌아가고 있으면 scheduler에 잡 넣고 시작
@@ -56,32 +71,17 @@ class AutomationService:
 
     def _produce_job(self):
         """The job that runs every 30s."""
-        # 과목 종류
-        subjects = [
-            "컴퓨터 구조", 
-            "운영체제", 
-            "컴퓨터 네트워크", 
-            "자료구조", 
-            "알고리즘", 
-            "데이터베이스",
-        ]
-        
-        # 레벨 종류
-        level_map = {
-            1: "난이도 1 (기초)",
-            2: "난이도 2 (기본)",
-            3: "난이도 3 (심화)"
-        }
         
         # 랜덤 선택
-        selected_subject = random.choice(subjects)
-        selected_level_key = random.choice(list(level_map.keys()))
-        selected_level_str = level_map[selected_level_key]
+        selected_subject_key = random.choice(list(self.subject_map.keys()))
+        selected_level_key = random.choice(list(self.level_map.keys()))
         
-        # 잡 넣기
+        # 잡 넣기 - 저장 및 Java 통신용으로는 Key(영어)를 사용, Prompt용으로는 Value(한글) 사용
         task = {
-            "subject": selected_subject,
-            "level": selected_level_str
+            "subject": selected_subject_key, # DB 저장용 (Java Enum)
+            "level": selected_level_key,     # DB 저장용 (Java Enum)
+            "subject_display": self.subject_map[selected_subject_key], # LLM 프롬프트용
+            "level_display": self.level_map[selected_level_key]       # LLM 프롬프트용
         }
         self.queue.enqueue(task)
 
@@ -104,15 +104,20 @@ class AutomationService:
                     try:
                         from app.repositories.exercise_repository import exercise_repository
                         
-                        # 문제 생성
-                        content = await loop.run_in_executor(None, exercise_service.generate_exercise, task['subject'], task['level'])
+                        # 문제 생성 
+                        content = await loop.run_in_executor(
+                            None, 
+                            exercise_service.generate_exercise, 
+                            task['subject_display'], 
+                            task['level_display']
+                        )
                         
                         # 파싱
                         parsed_data = exercise_service.parse_content(content)
                         question = parsed_data["question"]
                         answer = parsed_data["answer"]
                         
-                        # 결과 잘 있으면 저장
+                        # 결과 잘 있으면 저장 
                         if question and answer:
                             saved_exercise = await loop.run_in_executor(
                                 None, 
@@ -122,7 +127,7 @@ class AutomationService:
                                 question, 
                                 answer
                             )
-                            print(f"[Consumer] Saved : {saved_exercise.question} (ID : {saved_exercise.num})")
+                            print(f"[Consumer] Saved : {saved_exercise.question} (ID : {saved_exercise.id})")
                             
                         else: # 결과 잘 없으면 로그찍고 저장없이 다음
                             print(f"[Consumer] Failed to parse content: {content[:50]}...")
