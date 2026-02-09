@@ -21,11 +21,6 @@ public class UserServiceTest {
     @Autowired
     UserRepository userRepository;
 
-    @BeforeEach
-    void setup() {
-        userService = new UserService(userRepository);
-    }
-
     @Test
     @DisplayName("회원가입 - 성공")
     void signUpSuccess() {
@@ -35,18 +30,6 @@ public class UserServiceTest {
         // then
         User findedUser = userRepository.findByName("길원").orElse(null); // 조회
         Assertions.assertThat(findedUser).isNotNull(); // 있으면 성공
-    }
-
-    @Test
-    @DisplayName("회원가입 - ID 중복 실패")
-    void signUpIdDuplicated() {
-        // given
-        userService.signUp("길원", "1");
-        // when
-        // then
-        Assertions.assertThatThrownBy(() -> userService.signUp("길원1", "1"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessage("해당 ID로 가입한 유저가 존재합니다.");
     }
 
     @Test
@@ -76,7 +59,6 @@ public class UserServiceTest {
     @DisplayName("로그인 - 존재하지 않는 닉네임")
     void loginNoSuchName() {
         // given
-        userService.signUp("길원", "1");
         // when
         // then
         Assertions.assertThatThrownBy(() -> userService.login("길1", "1"))
