@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd) rhysd/actionlint:latest"
+          docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" rhysd/actionlint:latest
 
   java_ci: # Test 실행을 위해서는 Docker 실행이 필요하다.
     runs-on: ubuntu-latest
