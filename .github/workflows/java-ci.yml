@@ -1,6 +1,7 @@
 name: Java CI workflow
 
 on: 
+  push: ["main","JavaApp"]
   pull_request:
     paths: # 아래의 경우에 해당할 때만 실행하는 Workflow
       - 'DCBA/**/*.java' # JAVA 파일이 수정되었을 떄,
@@ -20,7 +21,7 @@ defaults:
 jobs:
   lint: # workflow 정적 검사
     runs-on: ubuntu-latest
-    timeout: 5
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -28,7 +29,7 @@ jobs:
 
   java_ci: # Test 실행을 위해서는 Docker 실행이 필요하다.
     runs-on: ubuntu-latest
-    timeout: 30 # 이후 변경 필요
+    timeout-minutes: 30 # 이후 변경 필요
     defaults:
       run:
         working-directory: ./DCBA
