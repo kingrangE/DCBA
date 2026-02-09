@@ -1,7 +1,8 @@
 name: Java CI workflow
 
 on: 
-  push: ["main","JavaApp"]
+  push: 
+    - branches : ["main","JavaApp"]
   pull_request:
     paths: # 아래의 경우에 해당할 때만 실행하는 Workflow
       - 'DCBA/**/*.java' # JAVA 파일이 수정되었을 떄,
