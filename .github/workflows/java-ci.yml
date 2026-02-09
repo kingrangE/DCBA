@@ -49,7 +49,7 @@ jobs:
           --health-retries=3
   
     steps:
-      - uses: actions/checkout@4 # checkout action 사용
+      - uses: actions/checkout@v4 # checkout action 사용
       - name: JDK(21) Setting
         uses: actions/setup-java@v4
         with:
