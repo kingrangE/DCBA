@@ -1,0 +1,66 @@
+name: Java CI workflow
+
+on: 
+  pull_request:
+    paths: # 아래의 경우에 해당할 때만 실행하는 Workflow
+      - 'DCBA/**/*.java' # JAVA 파일이 수정되었을 떄,
+      - 'DCBA/build.gradle' # 설정 파일이 수정되었을 떄,
+      - 'DCBA/Dockerfile' # Dockerfile이 수정되었을 때
+      - 'DCBA/**/*.properties' # properties가 수정되었을 때
+
+# workflow 종료 전, 새로운 pr이 오면 그것만 검사하도록
+concurrency: 
+  group: ${{github.workflow}}-${{ github.event.pull_request.number || github.ref }}}}
+  cancel-in-progress: true 
+
+defaults:
+      run:
+        shell: bash # pipe 처리 중 발생하는 오류를 발견하기 위함
+
+jobs:
+  lint: # workflow 정적 검사
+    runs-on: ubuntu-latest
+    timeout: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd) rhysd/actionlint:latest"
+
+  java_ci: # Test 실행을 위해서는 Docker 실행이 필요하다.
+    runs-on: ubuntu-latest
+    timeout: 30 # 이후 변경 필요
+    defaults:
+      run:
+        working-directory: ./DCBA
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: 1234
+          MARIADB_DATABASE: test_maria
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+  
+    steps:
+      - uses: actions/checkout@4 # checkout action 사용
+      - name: JDK(21) Setting
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle' # cache를 이용하여 CI 시간 감소
+      - name: Grant Execution Authority to Gradle
+        run: chmod +x gradlew
+      
+      - name: Build with Gradle
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mariadb://localhost:3306/test_maria
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: 1234
+        run: ./gradlew test # Test만 수행 
+      
