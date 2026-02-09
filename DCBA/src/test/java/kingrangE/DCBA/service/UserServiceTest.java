@@ -11,13 +11,18 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.test.context.ActiveProfiles;
 
+import org.springframework.context.annotation.Import;
+
 import java.util.List;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("local")
+@Import(UserService.class)
 public class UserServiceTest {
+    @Autowired
     UserService userService;
+
     @Autowired
     UserRepository userRepository;
 
@@ -28,8 +33,8 @@ public class UserServiceTest {
         // when
         userService.signUp("길원", "1");
         // then
-        User findedUser = userRepository.findByName("길원").orElse(null); // 조회
-        Assertions.assertThat(findedUser).isNotNull(); // 있으면 성공
+        User foundUser = userRepository.findByName("길원").orElse(null); // 조회
+        Assertions.assertThat(foundUser).isNotNull(); // 있으면 성공
     }
 
     @Test
@@ -50,9 +55,9 @@ public class UserServiceTest {
         // given
         userService.signUp("길원", "1");
         // when
-        User loginnedUser = userService.login("길원", "1");
+        User loggedInUser = userService.login("길원", "1");
         // then
-        Assertions.assertThat(loginnedUser).isNotNull(); // 있으면 성공
+        Assertions.assertThat(loggedInUser).isNotNull(); // 있으면 성공
     }
 
     @Test
