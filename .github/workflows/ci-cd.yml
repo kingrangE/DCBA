@@ -1,0 +1,90 @@
+name: DCBA CI/CD 
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  merge:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  backend-ci:2
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./DCBA
+    
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: 1234
+          MARIADB_DATABASE: test_maria
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: JDK 21 셋팅
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'gradle'
+        
+    - name: gradle 실행 권한 부여 
+      run: chmod +x gradlew
+      
+    - name: Build with Gradle
+      env:
+        MARIADB_HOST: localhost
+        MARIADB_PORT: 3306
+        MARIADB_DATABASE: test_maria
+        MARIADB_USER: root
+        MARIADB_PASSWORD: 1234
+      run: ./gradlew build
+
+  llm-server-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./LLM-Server
+        
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Python 3.13 셋팅
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+  docker-build:
+    needs: [backend-ci, llm-server-ci]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'merge'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Docker Buildx 셋팅
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Compress and Validate Docker Compose Build
+      run: |
+        docker compose -f docker-compose.yml build
