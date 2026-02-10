@@ -33,12 +33,23 @@ class ExerciseService:
     def parse_content(self, content: str) -> dict:
         question = ""
         answer = ""
-        for line in content.split("\n"):
+        lines = content.split("\n")
+
+        # Q \n A 형식으로 들어오지 않았다면 return 빈 값
+        if len(lines) != 2 : 
+            return {"question": question, "answer": answer}
+        
+        # 제대로 들어왔으면 Q,A 파싱 (둘 중 하나라도 없으면 빈값 리턴(Error 처리 할 수 있게 ))
+        for line in lines :
             processed_line = line.strip()
             if processed_line.startswith("Q:"):
                 question = processed_line.replace("Q:", "").strip()
             elif processed_line.startswith("A:"):
                 answer = processed_line.replace("A:", "").strip()
+        if not question or not answer : 
+            # 둘 중 하나라도 빈 값이면 빈 값 리턴
+            return {"question": "", "answer": ""}
+        # 둘 다 있으면 정상 리턴
         return {"question": question, "answer": answer}
 
     # 문제 생성
