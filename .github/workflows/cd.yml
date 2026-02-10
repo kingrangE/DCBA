@@ -26,6 +26,10 @@ jobs:
           username: ${{secrets.DOCKERHUB_USERNAME}}
           password: ${{secrets.DOCKERHUB_TOKEN}}
 
+
+      - name: Create .env
+        run: echo ${secrets.ENV} | echo >> .env
+
       # Compose 잘 되는지 확인 (CI는 통과해도 Compose에서 막힐 수도 있으니까)ㄴ
       - name: Build and Verify
         run: |
