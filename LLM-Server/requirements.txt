@@ -7,3 +7,9 @@ konlpy
 redis
 apscheduler
 pymysql
+
+# Testing
+pytest
+pytest-asyncio
+httpx
+pytest-mock
