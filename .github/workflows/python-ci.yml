@@ -24,6 +24,7 @@ jobs:
       - run: |
           docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" rhysd/actionlint:latest
   python_ci:
+    needs: lint
     runs-on: ubuntu-latest
     defaults:
       run:
