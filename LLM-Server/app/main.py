@@ -1,14 +1,16 @@
 from fastapi import FastAPI
 from app.routers import exercise
 from app.services.automation_service import automation_service
+from contextlib import asynccontextmanager
 import asyncio
 
 app = FastAPI()
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     automation_service.start_producer()
     asyncio.create_task(automation_service.start_consumer())
+    yield
 
 @app.get("/health")
 def health_check():
