@@ -56,8 +56,8 @@ jobs:
       - name: Build and push Image
         uses: docker/build-push-action@v5
         with:
-          context: ./DCBA # Java 경로
-          file: ./DCBA/Dockerfile # Dockerfile 경로
+          context: ./LLM-Server # Python Server 경로
+          file: ./LLM-Server/Dockerfile # Dockerfile 경로
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/DCBA-llm-server:latest
