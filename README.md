@@ -1,6 +1,9 @@
 # DCBA
 Daily CS, Base to Advanced
 
+# Domain
+[DCBA Service](DCBA.kingrange.site) <- You can access DCBA procject via this link.
+
 # Tech Stack
 1. **`Java Spring Boot`**
 2. **`FastAPI`**
@@ -14,7 +17,7 @@ Daily CS, Base to Advanced
 # Service Flow
 1. LLM-Server   
     - 30초마다 문제 생성 후, MariaDB Server에 저장
-        - `Exaone 4.0`을 사용하여 문제 생성 (이후, 자체 OpenSource LLM Server를 구성하여 연결할 예정 (Exaone API 중단을 대비))
+        - `Exaone 4.0`을 사용하여 문제 생성 (이후, 자체 OpenSource LLM Server를 구성하여 연결할 예정 (Exaone API 서비스 중단 대비))
         - 생성된 문제를 koNLPy를 이용하여 형태소 분석
             - 문제에서 명사를 추출하여 Redis에 저장
             - Jaccard 유사도 검사를 통해 Redis에 공통된 문제가 존재하는지 검사함.
