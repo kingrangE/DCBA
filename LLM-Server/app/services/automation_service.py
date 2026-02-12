@@ -144,7 +144,8 @@ class AutomationService:
     # 종료 
     def stop(self):
         self.is_running = False
-        self.scheduler.shutdown()
+        if self.scheduler.running: 
+            self.scheduler.shutdown()
 
 # 싱글톤을 위한 객체 생성
 automation_service = AutomationService()
