@@ -4,13 +4,16 @@ from app.services.automation_service import automation_service
 from contextlib import asynccontextmanager
 import asyncio
 
-app = FastAPI()
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 시작 시 실행
     automation_service.start_producer()
     asyncio.create_task(automation_service.start_consumer())
     yield
+    # 종료 시 실행
+    automation_service.stop()
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 def health_check():
