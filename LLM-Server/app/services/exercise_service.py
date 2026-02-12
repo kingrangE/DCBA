@@ -33,7 +33,7 @@ class ExerciseService:
     def parse_content(self, content: str) -> dict:
         question = ""
         answer = ""
-        lines = content.split("\n")
+        lines = content.strip().split("\n")
 
         # Q \n A 형식으로 들어오지 않았다면 return 빈 값
         if len(lines) != 2 : 
@@ -43,9 +43,9 @@ class ExerciseService:
         for line in lines :
             processed_line = line.strip()
             if processed_line.startswith("Q:"):
-                question = processed_line.replace("Q:", "").strip()
+                question = processed_line.replace("Q:", "").strip().strip("\"")
             elif processed_line.startswith("A:"):
-                answer = processed_line.replace("A:", "").strip()
+                answer = processed_line.replace("A:", "").strip().strip("\"")
         if not question or not answer : 
             # 둘 중 하나라도 빈 값이면 빈 값 리턴
             return {"question": "", "answer": ""}
@@ -92,7 +92,7 @@ class ExerciseService:
                 question = parsed_data["question"]
                 
                 if not question: # 질문이 없으면 실패로 간주하고 재시도
-                     print(f"[Retry] Failed to parse question (Attempt {attempt+1}/{max_retries})")
+                     print(f"[Retry] Failed to parse question (Attempt {attempt+1}/{max_retries})\ncontent: {content}")
                      continue
                     
                 # 중복 검사 (중복되면 다시)
