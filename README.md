@@ -2,7 +2,7 @@
 Daily CS, Base to Advanced
 
 # Domain
-[DCBA Service](DCBA.kingrange.site) <- You can access DCBA procject via this link.
+[DCBA Service](https://DCBA.kingrange.site) <- You can access DCBA procject via this link.
 
 # Tech Stack
 1. **`Java Spring Boot`**
