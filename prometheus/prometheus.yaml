@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # Java App 
+  - job_name: 'java-app'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['dcba-app:8080']
+
+  # LLM Server
+  - job_name: 'llm-server'
+    metrics_path: '/metrics' 
+    static_configs:
+      - targets: ['llm-server:8000']
+
+  # Server
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']

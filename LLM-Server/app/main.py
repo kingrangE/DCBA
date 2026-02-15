@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.routers import exercise
 from app.services.automation_service import automation_service
 from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 import asyncio
 
 @asynccontextmanager
@@ -14,6 +15,7 @@ async def lifespan(app: FastAPI):
     automation_service.stop()
 
 app = FastAPI(lifespan=lifespan)
+Instrumentator().instrument(app).expose(app)
 
 @app.get("/health")
 def health_check():
