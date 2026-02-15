@@ -13,3 +13,6 @@ pytest
 pytest-asyncio
 httpx
 pytest-mock
+
+# Monitoring
+prometheus_fastapi_instrumentator
