@@ -77,7 +77,7 @@ jobs:
       - name: Extract Version
         id: extract_version
         run: |
-          VERSION=$(grep "version =" build.gradle | awk -F"'" '{print $2}')
+          VERSION=$(grep "version =" DCBA/build.gradle | awk -F"'" '{print $2}')
           {
             echo "VERSION=$VERSION"
             echo "MAJOR=$(echo "$VERSION" | cut -d. -f1)"
