@@ -96,7 +96,7 @@ class ExerciseService:
                      continue
                     
                 # 중복 검사 (중복되면 다시)
-                if deduplication_service.is_duplicate(subject, level, question):
+                if deduplication_service.is_duplicate(subject, level, content):
                     print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
                     continue
                 
