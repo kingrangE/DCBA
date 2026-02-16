@@ -66,7 +66,7 @@ jobs:
       - name: Get Version 
         id: get_version
         run: |
-          VERSION=$(cat VERSION)
+          VERSION=$(cat LLM-Server/VERSION)
           {
             echo "VERSION=$VERSION"
             echo "MAJOR=$(echo "$VERSION" | cut -d. -f1)"
