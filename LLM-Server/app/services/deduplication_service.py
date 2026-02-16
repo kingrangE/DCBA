@@ -1,79 +1,102 @@
 import os
-import redis
-import json
-from konlpy.tag import Okt
 from typing import List, Set
+from konlpy.tag import Okt
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_core.documents import Document
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class DeduplicationService:
     def __init__(self):
-        # Token 저장을 위한 Redis 연결 정보
-        self.redis_host = os.getenv("REDIS_HOST", "localhost")
-        self.redis_port = int(os.getenv("REDIS_PORT", 6379))
-        self.redis_client = redis.Redis(
-            host=self.redis_host, 
-            port=self.redis_port, 
-            db=0, 
-            decode_responses=True
+        self.okt = Okt()
+        self.similarity_threshold = 0.7
+        # Cosine Similarity를 위한 Embedding 모델
+        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small",
+                                           api_key=os.getenv("OPENAI_API_KEY"))
+
+        # Chroma DB 초기화
+        self.persist_directory = "./chroma_db"
+        self.vector_store = Chroma(
+            collection_name="exercise_deduplication",
+            embedding_function=self.embeddings,
+            persist_directory=self.persist_directory,
         )
 
-        # 형태소 분석을 위한 Okt 라이브러리 사용
-        self.okt = Okt()
-
-        # 유사도 기준
-        self.similarity_threshold = 0.7
-
-    def _get_tokens(self, text: str) -> Set[str]:
+    def _process_text(self, text: str) -> str:
+        """
+        명사 추출 후, 각 명사를 공백으로 연결한 문자열 반환
+        """
         try:
             nouns = self.okt.nouns(text)
-            return set(nouns)
+            unique_nouns = set(nouns)
+            return " ".join(unique_nouns)
         except Exception as e:
             print(f"[Warning] Tokenization failed: {e}")
-            return set()
-
-    def _calculate_jaccard_similarity(self, set1: Set[str], set2: Set[str]) -> float:
-        # 유사도 검사(자카드) (교집합/합집합)
-        intersection = len(set1.intersection(set2))
-        union = len(set1.union(set2))
-        if union == 0:
-            return 0.0
-        return intersection / union
+            return ""
 
     def is_duplicate(self, subject: str, level: str, text: str) -> bool:
-        new_tokens = self._get_tokens(text)
-        if not new_tokens: # 토큰이 없으면 중복 X
+        """
+        text 중복 결과 반환 (True: 중복 / False: 중복 아님)
+        """
+        
+        # 명사 추출
+        processed_content = self._process_text(text)
+        if not processed_content: # 결과가 없으면 중복일 수 없음 (예외처리)
             return False
 
-        key = f"exercise:{subject}:{level}" # 저장할 키 (과목 : 레벨)
-        
-        stored_items = self.redis_client.lrange(key, 0, -1) # 저장된 값 Load
-        
-        # 저장된 item 하나씩 비교
-        for item_json in stored_items: 
-            try:
-                item = json.loads(item_json)
-                stored_tokens = set(item.get("tokens", []))
-                
-                similarity = self._calculate_jaccard_similarity(new_tokens, stored_tokens)
-                if similarity >= self.similarity_threshold: 
-                    print(f"[Duplicate Detected] Similarity: {similarity:.2f} | Text: {text[:30]}...")
-                    return True #중복되면 True
-            except Exception:
-                continue
-                
-        return False
+        try:
+            # Metadata를 사용하여 비용 효율 높임
+            results = self.vector_store.similarity_search_with_relevance_scores(
+                query=processed_content,
+                k=1,
+                filter={
+                    "$and": [
+                        {"subject": {"$eq": subject}},
+                        {"level": {"$eq": level}}
+                    ]
+                }
+            )
 
-    # 토큰 저장
+            if not results: # 없으면 중복이 아님 (예외 처리)
+                return False
+
+            # 가장 높은 값 확인
+            best_doc, score = results[0]
+            
+            # threshold 넘으면 중복 (로그 출력 후 중복 처리)
+            if score >= self.similarity_threshold:
+                print(f"[Duplicate Detected] Score: {score:.4f} \n Existing Content[:30]: {best_doc.page_content[:30]}... \n New Content[:30]: {processed_content[:30]}...")
+                return True
+            
+            return False
+
+        except Exception as e:
+            print(f"[Error] Deduplication check failed: {e}")
+            return False
+
     def save(self, subject: str, level: str, text: str):
-        tokens = list(self._get_tokens(text))
-        if not tokens:
+        """
+        Chroma DB에 Document 추가
+        """
+        processed_content = self._process_text(text)
+        if not processed_content:
             return
 
-        key = f"exercise:{subject}:{level}"
-        data = {
-            "tokens": tokens
-        }
-        
-        self.redis_client.rpush(key, json.dumps(data, ensure_ascii=False))
+        try:
+            document = Document(
+                page_content=processed_content,
+                metadata={
+                    "subject": subject,
+                    "level": level
+                }
+            )
+            self.vector_store.add_documents([document])
+            print(f"[Saved] Subject: {subject}, Level: {level}, Content[:30]: {processed_content[:30]}..")
 
-# 싱글톤을 위한 객체 생성
+        except Exception as e:
+            print(f"[Error] Failed to save document: {e}")
+
+# 싱글톤 객체 생성
 deduplication_service = DeduplicationService()

@@ -49,6 +49,7 @@ jobs:
         env: #환경 변수 에러 방지용 빈 값 (사용하지 않을 것이기에 값이 필요 없음)
           EXAONE_API_KEY: "key"
           EXAONE_API_URL: "url"
+          OPENAI_API_KEY: "key"
           MODEL_NAME: "model_name"
         run: pytest tests
 

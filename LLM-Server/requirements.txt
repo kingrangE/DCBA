@@ -8,6 +8,12 @@ redis
 apscheduler
 pymysql
 
+# AI & Vector DB
+langchain
+langchain-chroma
+langchain-openai
+chromadb
+
 # Testing
 pytest
 pytest-asyncio
