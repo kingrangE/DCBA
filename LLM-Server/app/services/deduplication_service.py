@@ -13,7 +13,8 @@ class DeduplicationService:
         self.okt = Okt()
         self.similarity_threshold = 0.7
         # Cosine Similarity를 위한 Embedding 모델
-        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small",
+                                           api_key=os.getenv("OPENAI_API_KEY"))
 
         # Chroma DB 초기화
         self.persist_directory = "./chroma_db"
