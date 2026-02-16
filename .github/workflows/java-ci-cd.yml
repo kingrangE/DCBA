@@ -1,0 +1,84 @@
+name: Java CI/CD
+
+on:
+  push:
+    branches: ["main", "JavaApp"]
+    paths:
+      - "DCBA/**"
+      - "!README.md"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "DCBA/**"
+      - "!README.md"
+concurrency:
+  group: ${{github.workflow}}-${{github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" rhysd/actionlint:latest
+
+  java-ci:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ./DCBA
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: 1234
+          MARIADB_DATABASE: test_maria
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    steps:
+      - uses: actions/checkout@v4
+      - name: JDK(21) Setting
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+      - name: Grant Execution Authority to Gradle
+        run: chmod +x gradlew
+      - name: Build with Gradle
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mariadb://localhost:3306/test_maria
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: 1234
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create
+        run: ./gradlew test
+
+  java-cd:
+    needs: java-ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # main에 push일 때만 CD 수행
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{secrets.DOCKERHUB_USERNAME}}
+          password: ${{secrets.DOCKERHUB_TOKEN}}
+      - name: Build and push Java App Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./DCBA
+          file: ./DCBA/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:latest
