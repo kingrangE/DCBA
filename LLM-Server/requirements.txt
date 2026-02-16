@@ -3,7 +3,6 @@ uvicorn
 openai
 python-dotenv
 pydantic
-konlpy
 redis
 apscheduler
 pymysql

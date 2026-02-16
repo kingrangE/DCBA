@@ -1,4 +1,5 @@
 import os
+import time
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -98,6 +99,7 @@ class ExerciseService:
                 # 중복 검사 (중복되면 다시)
                 if deduplication_service.is_duplicate(subject, level, content):
                     print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
+                    time.sleep(1) # Rate Limit 방지
                     continue
                 
                 # 중복 검사 통과하면 저장
@@ -107,6 +109,7 @@ class ExerciseService:
             # 에러 처리
             except Exception as e:
                 print(f"[Error] Generation failed: {e}")
+                time.sleep(1) # Rate Limit 방지
         
         raise Exception("Failed to generate unique content after multiple retries.")
 
