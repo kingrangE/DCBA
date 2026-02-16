@@ -17,6 +17,7 @@ services:
       - MARIADB_USER=${MARIADB_USER}
       - MARIADB_PASSWORD=${MARIADB_PASSWORD}
       - MARIADB_DATABASE=${MARIADB_DATABASE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - redis
       - mariadb
