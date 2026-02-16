@@ -63,6 +63,15 @@ jobs:
         with:
           username: ${{secrets.DOCKERHUB_USERNAME}}
           password: ${{secrets.DOCKERHUB_TOKEN}}
+      - name: Get Version 
+        id: get_version
+        run: |
+          VERSION=$(cat VERSION)
+          {
+            echo "VERSION=$VERSION"
+            echo "MAJOR=$(echo "$VERSION" | cut -d. -f1)"
+            echo "MINOR=$(echo "$VERSION" | cut -d. -f1,2)"
+          } >> "$GITHUB_ENV"
       - name: Build and push Python App Image
         uses: docker/build-push-action@v5
         with:
@@ -71,3 +80,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:${{ env.MINOR }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:${{ env.MAJOR }}

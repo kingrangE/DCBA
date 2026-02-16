@@ -74,6 +74,15 @@ jobs:
         with:
           username: ${{secrets.DOCKERHUB_USERNAME}}
           password: ${{secrets.DOCKERHUB_TOKEN}}
+      - name: Extract Version
+        id: extract_version
+        run: |
+          VERSION=$(grep "version =" build.gradle | awk -F"'" '{print $2}')
+          {
+            echo "VERSION=$VERSION"
+            echo "MAJOR=$(echo "$VERSION" | cut -d. -f1)"
+            echo "MINOR=$(echo "$VERSION" | cut -d. -f1,2)"
+          } >> "$GITHUB_ENV"
       - name: Build and push Java App Image
         uses: docker/build-push-action@v5
         with:
@@ -82,3 +91,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:${{ env.MINOR }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:${{ env.MAJOR }}
