@@ -24,11 +24,12 @@ public class ExerciseController {
 
     /**
      * 대시보드 메인 화면 요청 시 로직
-     * @param subject 과목 이름 (Enum)
-     * @param level 레벨 (Enum)
+     * 
+     * @param subject  과목 이름 (Enum)
+     * @param level    레벨 (Enum)
      * @param pageable 페이지 정보
-     * @param model 모델 객체 (HTML 파일 전달용)
-     * @param session Session 정보 (Login 검사용)
+     * @param model    모델 객체 (HTML 파일 전달용)
+     * @param session  Session 정보 (Login 검사용)
      * @return dashboard.html
      */
     @GetMapping("/dashboard")
@@ -44,12 +45,27 @@ public class ExerciseController {
 
         User user = (User) session.getAttribute("loginUser"); // 로그인한 유저 정보 가져옴
 
-        //현재 Pageable 정보를 기반으로 문제 페이지를 가져옴
+        // 현재 Pageable 정보를 기반으로 문제 페이지를 가져옴
         Page<Exercise> exercisePage = exerciseService.getExercises(user.getId(), subject, level, pageable); //
 
-        // 현재 페이지 정보 추가 ( 페이지 정보를 전체로 바꿔서, ... 을 나타낼 수 있게 하면 더 좋을듯)
-        model.addAttribute("exercises", exercisePage.getContent()); // List<Exercise> 객체 저장
+        // 현재 페이지 정보 추가
+        int nowPage = exercisePage.getPageable().getPageNumber() + 1;
+        int startPage = Math.max(nowPage - 4, 1); // 내 전의 4개 페이지
+        int endPage = Math.min(nowPage + 4, exercisePage.getTotalPages()); // 나 후의 4개 페이지
+
+        if (endPage - startPage < 8 && exercisePage.getTotalPages() >= 9) {
+            if (nowPage < 5) {
+                endPage = 9;
+            } else {
+                startPage = exercisePage.getTotalPages() - 8;
+            }
+        }
+
+        model.addAttribute("exercises", exercisePage.getContent());
         model.addAttribute("page", exercisePage);
+        model.addAttribute("nowPage", nowPage);
+        model.addAttribute("startPage", startPage);
+        model.addAttribute("endPage", endPage);
         model.addAttribute("currentSubject", subject);
         model.addAttribute("currentLevel", level);
 
@@ -67,8 +83,9 @@ public class ExerciseController {
 
     /**
      * 문제 저장 요청시 로직
+     * 
      * @param exerciseId 문제 Id
-     * @param session Session 정보 (유저 정보 얻는 용도)
+     * @param session    Session 정보 (유저 정보 얻는 용도)
      * @return dashboard.html(redirect)
      */
     @PostMapping("/exercise/save")
@@ -92,30 +109,32 @@ public class ExerciseController {
 
     /**
      * 문제 저장 취소 로직
+     * 
      * @param exerciseId 문제 Id
-     * @param session Session 정보 (유저 정보 얻는 용도)
+     * @param session    Session 정보 (유저 정보 얻는 용도)
      * @return dashboard.html(redirect)
      */
     @PostMapping("/exercise/save/cancel")
     public String cancelSaveExercise(@RequestParam Long exerciseId, HttpSession session) {
-        //취소를 위해 문제 ID와 Session을 받음
+        // 취소를 위해 문제 ID와 Session을 받음
         User user = (User) session.getAttribute("loginUser");
 
-        //User가 없다면
+        // User가 없다면
         if (user == null) {
-            //로그인하쇼
+            // 로그인하쇼
             return "redirect:/";
         }
-        //있으면 취소 로직 들어가쇼
+        // 있으면 취소 로직 들어가쇼
         exerciseService.cancelSaveExercise(user.getId(), exerciseId);
-        //끝났으면 dashboard로
+        // 끝났으면 dashboard로
         return "redirect:/dashboard";
     }
 
     /**
      * 문제 금지 요청 로직
+     * 
      * @param exerciseId 문제 Id
-     * @param session Session 정보 (유저 정보 얻는 용도)
+     * @param session    Session 정보 (유저 정보 얻는 용도)
      * @return dashboard.html(redirect)
      */
     @PostMapping("/exercise/ban")
@@ -123,7 +142,7 @@ public class ExerciseController {
         // 차단할 운동 ID 및 Session 정보
         // 유저 정보 Get
         User user = (User) session.getAttribute("loginUser");
-        if (user == null) { //없으면 로그인하쇼
+        if (user == null) { // 없으면 로그인하쇼
             return "redirect:/";
         }
         // 있으면 차단 로직
@@ -135,8 +154,9 @@ public class ExerciseController {
 
     /**
      * 문제 금지 취소 로직
+     * 
      * @param exerciseId 문제 Id
-     * @param session Session 정보 (유저 정보 얻는 용도)
+     * @param session    Session 정보 (유저 정보 얻는 용도)
      * @return dashboard.html(redirect)
      */
     @PostMapping("/exercise/ban/cancel")
@@ -151,18 +171,19 @@ public class ExerciseController {
 
     /**
      * 선택한 문제들 확인 화면 요청시 로직
+     * 
      * @param pageable 페이지 정보
-     * @param model 모델 객체(HTML 전달용)
-     * @param session Session 정보 (로그인 확인)
+     * @param model    모델 객체(HTML 전달용)
+     * @param session  Session 정보 (로그인 확인)
      * @return dashboard.html
      */
     @GetMapping("/dashboard/selected")
     public String dashboardSelected(@PageableDefault(size = 9) Pageable pageable, // 페이지 정보
-                                    Model model, // HTML에 전달할 모델 정보
-                                    HttpSession session) { //Session 관리를 위한 Session정보
+            Model model, // HTML에 전달할 모델 정보
+            HttpSession session) { // Session 관리를 위한 Session정보
         // Session에서 유저 정보 가져옴
         User user = (User) session.getAttribute("loginUser");
-        if (user == null) { //로그인 안 했으면 해
+        if (user == null) { // 로그인 안 했으면 해
             return "redirect:/";
         }
 
@@ -170,8 +191,23 @@ public class ExerciseController {
         Page<Exercise> exercisePage = exerciseService.getSelectedExercises(user.getId(), pageable);
 
         // 문제를 보여주기 위해 Model에 정보 추가
+        int nowPage = exercisePage.getPageable().getPageNumber() + 1;
+        int startPage = Math.max(nowPage - 4, 1);
+        int endPage = Math.min(nowPage + 4, exercisePage.getTotalPages());
+
+        if (endPage - startPage < 8 && exercisePage.getTotalPages() >= 9) {
+            if (nowPage < 5) {
+                endPage = 9;
+            } else {
+                startPage = exercisePage.getTotalPages() - 8;
+            }
+        }
+
         model.addAttribute("exercises", exercisePage.getContent());
         model.addAttribute("page", exercisePage);
+        model.addAttribute("nowPage", nowPage);
+        model.addAttribute("startPage", startPage);
+        model.addAttribute("endPage", endPage);
 
         // 다 같은 HTML 파일을 사용하기에 viewType 파라미터 설정해서 다르게 보이도록 함
         model.addAttribute("viewType", "selected");
@@ -187,9 +223,10 @@ public class ExerciseController {
 
     /**
      * 금지한 문제들 화면 요청시 로직
+     * 
      * @param pageable 페이지 정보
-     * @param model 모델 객체(HTML 전달용)
-     * @param session Session 정보 (로그인 확인)
+     * @param model    모델 객체(HTML 전달용)
+     * @param session  Session 정보 (로그인 확인)
      * @return dashboard.html
      */
     @GetMapping("/dashboard/banned")
@@ -201,8 +238,23 @@ public class ExerciseController {
 
         Page<Exercise> exercisePage = exerciseService.getBannedExercises(user.getId(), pageable);
 
+        int nowPage = exercisePage.getPageable().getPageNumber() + 1; // 0-based -> 1-based
+        int startPage = Math.max(nowPage - 4, 1);
+        int endPage = Math.min(nowPage + 4, exercisePage.getTotalPages());
+
+        if (endPage - startPage < 8 && exercisePage.getTotalPages() >= 9) {
+            if (nowPage < 5) {
+                endPage = 9;
+            } else {
+                startPage = exercisePage.getTotalPages() - 8;
+            }
+        }
+
         model.addAttribute("exercises", exercisePage.getContent());
         model.addAttribute("page", exercisePage);
+        model.addAttribute("nowPage", nowPage);
+        model.addAttribute("startPage", startPage);
+        model.addAttribute("endPage", endPage);
         model.addAttribute("viewType", "banned");
 
         model.addAttribute("subjects", Subject.values());
