@@ -78,6 +78,11 @@ public class UserController {
         return "redirect:/";
     }
 
+    @GetMapping("/logout")
+    public String logout(Model model) {
+        return "redirect:/";
+    }
+
     /**
      * 마이페이지 화면 요청 시 처리 로직
      *
