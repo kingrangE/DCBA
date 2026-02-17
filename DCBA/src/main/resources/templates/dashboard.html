@@ -422,37 +422,38 @@
         <div style="display: flex; align-items: center; gap: 2rem;">
             <h1><a href="/dashboard" style="text-decoration: none; color: inherit;">DCBA</a></h1>
             <div class="nav-links">
-                <a href="/dashboard" th:classappend="${viewType == 'all'} ? 'active'">All Exercises</a>
-                <a href="/dashboard/selected" th:classappend="${viewType == 'selected'} ? 'active'">Saved</a>
-                <a href="/dashboard/banned" th:classappend="${viewType == 'banned'} ? 'active'">Trash</a>
+                <a href="/dashboard" th:classappend="${viewType == 'all'} ? 'active'">전체 문제 목록</a>
+                <a href="/dashboard/selected" th:classappend="${viewType == 'selected'} ? 'active'">저장한 문제 목록</a>
+                <a href="/dashboard/banned" th:classappend="${viewType == 'banned'} ? 'active'">차단한 문제 목록</a>
             </div>
         </div>
         <div class="user-info">
-            <a href="/logout" class="logout-btn">Logout</a>
+            <a href="/mypage" class="logout-btn">내 정보</a>
+            <a href="/logout" class="logout-btn">로그아웃</a>
         </div>
     </nav>
 
     <div class="container">
         <div class="header-section">
-            <h2>Your Exercises</h2>
-            <p>Click on a card to reveal the answer.</p>
+            <h2>Daily CS, Base to Advanced</h2>
+            <p>1000개 이상의 CS 문제를 통해 기술 면접을 대비하세요!</p>
         </div>
 
         <!-- Filter Form -->
         <form action="/dashboard" method="get" class="filter-form">
             <select name="subject">
-                <option value="">All Subjects</option>
+                <option value="">전체</option>
                 <option th:each="sub : ${subjects}" th:value="${sub}" th:text="${sub.subjectName}"
                     th:selected="${sub == currentSubject}"></option>
             </select>
 
             <select name="level">
-                <option value="">All Levels</option>
+                <option value="">전체</option>
                 <option th:each="lvl : ${levels}" th:value="${lvl}" th:text="|Level ${lvl.level}|"
                     th:selected="${lvl == currentLevel}"></option>
             </select>
 
-            <button type="submit">Search</button>
+            <button type="submit">조회</button>
         </form>
 
         <!-- Exercise Grid -->
@@ -538,14 +539,14 @@
 
         <!-- Empty State -->
         <div class="empty-state" th:if="${#lists.isEmpty(exercises)}">
-            <h3>No exercises found</h3>
-            <p>You haven't been assigned any exercises matching your criteria.</p>
+            <h3>Empty!</h3>
+            <p>저장/차단한 문제가 없습니다.</p>
         </div>
 
         <!-- Pagination -->
         <div class="pagination" th:if="${page.totalPages > 0}">
             <a th:href="@{/dashboard(page=${page.number - 1}, subject=${currentSubject}, level=${currentLevel})}"
-                th:classappend="${page.first} ? 'disabled'" class="page-link">&laquo; Prev</a>
+                th:classappend="${page.first} ? 'disabled'" class="page-link">&laquo; 이전</a>
 
             <th:block th:each="i : ${#numbers.sequence(startPage - 1, endPage - 1)}">
                 <a th:href="@{/dashboard(page=${i}, subject=${currentSubject}, level=${currentLevel})}"
@@ -553,7 +554,7 @@
             </th:block>
 
             <a th:href="@{/dashboard(page=${page.number + 1}, subject=${currentSubject}, level=${currentLevel})}"
-                th:classappend="${page.last} ? 'disabled'" class="page-link">Next &raquo;</a>
+                th:classappend="${page.last} ? 'disabled'" class="page-link">다음 &raquo;</a>
         </div>
     </div>
 

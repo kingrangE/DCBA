@@ -151,8 +151,8 @@
 
 <body>
     <div class="signup-container">
-        <h2>Create Account</h2>
-        <p class="subtitle">Join DCBA to start your learning journey.</p>
+        <h2>회원가입</h2>
+        <p class="subtitle">DCBA에 가입하고, 1000개 이상의 단계별 CS 문제로 기술 면접 준비하세요!</p>
 
         <div th:if="${errorMessage}" class="error-msg">
             <p th:text="${errorMessage}" style="margin: 0;"></p>
@@ -160,17 +160,17 @@
 
         <form th:action="@{/signup}" th:object="${signUpForm}" method="post">
             <div class="form-group">
-                <label for="nickname">Nickname</label>
-                <input type="text" id="nickname" th:field="*{name}" placeholder="Choose a nickname" required>
+                <label for="nickname">닉네임</label>
+                <input type="text" id="nickname" th:field="*{name}" placeholder="사용하실 닉네임을 입력해주세요." required>
             </div>
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" th:field="*{password}" placeholder="Create a password" required>
+                <label for="password">비밀번호</label>
+                <input type="password" id="password" th:field="*{password}" placeholder="사용하실 비밀번호를 입력해주세요." required>
             </div>
 
             <hr>
-            <button type="submit" class="btn-primary">Sign Up</button>
-            <a href="/" class="cancel-link">Cancel</a>
+            <button type="submit" class="btn-primary">회원가입</button>
+            <a href="/" class="cancel-link">가입 취소</a>
         </form>
     </div>
 
