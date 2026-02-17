@@ -50,4 +50,23 @@ public class UserService {
         }
         return user;
     }
+
+    /**
+     * Slack ID 업데이트 로직
+     *
+     * @param userId user Id
+     * @param slackId 업데이트할 slackId
+     */
+    public void updateSlackId(Long userId, String slackId) {
+        if (slackId.isEmpty()){
+            return;
+        }
+        User user = userRepo.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.updateSlackId(slackId);
+        userRepo.save(user);
+    }
+
+    public User getUser(Long userId) {
+        return userRepo.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    }
 }

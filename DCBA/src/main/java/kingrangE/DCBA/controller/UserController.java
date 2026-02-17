@@ -22,6 +22,7 @@ public class UserController {
 
     /**
      * URL 접속 시 메인 페이지 (Login)
+     * 
      * @param model HTML 파일에 전달할 모델 객체
      * @return login.html
      */
@@ -34,8 +35,9 @@ public class UserController {
 
     /**
      * login 요청 시 로직
+     * 
      * @param loginForm LoginFrom DTO
-     * @param session Session (login 결과 저장)
+     * @param session   Session (login 결과 저장)
      * @return dashboard(redirect)
      */
     @PostMapping("/login")
@@ -52,6 +54,7 @@ public class UserController {
 
     /**
      * 회원가입 화면 요청 시 로직
+     * 
      * @param model HTML 파일에 전달할 모델 객체
      * @return signup.html
      */
@@ -64,6 +67,7 @@ public class UserController {
 
     /**
      * 회원가입 요청 시, 처리 로직
+     * 
      * @param signUpForm 회원가입 형식 DTO
      * @return login(redirect)
      */
@@ -74,17 +78,59 @@ public class UserController {
         return "redirect:/";
     }
 
+    /**
+     * 마이페이지 화면 요청 시 처리 로직
+     *
+     * @param model HTML에 전달할 모델 객체
+     * @param session HTTP session 정보
+     * @return mypage.html
+     */
+    @GetMapping("/mypage")
+    public String myPage(Model model, HttpSession session) {
+        User user = (User) session.getAttribute("loginUser");
+        if (user == null) {
+            return "redirect:/";
+        }
+
+        // 최신 유저 정보 조회 (세션 정보가 갱신되지 않았을 수 있으므로)
+        User currentUser = userService.getUser(user.getId());
+        model.addAttribute("user", currentUser);
+        return "mypage";
+    }
+
+    /**
+     * slack Id 입력 후 저장 시 처리 로직
+     *
+     * @param slackId 유저가 입력한 Slack Id
+     * @param session HTTP session 정보
+     * @return mypage.html (redirect)
+     */
+    @PostMapping("/mypage/slack")
+    public String updateSlackId(@RequestParam String slackId, HttpSession session) {
+        User user = (User) session.getAttribute("loginUser");
+        if (user == null) {
+            return "redirect:/";
+        }
+
+        userService.updateSlackId(user.getId(), slackId);
+
+        // 세션 정보 갱신
+        session.setAttribute("loginUser", userService.getUser(user.getId()));
+
+        return "redirect:/mypage";
+    }
 
     /**
      * UserController에서 발생한 모든 종류의 Runtime Error 발생 시, 처리하기 위한 Handler
-     * @param e Error
-     * @param request Error가 발생한 HTTP 요청
+     * 
+     * @param e                  Error
+     * @param request            Error가 발생한 HTTP 요청
      * @param redirectAttributes 데이터 전달하기 위한 객체 (Error Message를 전달하기 위함)
      * @return
      */
     @ExceptionHandler({ RuntimeException.class })
     public String handlerException(RuntimeException e, HttpServletRequest request,
-            RedirectAttributes redirectAttributes) {
+                                   RedirectAttributes redirectAttributes) {
         // Error 메시지를 같이 보내주기 위함
         redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
 
@@ -95,4 +141,6 @@ public class UserController {
         }
         return "redirect:/?error";
     }
+
+
 }
