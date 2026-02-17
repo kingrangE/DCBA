@@ -547,10 +547,10 @@
             <a th:href="@{/dashboard(page=${page.number - 1}, subject=${currentSubject}, level=${currentLevel})}"
                 th:classappend="${page.first} ? 'disabled'" class="page-link">&laquo; Prev</a>
 
-            <span th:each="i : ${#numbers.sequence(0, page.totalPages - 1)}">
+            <th:block th:each="i : ${#numbers.sequence(startPage - 1, endPage - 1)}">
                 <a th:href="@{/dashboard(page=${i}, subject=${currentSubject}, level=${currentLevel})}"
                     th:text="${i + 1}" th:classappend="${i == page.number} ? 'active'" class="page-link">1</a>
-            </span>
+            </th:block>
 
             <a th:href="@{/dashboard(page=${page.number + 1}, subject=${currentSubject}, level=${currentLevel})}"
                 th:classappend="${page.last} ? 'disabled'" class="page-link">Next &raquo;</a>
