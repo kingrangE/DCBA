@@ -284,6 +284,107 @@
             background-color: var(--primary-hover);
         }
 
+        /* On-demand Exercise Generation */
+        .generation-panel {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+            margin-bottom: 1.25rem;
+            padding: 1.25rem 1.5rem;
+            border: 1px solid #C7D2FE;
+            border-radius: 1rem;
+            background: linear-gradient(135deg, #EEF2FF 0%, #FFFFFF 72%);
+        }
+
+        .generation-copy h3 {
+            margin: 0.25rem 0 0.35rem;
+            color: #312E81;
+            font-size: 1.1rem;
+        }
+
+        .generation-copy p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .generation-eyebrow {
+            color: var(--primary-color);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+
+        .generation-form {
+            display: flex;
+            align-items: end;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .generation-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .generation-field label {
+            color: #4338CA;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .generation-field select {
+            min-width: 145px;
+            padding: 0.55rem 0.75rem;
+            border: 1px solid #C7D2FE;
+            border-radius: 0.5rem;
+            background-color: white;
+            color: var(--text-color);
+        }
+
+        .generation-form button {
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .generation-form button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .generation-alert {
+            margin-bottom: 1rem;
+            padding: 0.8rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .generation-alert.success {
+            border: 1px solid #A7F3D0;
+            background-color: #ECFDF5;
+            color: #047857;
+        }
+
+        .generation-alert.error {
+            border: 1px solid #FECACA;
+            background-color: #FEF2F2;
+            color: #B91C1C;
+        }
+
+        @media (max-width: 820px) {
+            .generation-panel {
+                align-items: stretch;
+                flex-direction: column;
+            }
+        }
+
         /* Pagination */
         .pagination {
             display: flex;
@@ -438,6 +539,38 @@
             <h2>Daily CS, Base to Advanced</h2>
             <p>1000개 이상의 CS 문제를 통해 기술 면접을 대비하세요!</p>
         </div>
+
+        <div class="generation-alert success" role="status" th:if="${generationMessage}"
+            th:text="${generationMessage}"></div>
+        <div class="generation-alert error" role="alert" th:if="${generationError}"
+            th:text="${generationError}"></div>
+
+        <section class="generation-panel" th:if="${viewType == 'all'}">
+            <div class="generation-copy">
+                <span class="generation-eyebrow">ON-DEMAND GENERATION</span>
+                <h3>새 CS 문제를 요청하세요</h3>
+                <p>요청은 Redis 대기열에 등록되며 LLM 서버가 순서대로 생성합니다.</p>
+            </div>
+            <form action="/exercise/generate" method="post" class="generation-form">
+                <div class="generation-field">
+                    <label for="generation-subject">분야</label>
+                    <select id="generation-subject" name="subject" required>
+                        <option value="" disabled th:selected="${currentSubject == null}">분야 선택</option>
+                        <option th:each="sub : ${subjects}" th:value="${sub}" th:text="${sub.subjectName}"
+                            th:selected="${sub == currentSubject}"></option>
+                    </select>
+                </div>
+                <div class="generation-field">
+                    <label for="generation-level">난이도</label>
+                    <select id="generation-level" name="level" required>
+                        <option value="" disabled th:selected="${currentLevel == null}">난이도 선택</option>
+                        <option th:each="lvl : ${levels}" th:value="${lvl}" th:text="|Level ${lvl.level}|"
+                            th:selected="${lvl == currentLevel}"></option>
+                    </select>
+                </div>
+                <button type="submit">문제 생성 요청</button>
+            </form>
+        </section>
 
         <!-- Filter Form -->
         <form action="/dashboard" method="get" class="filter-form">

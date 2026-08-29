@@ -42,7 +42,10 @@ services:
       - MARIADB_USER=${MARIADB_USER}
       - MARIADB_PASSWORD=${MARIADB_PASSWORD}
       - MARIADB_DATABASE=${MARIADB_DATABASE}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
+      - redis
       - mariadb
     networks:
       - dcba-network

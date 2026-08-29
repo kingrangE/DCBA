@@ -3,6 +3,7 @@ package kingrangE.DCBA.controller;
 import kingrangE.DCBA.domain.Exercise;
 import kingrangE.DCBA.domain.Level;
 import kingrangE.DCBA.domain.Subject;
+import kingrangE.DCBA.service.ExerciseGenerationQueueService;
 import kingrangE.DCBA.service.ExerciseService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import kingrangE.DCBA.domain.User;
 import jakarta.servlet.http.HttpSession;
 
@@ -21,6 +23,7 @@ import jakarta.servlet.http.HttpSession;
 public class ExerciseController {
 
     private final ExerciseService exerciseService;
+    private final ExerciseGenerationQueueService exerciseGenerationQueueService;
 
     /**
      * 대시보드 메인 화면 요청 시 로직
@@ -68,6 +71,7 @@ public class ExerciseController {
         model.addAttribute("endPage", endPage);
         model.addAttribute("currentSubject", subject);
         model.addAttribute("currentLevel", level);
+        model.addAttribute("viewType", "all");
 
         // 현재 과목 및 레벨 정보 추가
         model.addAttribute("subjects", Subject.values());
@@ -79,6 +83,34 @@ public class ExerciseController {
 
         // dashboard.html view resolver 전달ㄴ
         return "dashboard";
+    }
+
+    /**
+     * 대시보드에서 선택한 과목과 난이도의 문제 생성 작업을 Redis 큐에 추가한다.
+     */
+    @PostMapping("/exercise/generate")
+    public String requestExerciseGeneration(@RequestParam Subject subject,
+            @RequestParam Level level,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+        User user = (User) session.getAttribute("loginUser");
+        if (user == null) {
+            return "redirect:/";
+        }
+
+        try {
+            Long queueSize = exerciseGenerationQueueService.enqueue(subject, level);
+            redirectAttributes.addFlashAttribute("generationMessage",
+                    String.format("%s · Level %d 문제 생성 요청이 등록되었습니다. (대기열: %d)",
+                            subject.getSubjectName(), level.getLevel(), queueSize == null ? 0 : queueSize));
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("generationError",
+                    "문제 생성 요청을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        }
+
+        redirectAttributes.addAttribute("subject", subject);
+        redirectAttributes.addAttribute("level", level);
+        return "redirect:/dashboard";
     }
 
     /**
