@@ -1,4 +1,18 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: kingrange/dcba-frontend:latest
+    container_name: dcba-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - dcba-app
+    networks:
+      - dcba-network
+    restart: always
+
   llm-server:
     # build: 
     #   context: ./LLM-Server

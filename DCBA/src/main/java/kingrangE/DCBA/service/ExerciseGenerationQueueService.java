@@ -18,7 +18,7 @@ public class ExerciseGenerationQueueService {
     static final String QUEUE_KEY = "exercise:generation_queue";
 
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Python LLM consumer가 처리할 문제 생성 작업을 Redis 큐에 추가한다.

@@ -34,7 +34,7 @@ class ExerciseGenerationQueueServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        queueService = new ExerciseGenerationQueueService(redisTemplate, objectMapper);
+        queueService = new ExerciseGenerationQueueService(redisTemplate);
     }
 
     @Test

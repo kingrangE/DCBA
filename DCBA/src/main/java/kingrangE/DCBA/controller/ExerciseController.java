@@ -1,300 +1,147 @@
 package kingrangE.DCBA.controller;
 
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import jakarta.servlet.http.HttpSession;
 import kingrangE.DCBA.domain.Exercise;
 import kingrangE.DCBA.domain.Level;
 import kingrangE.DCBA.domain.Subject;
+import kingrangE.DCBA.domain.User;
+import kingrangE.DCBA.dto.api.ExerciseResponse;
+import kingrangE.DCBA.dto.api.GenerationRequest;
+import kingrangE.DCBA.dto.api.GenerationResponse;
+import kingrangE.DCBA.dto.api.PageResponse;
+import kingrangE.DCBA.exception.UnauthorizedException;
 import kingrangE.DCBA.service.ExerciseGenerationQueueService;
 import kingrangE.DCBA.service.ExerciseService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.web.bind.annotation.RequestParam;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import kingrangE.DCBA.domain.User;
-import jakarta.servlet.http.HttpSession;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
-@Controller
-@RequiredArgsConstructor // 자동 Constructor 생성
+@RestController
+@RequestMapping("/api/exercises")
+@RequiredArgsConstructor
 public class ExerciseController {
 
     private final ExerciseService exerciseService;
     private final ExerciseGenerationQueueService exerciseGenerationQueueService;
 
-    /**
-     * 대시보드 메인 화면 요청 시 로직
-     * 
-     * @param subject  과목 이름 (Enum)
-     * @param level    레벨 (Enum)
-     * @param pageable 페이지 정보
-     * @param model    모델 객체 (HTML 파일 전달용)
-     * @param session  Session 정보 (Login 검사용)
-     * @return dashboard.html
-     */
-    @GetMapping("/dashboard")
-    public String dashboardMain(@RequestParam(required = false) Subject subject, // 필터링 조건 (Optional)
-            @RequestParam(required = false) Level level, // 필터링 조건 (Optional)
-            @PageableDefault(size = 9) Pageable pageable, // page번호와 size에 따라 Page 관리 (기본 9개)
-            Model model, // Controller 데이터를 HTML 파일에서 이용하기 위함
-            HttpSession session) { // 로그인해야 접근 가능하도록 Session정보 저장용
+    @GetMapping
+    public PageResponse<ExerciseResponse> exercises(
+            @RequestParam(defaultValue = "all") String view,
+            @RequestParam(required = false) Subject subject,
+            @RequestParam(required = false) Level level,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "9") int size,
+            HttpSession session) {
+        User user = requireUser(session);
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.max(1, Math.min(size, 50)));
+        Page<Exercise> exercisePage = switch (view) {
+            case "all" -> exerciseService.getExercises(user.getId(), subject, level, pageable);
+            case "selected" -> exerciseService.getSelectedExercises(user.getId(), pageable);
+            case "banned" -> exerciseService.getBannedExercises(user.getId(), pageable);
+            default -> throw new IllegalArgumentException("지원하지 않는 문제 보기 방식입니다.");
+        };
 
-        if (session.getAttribute("loginUser") == null) { // login한 정보가 없으면
-            return "redirect:/"; // 처음으로
-        }
-
-        User user = (User) session.getAttribute("loginUser"); // 로그인한 유저 정보 가져옴
-
-        // 현재 Pageable 정보를 기반으로 문제 페이지를 가져옴
-        Page<Exercise> exercisePage = exerciseService.getExercises(user.getId(), subject, level, pageable); //
-
-        // 현재 페이지 정보 추가
-        int nowPage = exercisePage.getPageable().getPageNumber() + 1;
-        int startPage = Math.max(nowPage - 4, 1); // 내 전의 4개 페이지
-        int endPage = Math.min(nowPage + 4, exercisePage.getTotalPages()); // 나 후의 4개 페이지
-
-        if (endPage - startPage < 8 && exercisePage.getTotalPages() >= 9) {
-            if (nowPage < 5) {
-                endPage = 9;
-            } else {
-                startPage = exercisePage.getTotalPages() - 8;
-            }
-        }
-
-        model.addAttribute("exercises", exercisePage.getContent());
-        model.addAttribute("page", exercisePage);
-        model.addAttribute("nowPage", nowPage);
-        model.addAttribute("startPage", startPage);
-        model.addAttribute("endPage", endPage);
-        model.addAttribute("currentSubject", subject);
-        model.addAttribute("currentLevel", level);
-        model.addAttribute("viewType", "all");
-
-        // 현재 과목 및 레벨 정보 추가
-        model.addAttribute("subjects", Subject.values());
-        model.addAttribute("levels", Level.values());
-
-        // 저장한 문제들과 banned한 문제들을 표시하기 위한 id들 추가
-        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId()));
-        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId()));
-
-        // dashboard.html view resolver 전달ㄴ
-        return "dashboard";
+        Set<Long> savedIds = Set.copyOf(exerciseService.getSavedExerciseIds(user.getId()));
+        Set<Long> bannedIds = Set.copyOf(exerciseService.getBannedExerciseIds(user.getId()));
+        return PageResponse.from(exercisePage.map(exercise -> ExerciseResponse.from(exercise, savedIds, bannedIds)));
     }
 
-    /**
-     * 대시보드에서 선택한 과목과 난이도의 문제 생성 작업을 Redis 큐에 추가한다.
-     */
-    @PostMapping("/exercise/generate")
-    public String requestExerciseGeneration(@RequestParam Subject subject,
-            @RequestParam Level level,
-            HttpSession session,
-            RedirectAttributes redirectAttributes) {
-        User user = (User) session.getAttribute("loginUser");
-        if (user == null) {
-            return "redirect:/";
+    @GetMapping("/options")
+    public Map<String, List<Map<String, Object>>> options(HttpSession session) {
+        requireUser(session);
+
+        List<Map<String, Object>> subjects = Arrays.stream(Subject.values())
+                .map(subject -> option(subject.name(), subject.getSubjectName()))
+                .toList();
+        List<Map<String, Object>> levels = Arrays.stream(Level.values())
+                .map(level -> levelOption(level.name(), level.getPromptName(), level.getLevel()))
+                .toList();
+        return Map.of("subjects", subjects, "levels", levels);
+    }
+
+    @PostMapping("/{exerciseId}/saved")
+    public ResponseEntity<Void> save(@PathVariable Long exerciseId, HttpSession session) {
+        exerciseService.saveExercise(requireUser(session).getId(), exerciseId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{exerciseId}/saved")
+    public ResponseEntity<Void> cancelSave(@PathVariable Long exerciseId, HttpSession session) {
+        exerciseService.cancelSaveExercise(requireUser(session).getId(), exerciseId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{exerciseId}/banned")
+    public ResponseEntity<Void> ban(@PathVariable Long exerciseId, HttpSession session) {
+        exerciseService.banExercise(requireUser(session).getId(), exerciseId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{exerciseId}/banned")
+    public ResponseEntity<Void> cancelBan(@PathVariable Long exerciseId, HttpSession session) {
+        exerciseService.cancelBanExercise(requireUser(session).getId(), exerciseId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/generation-requests")
+    public ResponseEntity<GenerationResponse> requestGeneration(
+            @RequestBody GenerationRequest request,
+            HttpSession session) {
+        requireUser(session);
+        if (request.subject() == null || request.level() == null) {
+            throw new IllegalArgumentException("분야와 난이도를 모두 선택해 주세요.");
         }
 
         try {
-            Long queueSize = exerciseGenerationQueueService.enqueue(subject, level);
-            redirectAttributes.addFlashAttribute("generationMessage",
-                    String.format("%s · Level %d 문제 생성 요청이 등록되었습니다. (대기열: %d)",
-                            subject.getSubjectName(), level.getLevel(), queueSize == null ? 0 : queueSize));
-        } catch (RuntimeException e) {
-            redirectAttributes.addFlashAttribute("generationError",
-                    "문제 생성 요청을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+            Long queueSize = exerciseGenerationQueueService.enqueue(request.subject(), request.level());
+            long safeQueueSize = queueSize == null ? 0 : queueSize;
+            String message = "%s · Level %d 문제 생성 요청이 등록되었습니다."
+                    .formatted(request.subject().getSubjectName(), request.level().getLevel());
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(new GenerationResponse(message, safeQueueSize));
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "문제 생성 요청을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+                    exception);
         }
-
-        redirectAttributes.addAttribute("subject", subject);
-        redirectAttributes.addAttribute("level", level);
-        return "redirect:/dashboard";
     }
 
-    /**
-     * 문제 저장 요청시 로직
-     * 
-     * @param exerciseId 문제 Id
-     * @param session    Session 정보 (유저 정보 얻는 용도)
-     * @return dashboard.html(redirect)
-     */
-    @PostMapping("/exercise/save")
-    public String saveExercise(@RequestParam Long exerciseId, HttpSession session) {
-        // 저장하려는 문제와 HttpSession(User 정보 얻는용도)를 받음
-
-        // User 정보 GET
-        User user = (User) session.getAttribute("loginUser");
-
-        // login 안했으면 처음으로
-        if (user == null) {
-            return "redirect:/";
-        }
-
-        // login 했으면, 저장
-        exerciseService.saveExercise(user.getId(), exerciseId);
-
-        // 로직 끝났으면 다시 dashboard로
-        return "redirect:/dashboard";
-    }
-
-    /**
-     * 문제 저장 취소 로직
-     * 
-     * @param exerciseId 문제 Id
-     * @param session    Session 정보 (유저 정보 얻는 용도)
-     * @return dashboard.html(redirect)
-     */
-    @PostMapping("/exercise/save/cancel")
-    public String cancelSaveExercise(@RequestParam Long exerciseId, HttpSession session) {
-        // 취소를 위해 문제 ID와 Session을 받음
-        User user = (User) session.getAttribute("loginUser");
-
-        // User가 없다면
-        if (user == null) {
-            // 로그인하쇼
-            return "redirect:/";
-        }
-        // 있으면 취소 로직 들어가쇼
-        exerciseService.cancelSaveExercise(user.getId(), exerciseId);
-        // 끝났으면 dashboard로
-        return "redirect:/dashboard";
-    }
-
-    /**
-     * 문제 금지 요청 로직
-     * 
-     * @param exerciseId 문제 Id
-     * @param session    Session 정보 (유저 정보 얻는 용도)
-     * @return dashboard.html(redirect)
-     */
-    @PostMapping("/exercise/ban")
-    public String banExercise(@RequestParam Long exerciseId, HttpSession session) {
-        // 차단할 운동 ID 및 Session 정보
-        // 유저 정보 Get
-        User user = (User) session.getAttribute("loginUser");
-        if (user == null) { // 없으면 로그인하쇼
-            return "redirect:/";
-        }
-        // 있으면 차단 로직
-        exerciseService.banExercise(user.getId(), exerciseId);
-
-        // 끝났으면 대시보드로
-        return "redirect:/dashboard";
-    }
-
-    /**
-     * 문제 금지 취소 로직
-     * 
-     * @param exerciseId 문제 Id
-     * @param session    Session 정보 (유저 정보 얻는 용도)
-     * @return dashboard.html(redirect)
-     */
-    @PostMapping("/exercise/ban/cancel")
-    public String cancelBanExercise(@RequestParam Long exerciseId, HttpSession session) {
+    private User requireUser(HttpSession session) {
         User user = (User) session.getAttribute("loginUser");
         if (user == null) {
-            return "redirect:/";
+            throw new UnauthorizedException("로그인이 필요합니다.");
         }
-        exerciseService.cancelBanExercise(user.getId(), exerciseId);
-        return "redirect:/dashboard";
+        return user;
     }
 
-    /**
-     * 선택한 문제들 확인 화면 요청시 로직
-     * 
-     * @param pageable 페이지 정보
-     * @param model    모델 객체(HTML 전달용)
-     * @param session  Session 정보 (로그인 확인)
-     * @return dashboard.html
-     */
-    @GetMapping("/dashboard/selected")
-    public String dashboardSelected(@PageableDefault(size = 9) Pageable pageable, // 페이지 정보
-            Model model, // HTML에 전달할 모델 정보
-            HttpSession session) { // Session 관리를 위한 Session정보
-        // Session에서 유저 정보 가져옴
-        User user = (User) session.getAttribute("loginUser");
-        if (user == null) { // 로그인 안 했으면 해
-            return "redirect:/";
-        }
-
-        // 선택한 문제 가져와
-        Page<Exercise> exercisePage = exerciseService.getSelectedExercises(user.getId(), pageable);
-
-        // 문제를 보여주기 위해 Model에 정보 추가
-        int nowPage = exercisePage.getPageable().getPageNumber() + 1;
-        int startPage = Math.max(nowPage - 4, 1);
-        int endPage = Math.min(nowPage + 4, exercisePage.getTotalPages());
-
-        if (endPage - startPage < 8 && exercisePage.getTotalPages() >= 9) {
-            if (nowPage < 5) {
-                endPage = 9;
-            } else {
-                startPage = exercisePage.getTotalPages() - 8;
-            }
-        }
-
-        model.addAttribute("exercises", exercisePage.getContent());
-        model.addAttribute("page", exercisePage);
-        model.addAttribute("nowPage", nowPage);
-        model.addAttribute("startPage", startPage);
-        model.addAttribute("endPage", endPage);
-
-        // 다 같은 HTML 파일을 사용하기에 viewType 파라미터 설정해서 다르게 보이도록 함
-        model.addAttribute("viewType", "selected");
-        model.addAttribute("subjects", Subject.values());
-        model.addAttribute("levels", Level.values());
-
-        // 저장한거랑 밴한거 정보 가져와서 표시하도록 함.
-        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId()));
-        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId()));
-
-        return "dashboard";
+    private Map<String, Object> option(String value, String label) {
+        Map<String, Object> option = new LinkedHashMap<>();
+        option.put("value", value);
+        option.put("label", label);
+        return option;
     }
 
-    /**
-     * 금지한 문제들 화면 요청시 로직
-     * 
-     * @param pageable 페이지 정보
-     * @param model    모델 객체(HTML 전달용)
-     * @param session  Session 정보 (로그인 확인)
-     * @return dashboard.html
-     */
-    @GetMapping("/dashboard/banned")
-    public String dashboardBanned(@PageableDefault(size = 9) Pageable pageable, Model model, HttpSession session) {
-        User user = (User) session.getAttribute("loginUser");
-        if (user == null) {
-            return "redirect:/";
-        }
-
-        Page<Exercise> exercisePage = exerciseService.getBannedExercises(user.getId(), pageable);
-
-        int nowPage = exercisePage.getPageable().getPageNumber() + 1; // 0-based -> 1-based
-        int startPage = Math.max(nowPage - 4, 1);
-        int endPage = Math.min(nowPage + 4, exercisePage.getTotalPages());
-
-        if (endPage - startPage < 8 && exercisePage.getTotalPages() >= 9) {
-            if (nowPage < 5) {
-                endPage = 9;
-            } else {
-                startPage = exercisePage.getTotalPages() - 8;
-            }
-        }
-
-        model.addAttribute("exercises", exercisePage.getContent());
-        model.addAttribute("page", exercisePage);
-        model.addAttribute("nowPage", nowPage);
-        model.addAttribute("startPage", startPage);
-        model.addAttribute("endPage", endPage);
-        model.addAttribute("viewType", "banned");
-
-        model.addAttribute("subjects", Subject.values());
-        model.addAttribute("levels", Level.values());
-
-        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId()));
-        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId()));
-
-        return "dashboard";
+    private Map<String, Object> levelOption(String value, String label, int level) {
+        Map<String, Object> option = option(value, label);
+        option.put("level", level);
+        return option;
     }
 }
