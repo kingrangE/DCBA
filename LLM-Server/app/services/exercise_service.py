@@ -1,21 +1,22 @@
 import os
+import re
 import time
-from openai import OpenAI
 from dotenv import load_dotenv
+from app.services.kanana_generator import KananaGenerator
 
 load_dotenv()
 
 # 운동 관련 서비스
 class ExerciseService:
     def __init__(self):
-        # Exaone API 이용을 위한 설정
-        self.api_key = os.getenv("EXAONE_API_KEY") 
-        self.base_url = os.getenv("EXAONE_API_URL")
-        self.model_name = os.getenv("MODEL_NAME")
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url,
+        # Kanana 모델은 첫 생성 요청에서 지연 로딩한다.
+        self.model_name = os.getenv(
+            "KANANA_MODEL_NAME", "kakaocorp/kanana-2-3b-instruct"
         )
+        self.client = KananaGenerator(model_name=self.model_name)
+        self.deduplication_enabled = os.getenv(
+            "DEDUPLICATION_ENABLED", "false"
+        ).lower() in {"1", "true", "yes", "on"}
         
         # Prompt load
         self.system_prompt = self._load_prompt("instructions/system_prompt.txt")
@@ -32,30 +33,43 @@ class ExerciseService:
     
     # 파싱 전용 함수 
     def parse_content(self, content: str) -> dict:
-        question = ""
-        answer = ""
-        lines = content.strip().split("\n")
-
-        # Q \n A 형식으로 들어오지 않았다면 return 빈 값
-        if len(lines) != 2 : 
-            return {"question": question, "answer": answer}
-        
-        # 제대로 들어왔으면 Q,A 파싱 (둘 중 하나라도 없으면 빈값 리턴(Error 처리 할 수 있게 ))
-        for line in lines :
-            processed_line = line.strip()
-            if processed_line.startswith("Q:"):
-                question = processed_line.replace("Q:", "").strip().strip("\"")
-            elif processed_line.startswith("A:"):
-                answer = processed_line.replace("A:", "").strip().strip("\"")
-        if not question or not answer : 
-            # 둘 중 하나라도 빈 값이면 빈 값 리턴
+        if not content:
             return {"question": "", "answer": ""}
-        # 둘 다 있으면 정상 리턴
+
+        # Kanana가 빈 줄이나 여러 문단을 포함해도 줄 시작의 Q:/A:를 기준으로 분리한다.
+        question_marker = re.search(r"(?im)^\s*Q\s*:\s*", content)
+        if not question_marker:
+            return {"question": "", "answer": ""}
+
+        answer_marker = re.search(
+            r"(?im)^\s*A\s*:\s*",
+            content[question_marker.end():],
+        )
+        if not answer_marker:
+            return {"question": "", "answer": ""}
+
+        answer_start = question_marker.end() + answer_marker.start()
+        answer_content_start = question_marker.end() + answer_marker.end()
+        question = self._normalize_generated_field(
+            content[question_marker.end():answer_start]
+        )
+        answer = self._normalize_generated_field(content[answer_content_start:])
+
+        if not question or not answer:
+            return {"question": "", "answer": ""}
+
         return {"question": question, "answer": answer}
+
+    @staticmethod
+    def _normalize_generated_field(value: str) -> str:
+        # DB에는 기존과 동일하게 개행 없는 한 줄 문자열로 저장한다.
+        return re.sub(r"\s+", " ", value).strip().strip("\"").strip()
 
     # 문제 생성
     def generate_exercise(self, subject: str, level: str) -> str:
-        from app.services.deduplication_service import deduplication_service
+        deduplication_service = None
+        if self.deduplication_enabled:
+            from app.services.deduplication_service import deduplication_service
         
         if not self.system_prompt or not self.prompt_template: # Prompt 없으면 Error
             raise Exception("Prompt files not correctly loaded.")
@@ -72,21 +86,12 @@ class ExerciseService:
         for attempt in range(max_retries):
             try:
                 # 문제 생성 요청
-                completion = self.client.chat.completions.create(
-                    model=self.model_name,
-                    extra_body={
-                      "parse_reasoning": True,
-                      "chat_template_kwargs": {
-                        "enable_thinking": True
-                      }
-                    },
+                content = self.client.generate(
                     messages=[
                         {"role": "system", "content": self.system_prompt},
                         {"role": "user", "content": formatted_prompt},
                     ],
                 )
-                # 응답에서 content 꺼냄
-                content = completion.choices[0].message.content
                 
                 # 생성된 내용 파싱
                 parsed_data = self.parse_content(content)
@@ -96,14 +101,14 @@ class ExerciseService:
                      print(f"[Retry] Failed to parse question (Attempt {attempt+1}/{max_retries})\ncontent: {content}")
                      continue
                     
-                # 중복 검사 (중복되면 다시)
-                if deduplication_service.is_duplicate(subject, level, content):
-                    print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
-                    time.sleep(1) # Rate Limit 방지
-                    continue
-                
-                # 중복 검사 통과하면 저장
-                deduplication_service.save(subject, level, content)
+                if self.deduplication_enabled:
+                    # 중복이면 새 문제 생성을 다시 시도한다.
+                    if deduplication_service.is_duplicate(subject, level, content):
+                        print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
+                        time.sleep(1) # Rate Limit 방지
+                        continue
+
+                    deduplication_service.save(subject, level, content)
                 return content
                 
             # 에러 처리

@@ -1,151 +1,97 @@
 package kingrangE.DCBA.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import kingrangE.DCBA.domain.User;
 import kingrangE.DCBA.dto.LoginForm;
 import kingrangE.DCBA.dto.SignUpForm;
-import kingrangE.DCBA.repository.UserRepository;
+import kingrangE.DCBA.dto.api.MessageResponse;
+import kingrangE.DCBA.dto.api.SlackUpdateRequest;
+import kingrangE.DCBA.dto.api.UserResponse;
+import kingrangE.DCBA.exception.UnauthorizedException;
 import kingrangE.DCBA.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
-@Controller
+@RestController
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class UserController {
 
+    private static final String LOGIN_USER = "loginUser";
+
     private final UserService userService;
 
-    /**
-     * URL 접속 시 메인 페이지 (Login)
-     * 
-     * @param model HTML 파일에 전달할 모델 객체
-     * @return login.html
-     */
-    @GetMapping("/")
-    public String loginForm(Model model) {
-        // 로그인을 위한 LoginForm
-        model.addAttribute("loginForm", new LoginForm());
-        return "login";
+    @PostMapping("/auth/login")
+    public UserResponse login(@RequestBody LoginForm loginForm, HttpSession session) {
+        validateCredentials(loginForm.getName(), loginForm.getPassword());
+
+        try {
+            User user = userService.login(loginForm.getName().trim(), loginForm.getPassword());
+            session.setAttribute(LOGIN_USER, user);
+            return UserResponse.from(user);
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, exception.getMessage(), exception);
+        }
     }
 
-    /**
-     * login 요청 시 로직
-     * 
-     * @param loginForm LoginFrom DTO
-     * @param session   Session (login 결과 저장)
-     * @return dashboard(redirect)
-     */
-    @PostMapping("/login")
-    public String login(@ModelAttribute LoginForm loginForm, HttpSession session) {
+    @PostMapping("/auth/signup")
+    public ResponseEntity<MessageResponse> signup(@RequestBody SignUpForm signUpForm) {
+        validateCredentials(signUpForm.getName(), signUpForm.getPassword());
 
-        // 이름과 비밀번호로 로그인 진행
-        User user = userService.login(loginForm.getName(), loginForm.getPassword());
-
-        // User Login Session 유지를 위한 Attribute 추가
-        session.setAttribute("loginUser", user);
-
-        return "redirect:/dashboard";
+        try {
+            userService.signUp(signUpForm.getName().trim(), signUpForm.getPassword());
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new MessageResponse("회원가입이 완료되었습니다."));
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage(), exception);
+        }
     }
 
-    /**
-     * 회원가입 화면 요청 시 로직
-     * 
-     * @param model HTML 파일에 전달할 모델 객체
-     * @return signup.html
-     */
-    @GetMapping("/signup")
-    public String signupForm(Model model) {
-        // 회원가입을 위한 회원가입 Form 전달
-        model.addAttribute("signUpForm", new SignUpForm());
-        return "signup";
+    @PostMapping("/auth/logout")
+    public ResponseEntity<Void> logout(HttpSession session) {
+        session.invalidate();
+        return ResponseEntity.noContent().build();
     }
 
-    /**
-     * 회원가입 요청 시, 처리 로직
-     * 
-     * @param signUpForm 회원가입 형식 DTO
-     * @return login(redirect)
-     */
-    @PostMapping("/signup")
-    public String signup(@ModelAttribute SignUpForm signUpForm) {
-        userService.signUp(signUpForm.getName(),
-                signUpForm.getPassword());
-        return "redirect:/";
+    @GetMapping("/auth/me")
+    public UserResponse currentUser(HttpSession session) {
+        User sessionUser = requireUser(session);
+        return UserResponse.from(userService.getUser(sessionUser.getId()));
     }
 
-    @GetMapping("/logout")
-    public String logout(Model model) {
-        return "redirect:/";
+    @PatchMapping("/users/me/slack")
+    public UserResponse updateSlackId(@RequestBody SlackUpdateRequest request, HttpSession session) {
+        User sessionUser = requireUser(session);
+        String slackId = request.slackId() == null ? "" : request.slackId().trim();
+        if (slackId.isEmpty()) {
+            throw new IllegalArgumentException("Slack ID를 입력해 주세요.");
+        }
+
+        userService.updateSlackId(sessionUser.getId(), slackId);
+        User updatedUser = userService.getUser(sessionUser.getId());
+        session.setAttribute(LOGIN_USER, updatedUser);
+        return UserResponse.from(updatedUser);
     }
 
-    /**
-     * 마이페이지 화면 요청 시 처리 로직
-     *
-     * @param model HTML에 전달할 모델 객체
-     * @param session HTTP session 정보
-     * @return mypage.html
-     */
-    @GetMapping("/mypage")
-    public String myPage(Model model, HttpSession session) {
-        User user = (User) session.getAttribute("loginUser");
+    private User requireUser(HttpSession session) {
+        User user = (User) session.getAttribute(LOGIN_USER);
         if (user == null) {
-            return "redirect:/";
+            throw new UnauthorizedException("로그인이 필요합니다.");
         }
-
-        // 최신 유저 정보 조회 (세션 정보가 갱신되지 않았을 수 있으므로)
-        User currentUser = userService.getUser(user.getId());
-        model.addAttribute("user", currentUser);
-        return "mypage";
+        return user;
     }
 
-    /**
-     * slack Id 입력 후 저장 시 처리 로직
-     *
-     * @param slackId 유저가 입력한 Slack Id
-     * @param session HTTP session 정보
-     * @return mypage.html (redirect)
-     */
-    @PostMapping("/mypage/slack")
-    public String updateSlackId(@RequestParam String slackId, HttpSession session) {
-        User user = (User) session.getAttribute("loginUser");
-        if (user == null) {
-            return "redirect:/";
+    private void validateCredentials(String name, String password) {
+        if (name == null || name.isBlank() || password == null || password.isBlank()) {
+            throw new IllegalArgumentException("이름과 비밀번호를 모두 입력해 주세요.");
         }
-
-        userService.updateSlackId(user.getId(), slackId);
-
-        // 세션 정보 갱신
-        session.setAttribute("loginUser", userService.getUser(user.getId()));
-
-        return "redirect:/mypage";
     }
-
-    /**
-     * UserController에서 발생한 모든 종류의 Runtime Error 발생 시, 처리하기 위한 Handler
-     * 
-     * @param e                  Error
-     * @param request            Error가 발생한 HTTP 요청
-     * @param redirectAttributes 데이터 전달하기 위한 객체 (Error Message를 전달하기 위함)
-     * @return
-     */
-    @ExceptionHandler({ RuntimeException.class })
-    public String handlerException(RuntimeException e, HttpServletRequest request,
-                                   RedirectAttributes redirectAttributes) {
-        // Error 메시지를 같이 보내주기 위함
-        redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
-
-        // 현재 요청이 어디서 왔는지 확인해서 해당 페이지로 돌려보냄
-        String referer = request.getHeader("Referer");
-        if (referer != null && referer.contains("/signup")) {
-            return "redirect:/signup?error";
-        }
-        return "redirect:/?error";
-    }
-
-
 }

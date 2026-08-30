@@ -44,13 +44,13 @@ jobs:
           cache: pip
           cache-dependency-path: './LLM-Server/requirements.txt'
       - name: Install Packages
-        run: pip install -r requirements.txt
+        run: |
+          pip install uv
+          uv pip install --system --torch-backend cpu -r requirements.txt
       - name: Execute Test
-        env: #환경 변수 에러 방지용 빈 값 (사용하지 않을 것이기에 값이 필요 없음)
-          EXAONE_API_KEY: "key"
-          EXAONE_API_URL: "url"
+        env:
+          KANANA_MODEL_NAME: "kakaocorp/kanana-2-3b-instruct"
           OPENAI_API_KEY: "key"
-          MODEL_NAME: "model_name"
         run: pytest tests
 
   python-cd:

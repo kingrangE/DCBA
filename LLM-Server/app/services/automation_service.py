@@ -65,7 +65,7 @@ class AutomationService:
     def start_producer(self):
         # 아직 안돌아가고 있으면 scheduler에 잡 넣고 시작
         if not self.scheduler.running:
-            self.scheduler.add_job(self._produce_job, 'interval', seconds=30)
+            self.scheduler.add_job(self._produce_job, 'interval', seconds=60)
             self.scheduler.start()
             print("[Start] Producer Scheduler started.")
 

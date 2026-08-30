@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="DCBA Web UI interactive example" />
+  <title>DCBA · Web UI Example</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      font-family: 'DM Sans', 'Noto Sans KR', sans-serif;
+      color: #161814;
+      background: #f4f2ec;
+      font-synthesis: none;
+      --ink: #161814;
+      --paper: #f4f2ec;
+      --card: #f7f5ef;
+      --line: #c9c7be;
+      --lime: #d7ff3f;
+      --red: #f2533f;
+      --muted: #6b6e65;
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; scroll-behavior: smooth; }
+    body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--paper); }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    a { color: inherit; }
+    [hidden] { display: none !important; }
+    :focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
+
+    .wordmark { font-size: 1.45rem; font-weight: 800; letter-spacing: -.08em; text-decoration: none; }
+    .wordmark::after { color: var(--red); content: '.'; }
+    .wordmark--light { color: white; }
+    .eyebrow { margin: 0 0 .75rem; color: #55594e; font-size: .69rem; font-weight: 700; letter-spacing: .16em; }
+    .eyebrow--light { color: #b9beaf; }
+    .muted { color: var(--muted); line-height: 1.7; }
+
+    .auth-page { display: grid; min-height: 100vh; grid-template-columns: minmax(360px, .9fr) minmax(480px, 1.1fr); }
+    .auth-brand { display: flex; min-height: 100vh; padding: 3rem 4.5rem; color: #f8f7f2; background: var(--ink); flex-direction: column; justify-content: space-between; }
+    .auth-brand h1 { margin: 0; max-width: 650px; font-size: clamp(2.8rem, 5vw, 5.8rem); line-height: .98; letter-spacing: -.075em; }
+    .auth-brand p:not(.eyebrow) { max-width: 480px; margin-top: 2rem; color: #b9beaf; line-height: 1.8; }
+    .auth-index { color: #7c8175; font-size: .65rem; letter-spacing: .15em; }
+    .auth-panel { display: grid; padding: 4rem; place-items: center; }
+    .auth-card { width: min(100%, 460px); }
+    .auth-card h2, .profile-card h2 { margin: 0; font-size: clamp(2rem, 4vw, 3.3rem); letter-spacing: -.065em; }
+    .stack-form { display: grid; gap: 1.25rem; margin-top: 2.4rem; }
+    .stack-form label, .generation-form label { display: grid; gap: .55rem; font-size: .75rem; font-weight: 700; letter-spacing: .04em; }
+    input, select { width: 100%; border: 1px solid var(--line); border-radius: 0; outline: none; background: transparent; }
+    input { padding: 1rem .1rem; border-width: 0 0 1px; font-size: 1rem; }
+    select { min-width: 155px; padding: .85rem 2.4rem .85rem 1rem; background: var(--paper); }
+    input:focus, select:focus { border-color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
+    .button { min-height: 46px; padding: .8rem 1.15rem; border: 1px solid var(--ink); font-weight: 700; transition: transform .15s, background .15s; }
+    .button:hover:not(:disabled) { transform: translateY(-2px); }
+    .button:disabled { cursor: wait; opacity: .6; }
+    .button--wide { width: 100%; margin-top: .5rem; }
+    .button--primary, .button--dark { color: white; background: var(--ink); }
+    .button--accent { border-color: var(--lime); color: var(--ink); background: var(--lime); }
+    .auth-footer { margin-top: 2rem; color: #72756b; font-size: .88rem; text-align: center; }
+    .auth-footer button { padding: 0; border: 0; border-bottom: 1px solid var(--ink); background: transparent; font-weight: 700; }
+    .form-status { grid-column: 1 / -1; margin: 0; padding: .75rem 1rem; font-size: .82rem; line-height: 1.5; }
+    .form-status--error { color: #922819; background: #ffe0da; }
+    .form-status--success { color: #314800; background: #e8f7b5; }
+
+    .topbar { position: sticky; z-index: 10; top: 0; display: grid; height: 76px; padding: 0 clamp(1.25rem, 5vw, 5rem); border-bottom: 1px solid var(--line); background: rgba(244, 242, 236, .94); grid-template-columns: 1fr auto 1fr; align-items: center; backdrop-filter: blur(12px); }
+    .main-nav { display: flex; height: 100%; gap: 2rem; }
+    .main-nav button { display: grid; position: relative; padding: 0 .2rem; border: 0; color: var(--muted); background: transparent; font-size: .85rem; font-weight: 600; place-items: center; }
+    .main-nav button.active { color: var(--ink); }
+    .main-nav button.active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 3px; background: var(--ink); content: ''; }
+    .account-menu { display: flex; justify-self: end; gap: 1rem; align-items: center; font-size: .8rem; }
+    .text-button { padding: 0; border: 0; border-bottom: 1px solid #999b92; color: var(--muted); background: transparent; font-size: .75rem; }
+
+    .hero { display: grid; padding: clamp(4rem, 9vw, 8rem) clamp(1.25rem, 7vw, 7rem) clamp(3.2rem, 7vw, 6rem); grid-template-columns: 1.25fr .75fr; gap: 4rem; align-items: end; }
+    .hero h1, .profile-intro h1 { margin: 0; font-size: clamp(3rem, 7.5vw, 7.5rem); line-height: .9; letter-spacing: -.08em; }
+    .hero-copy { max-width: 480px; margin: 0 0 .5rem; color: #60635a; line-height: 1.9; }
+    .generation-panel { display: grid; padding: 3rem clamp(1.25rem, 7vw, 7rem); color: white; background: var(--ink); grid-template-columns: .8fr 1.2fr; gap: 4rem; align-items: center; }
+    .generation-panel h2 { margin: 0; font-size: clamp(2rem, 4vw, 3.8rem); line-height: 1.05; letter-spacing: -.06em; }
+    .generation-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end; }
+    .generation-form select { color: white; border-color: #5f6458; background: #242720; }
+    .generation-form select option { color: white; background: #242720; }
+
+    .exercise-section { padding: clamp(4rem, 8vw, 7rem) clamp(1.25rem, 7vw, 7rem); }
+    .section-heading { display: flex; justify-content: space-between; gap: 2rem; align-items: end; }
+    .section-heading h2 { margin: 0; font-size: clamp(2.2rem, 4vw, 4rem); letter-spacing: -.065em; }
+    .section-heading h2 span { color: #94978d; font-size: .4em; vertical-align: top; }
+    .filters { display: flex; gap: .75rem; }
+    .tabs { display: flex; margin: 2.5rem 0 1.5rem; border-bottom: 1px solid var(--line); gap: 1.75rem; }
+    .tabs button { position: relative; padding: .75rem 0; border: 0; color: #777a71; background: transparent; font-size: .85rem; font-weight: 600; }
+    .tabs button.is-active { color: var(--ink); }
+    .tabs button.is-active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 3px; background: var(--ink); content: ''; }
+    .exercise-grid { display: grid; border-top: 1px solid var(--line); border-left: 1px solid var(--line); grid-template-columns: repeat(3, 1fr); }
+    .exercise-card { display: flex; min-height: 390px; padding: 1.6rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--card); flex-direction: column; }
+    .exercise-card--answer { background: #e8ebdf; }
+    .card-meta { display: flex; justify-content: space-between; color: #666960; font-size: .68rem; font-weight: 700; letter-spacing: .08em; }
+    .card-number { margin-top: 2.5rem; color: #a1a399; font-size: .75rem; }
+    .exercise-card h3 { margin: 1rem 0; font-size: clamp(1.15rem, 1.8vw, 1.55rem); line-height: 1.5; letter-spacing: -.035em; white-space: pre-line; }
+    .answer-copy { overflow: auto; max-height: 210px; margin: .5rem 0 1.5rem; color: #41443d; line-height: 1.75; white-space: pre-line; }
+    .card-actions { display: flex; margin-top: auto; gap: .55rem; }
+    .card-actions .button { flex: 1; }
+    .icon-button { width: 46px; border: 1px solid var(--line); color: #71746a; background: transparent; font-size: 1.25rem; }
+    .icon-button.is-active { color: var(--ink); border-color: var(--lime); background: var(--lime); }
+    .icon-button--ban.is-active { color: white; border-color: var(--red); background: var(--red); }
+    .empty-state { display: grid; min-height: 280px; border: 1px solid var(--line); color: #777a71; place-content: center; gap: .5rem; text-align: center; }
+    .empty-state strong { color: var(--ink); font-size: 1.25rem; }
+    .pagination { display: flex; justify-content: center; margin-top: 2.5rem; gap: .3rem; }
+    .pagination button { width: 42px; height: 42px; border: 1px solid transparent; color: #70736a; background: transparent; }
+    .pagination button.is-current { color: white; background: var(--ink); }
+    .pagination button:disabled { cursor: default; opacity: .3; }
+
+    .profile-page { display: grid; min-height: calc(100vh - 76px); grid-template-columns: 1fr 1fr; }
+    .profile-intro { display: flex; padding: clamp(3rem, 7vw, 7rem); border-right: 1px solid var(--line); flex-direction: column; justify-content: space-between; }
+    .profile-intro h1 { font-size: clamp(3.3rem, 7vw, 7rem); }
+    .profile-intro dl { display: grid; margin: 4rem 0 0; gap: .75rem; }
+    .profile-intro dl div { display: flex; justify-content: space-between; padding: 1rem 0; border-top: 1px solid var(--line); }
+    .profile-intro dt { color: #75786e; }
+    .profile-intro dd { margin: 0; font-weight: 700; }
+    .profile-card { display: grid; padding: clamp(3rem, 8vw, 8rem); align-content: center; }
+    .demo-note { position: fixed; z-index: 30; right: 18px; bottom: 18px; max-width: 330px; padding: .7rem .9rem; border: 1px solid #aeb0a6; color: #55584f; background: rgba(244,242,236,.96); font-size: .72rem; line-height: 1.5; }
+
+    @media (max-width: 980px) {
+      .auth-page, .hero, .generation-panel, .profile-page { grid-template-columns: 1fr; }
+      .auth-brand { min-height: 42vh; padding: 2rem; }
+      .auth-brand h1 { font-size: clamp(2.5rem, 10vw, 5rem); }
+      .auth-index { display: none; }
+      .auth-panel { padding: 4rem 1.5rem; }
+      .hero { gap: 2rem; }
+      .generation-form { grid-template-columns: 1fr 1fr; }
+      .generation-form .button { grid-column: 1 / -1; }
+      .exercise-grid { grid-template-columns: repeat(2, 1fr); }
+      .profile-intro { min-height: 55vh; border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+
+    @media (max-width: 650px) {
+      .topbar { height: auto; min-height: 68px; padding: .8rem 1rem; grid-template-columns: 1fr auto; }
+      .main-nav { grid-row: 2; grid-column: 1 / -1; justify-content: center; margin-top: .8rem; }
+      .account-menu span { display: none; }
+      .hero { padding-top: 3rem; }
+      .generation-form, .exercise-grid { grid-template-columns: 1fr; }
+      .generation-form .button { grid-column: auto; }
+      .section-heading { align-items: stretch; flex-direction: column; }
+      .filters { display: grid; grid-template-columns: 1fr 1fr; }
+      .filters select { min-width: 0; }
+      .exercise-card { min-height: 350px; }
+      .tabs { gap: 1rem; }
+      .demo-note { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="auth-view" hidden>
+    <main class="auth-page">
+      <section class="auth-brand">
+        <button class="wordmark wordmark--light" style="width:max-content;border:0;background:none;padding:0" data-route="dashboard">DCBA</button>
+        <div>
+          <p class="eyebrow eyebrow--light">DAILY CS, BASE TO ADVANCED</p>
+          <h1>오늘의 한 문제로<br />단단해지는 개발 기본기.</h1>
+          <p>컴퓨터 구조부터 알고리즘까지, 매일 새롭게 생성되는 문제로 CS 감각을 이어가세요.</p>
+        </div>
+        <span class="auth-index">01—06 · LEARN EVERY DAY</span>
+      </section>
+      <section class="auth-panel">
+        <div class="auth-card" id="login-card">
+          <p class="eyebrow">WELCOME BACK</p>
+          <h2>다시 시작해 볼까요?</h2>
+          <p class="muted">오늘의 CS 문제를 만나려면 로그인하세요.</p>
+          <form class="stack-form" id="login-form">
+            <label>이름<input name="name" autocomplete="username" maxlength="10" value="김개발" placeholder="이름을 입력하세요" required /></label>
+            <label>비밀번호<input name="password" type="password" autocomplete="current-password" value="demo1234" placeholder="비밀번호를 입력하세요" required /></label>
+            <p class="form-status form-status--error" id="login-error" hidden></p>
+            <button class="button button--primary button--wide" type="submit">로그인 →</button>
+          </form>
+          <p class="auth-footer">아직 계정이 없나요? <button type="button" data-auth="signup">회원가입</button></p>
+        </div>
+        <div class="auth-card" id="signup-card" hidden>
+          <p class="eyebrow">JOIN DCBA</p>
+          <h2>학습 루틴을 만드세요.</h2>
+          <p class="muted">10자 이내의 이름과 안전한 비밀번호로 시작하세요.</p>
+          <form class="stack-form" id="signup-form">
+            <label>이름<input name="name" autocomplete="username" maxlength="10" placeholder="사용할 이름" required /></label>
+            <label>비밀번호<input name="password" type="password" autocomplete="new-password" placeholder="비밀번호" required /></label>
+            <label>비밀번호 확인<input name="confirm" type="password" autocomplete="new-password" placeholder="비밀번호 다시 입력" required /></label>
+            <p class="form-status form-status--error" id="signup-error" hidden></p>
+            <button class="button button--primary button--wide" type="submit">회원가입 →</button>
+          </form>
+          <p class="auth-footer">이미 계정이 있나요? <button type="button" data-auth="login">로그인</button></p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="app-view">
+    <header class="topbar">
+      <button class="wordmark" style="width:max-content;border:0;background:none;padding:0" data-route="dashboard">DCBA</button>
+      <nav class="main-nav" aria-label="주요 메뉴">
+        <button class="active" type="button" data-route="dashboard">문제 풀기</button>
+        <button type="button" data-route="mypage">마이페이지</button>
+      </nav>
+      <div class="account-menu">
+        <span><strong id="nav-user-name">김개발</strong> 님</span>
+        <button class="text-button" id="logout" type="button">로그아웃</button>
+      </div>
+    </header>
+
+    <main id="dashboard-view">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">TODAY'S PRACTICE</p>
+          <h1>기본기를 채우는<br />오늘의 CS 문제.</h1>
+        </div>
+        <p class="hero-copy">분야와 난이도를 골라 학습하고, 다시 볼 문제는 저장하세요. 익숙한 문제는 차단해 새로운 문제에 집중할 수 있습니다.</p>
+      </section>
+
+      <section class="generation-panel">
+        <div>
+          <p class="eyebrow eyebrow--light">ON-DEMAND GENERATION</p>
+          <h2>원하는 문제를<br />직접 요청하세요.</h2>
+        </div>
+        <form class="generation-form" id="generation-form">
+          <label>분야<select id="generate-subject" required></select></label>
+          <label>난이도<select id="generate-level" required></select></label>
+          <button class="button button--accent" type="submit">문제 생성 요청 →</button>
+          <p class="form-status" id="generation-status" role="status" aria-live="polite" hidden></p>
+        </form>
+      </section>
+
+      <section class="exercise-section" id="library">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">QUESTION LIBRARY</p>
+            <h2>문제 보관함 <span id="total-count">0</span></h2>
+          </div>
+          <div class="filters" id="filters">
+            <select id="subject-filter" aria-label="분야 필터"></select>
+            <select id="level-filter" aria-label="난이도 필터"></select>
+          </div>
+        </div>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" class="is-active" aria-selected="true" data-view="all">전체 문제</button>
+          <button type="button" role="tab" aria-selected="false" data-view="selected">저장한 문제</button>
+          <button type="button" role="tab" aria-selected="false" data-view="banned">차단한 문제</button>
+        </div>
+        <div class="exercise-grid" id="exercise-grid"></div>
+        <nav class="pagination" id="pagination" aria-label="문제 페이지"></nav>
+      </section>
+    </main>
+
+    <main class="profile-page" id="mypage-view" hidden>
+      <section class="profile-intro">
+        <p class="eyebrow">MY PROFILE</p>
+        <h1><span id="profile-name">김개발</span>님의<br />학습 설정.</h1>
+        <dl>
+          <div><dt>가입일</dt><dd id="joined-at">2026. 8. 30.</dd></div>
+          <div><dt>Slack 연동</dt><dd id="slack-state">연결 전</dd></div>
+        </dl>
+      </section>
+      <section class="profile-card">
+        <p class="eyebrow">NOTIFICATION</p>
+        <h2>Slack 알림 설정</h2>
+        <p class="muted">문제 알림을 받을 Slack Member ID를 등록하세요.</p>
+        <form class="stack-form" id="slack-form">
+          <label>Slack Member ID<input id="slack-id" placeholder="예: U012ABCDEF" /></label>
+          <p class="form-status form-status--success" id="slack-status" hidden>Slack ID를 저장했습니다.</p>
+          <button class="button button--primary" type="submit">설정 저장 →</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <aside class="demo-note">INTERACTIVE DEMO · 정답 확인, 저장, 차단, 필터, 페이지, 문제 생성, 로그인과 마이페이지가 모두 동작합니다.</aside>
+
+  <script>
+    const subjects = [
+      ['COMPUTER_ARCHITECTURE', '컴퓨터 구조'],
+      ['OPERATING_SYSTEM', '운영체제'],
+      ['COMPUTER_NETWORK', '컴퓨터 네트워크'],
+      ['DATA_STRUCTURE', '자료구조'],
+      ['ALGORITHM', '알고리즘'],
+      ['DATABASE', '데이터베이스'],
+    ];
+    const levels = [['EASY', '난이도 1 (기초)', 1], ['MEDIUM', '난이도 2 (기본)', 2], ['HARD', '난이도 3 (심화)', 3]];
+
+    const seedExercises = [
+      { subject:'COMPUTER_ARCHITECTURE', level:'EASY', question:'CPU를 구성하는 핵심 요소 세 가지와 각각의 역할을 설명하세요.', answer:'산술논리장치(ALU)는 계산과 논리 연산을, 제어장치(CU)는 명령어 해석과 실행 흐름 제어를, 레지스터는 CPU가 즉시 사용할 데이터와 상태를 저장합니다.' },
+      { subject:'OPERATING_SYSTEM', level:'EASY', question:'프로세스와 스레드의 가장 큰 차이는 무엇인가요?', answer:'프로세스는 독립된 주소 공간과 자원을 가지는 실행 단위입니다. 스레드는 한 프로세스 안에서 코드·데이터·힙을 공유하되 각자의 스택과 레지스터 상태를 갖습니다.' },
+      { subject:'COMPUTER_NETWORK', level:'MEDIUM', question:'TCP의 3-way handshake가 필요한 이유와 세 단계를 설명하세요.', answer:'양쪽이 송수신 가능 상태와 초기 순서 번호를 확인해 신뢰성 있는 연결을 맺기 위함입니다. 클라이언트 SYN → 서버 SYN+ACK → 클라이언트 ACK 순서로 진행됩니다.' },
+      { subject:'DATA_STRUCTURE', level:'EASY', question:'스택과 큐의 데이터 처리 순서를 각각 한 문장으로 비교하세요.', answer:'스택은 나중에 넣은 데이터를 먼저 꺼내는 LIFO, 큐는 먼저 넣은 데이터를 먼저 꺼내는 FIFO 방식입니다.' },
+      { subject:'ALGORITHM', level:'MEDIUM', question:'퀵 정렬의 평균·최악 시간 복잡도와 최악의 경우가 발생하는 조건은?', answer:'평균 시간 복잡도는 O(n log n), 최악은 O(n²)입니다. 피벗이 매번 최솟값이나 최댓값에 가까워 분할이 한쪽으로 치우칠 때 최악의 경우가 발생합니다.' },
+      { subject:'DATABASE', level:'EASY', question:'데이터베이스 인덱스가 조회 성능을 높이는 원리를 설명하세요.', answer:'인덱스는 특정 열의 값을 별도 자료구조(B-Tree 등)로 정렬해 보관합니다. 전체 테이블을 순차 탐색하지 않고 원하는 행의 위치를 빠르게 찾게 합니다.' },
+      { subject:'COMPUTER_ARCHITECTURE', level:'MEDIUM', question:'캐시 지역성의 두 종류를 예시와 함께 구분하세요.', answer:'시간 지역성은 최근 접근한 데이터를 곧 다시 쓰는 성질(반복문 변수), 공간 지역성은 접근한 주소 주변을 곧 쓰는 성질(배열 순회)입니다.' },
+      { subject:'OPERATING_SYSTEM', level:'HARD', question:'교착 상태의 네 가지 필요조건과 예방 전략 한 가지를 설명하세요.', answer:'상호 배제, 점유와 대기, 비선점, 순환 대기가 모두 성립하면 교착 상태가 가능합니다. 예를 들어 자원 획득 순서를 고정하면 순환 대기를 깨 예방할 수 있습니다.' },
+      { subject:'COMPUTER_NETWORK', level:'EASY', question:'HTTP와 HTTPS의 차이를 보안 관점에서 설명하세요.', answer:'HTTPS는 HTTP 통신을 TLS로 암호화합니다. 서버 인증, 데이터 기밀성, 무결성을 제공해 도청과 변조, 위장 서버 위험을 줄입니다.' },
+      { subject:'DATA_STRUCTURE', level:'MEDIUM', question:'해시 테이블 충돌을 해결하는 대표적인 두 방법은 무엇인가요?', answer:'분리 연결법은 같은 버킷의 항목을 연결 리스트 등에 모읍니다. 개방 주소법은 충돌 시 정해진 규칙에 따라 다른 빈 버킷을 탐색합니다.' },
+      { subject:'ALGORITHM', level:'EASY', question:'이진 탐색을 적용하기 위해 입력 데이터가 만족해야 하는 전제는?', answer:'탐색 대상 데이터가 비교 가능한 기준에 따라 정렬되어 있어야 합니다. 이 전제에서 탐색 범위를 절반씩 줄여 O(log n)에 찾을 수 있습니다.' },
+      { subject:'DATABASE', level:'MEDIUM', question:'트랜잭션의 ACID 네 속성을 각각 설명하세요.', answer:'원자성은 전부 실행 또는 전부 취소, 일관성은 규칙 보존, 격리성은 동시 트랜잭션 간 간섭 제한, 지속성은 커밋 결과의 영구 보존을 뜻합니다.' },
+      { subject:'COMPUTER_ARCHITECTURE', level:'HARD', question:'파이프라인 데이터 해저드가 무엇이며 포워딩은 어떻게 이를 완화하나요?', answer:'앞선 명령의 결과가 준비되기 전에 다음 명령이 그 값을 요구하는 상황입니다. 포워딩은 결과를 레지스터 기록 단계까지 기다리지 않고 필요한 파이프라인 단계로 직접 전달합니다.' },
+      { subject:'OPERATING_SYSTEM', level:'MEDIUM', question:'가상 메모리와 페이지 폴트의 관계를 설명하세요.', answer:'가상 메모리는 필요한 페이지만 물리 메모리에 올립니다. 참조한 페이지가 메모리에 없으면 페이지 폴트가 발생하고 OS가 보조기억장치에서 해당 페이지를 적재합니다.' },
+      { subject:'COMPUTER_NETWORK', level:'HARD', question:'혼잡 제어와 흐름 제어는 각각 누구를 보호하며 어떤 정보를 사용하나요?', answer:'흐름 제어는 수신자의 처리 용량을 보호하며 수신 윈도 크기를 사용합니다. 혼잡 제어는 네트워크 전체를 보호하며 손실·지연 등의 신호와 혼잡 윈도를 사용합니다.' },
+      { subject:'DATA_STRUCTURE', level:'HARD', question:'AVL 트리에서 LL 불균형이 발생하는 조건과 회전 방법을 설명하세요.', answer:'어떤 노드의 왼쪽 자식의 왼쪽 서브트리에 삽입되어 균형 인수가 +2가 되면 LL 불균형입니다. 해당 노드를 기준으로 한 번 우회전해 균형을 복구합니다.' },
+      { subject:'ALGORITHM', level:'HARD', question:'다익스트라 알고리즘이 음수 가중치 간선에서 올바르지 않은 이유는?', answer:'한번 확정한 최단 거리가 이후 더 줄어들지 않는다는 탐욕적 가정이 음수 간선에서는 깨집니다. 음수 가중치가 있다면 벨만-포드 같은 알고리즘을 사용해야 합니다.' },
+      { subject:'DATABASE', level:'HARD', question:'MVCC가 읽기와 쓰기의 동시성을 높이는 방식을 설명하세요.', answer:'데이터의 여러 버전을 유지해 읽기가 일관된 과거 스냅샷을 보도록 합니다. 읽기와 쓰기가 같은 레코드에서 서로를 덜 차단하므로 동시성이 높아집니다.' },
+    ].map((item, index) => ({ ...item, id: index + 1, saved: [2, 6, 12].includes(index + 1), banned: [9, 14].includes(index + 1) }));
+
+    const state = {
+      user: { name: '김개발', joinedAt: '2026. 8. 30.', slackId: '' },
+      exercises: seedExercises,
+      view: 'all', subject: '', level: '', page: 0, pageSize: 9,
+    };
+
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => [...document.querySelectorAll(selector)];
+    const subjectName = (value) => subjects.find(([key]) => key === value)?.[1] || value;
+    const levelInfo = (value) => levels.find(([key]) => key === value) || ['', '', 0];
+    const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+
+    function fillSelects() {
+      $('#generate-subject').innerHTML = '<option value="">분야 선택</option>' + subjects.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+      $('#subject-filter').innerHTML = '<option value="">모든 분야</option>' + subjects.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+      $('#generate-level').innerHTML = '<option value="">난이도 선택</option>' + levels.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+      $('#level-filter').innerHTML = '<option value="">모든 난이도</option>' + levels.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    }
+
+    function filteredExercises() {
+      return state.exercises.filter((item) => {
+        if (state.view === 'selected' && !item.saved) return false;
+        if (state.view === 'banned' && !item.banned) return false;
+        if (state.view === 'all' && state.subject && item.subject !== state.subject) return false;
+        if (state.view === 'all' && state.level && item.level !== state.level) return false;
+        return true;
+      });
+    }
+
+    function renderExercises() {
+      const items = filteredExercises();
+      const totalPages = Math.max(1, Math.ceil(items.length / state.pageSize));
+      state.page = Math.min(state.page, totalPages - 1);
+      const visible = items.slice(state.page * state.pageSize, (state.page + 1) * state.pageSize);
+      $('#total-count').textContent = items.length;
+      $('#filters').hidden = state.view !== 'all';
+
+      $('#exercise-grid').className = visible.length ? 'exercise-grid' : 'empty-state';
+      $('#exercise-grid').innerHTML = visible.length ? visible.map((item) => `
+        <article class="exercise-card" data-card="${item.id}">
+          <div class="card-meta"><span>${subjectName(item.subject)}</span><span>LEVEL ${levelInfo(item.level)[2]}</span></div>
+          <span class="card-number">Q${String(item.id).padStart(3, '0')}</span>
+          <h3>${escapeHtml(item.question)}</h3>
+          <p class="answer-copy" hidden>${escapeHtml(item.answer)}</p>
+          <div class="card-actions">
+            <button class="button button--dark" type="button" data-action="answer" data-id="${item.id}">정답 확인</button>
+            <button class="icon-button ${item.saved ? 'is-active' : ''}" type="button" data-action="save" data-id="${item.id}" aria-label="${item.saved ? '저장 취소' : '문제 저장'}" title="${item.saved ? '저장 취소' : '문제 저장'}">${item.saved ? '★' : '☆'}</button>
+            <button class="icon-button icon-button--ban ${item.banned ? 'is-active' : ''}" type="button" data-action="ban" data-id="${item.id}" aria-label="${item.banned ? '차단 취소' : '문제 차단'}" title="${item.banned ? '차단 취소' : '문제 차단'}">${item.banned ? '↺' : '×'}</button>
+          </div>
+        </article>`).join('') : '<strong>표시할 문제가 없습니다.</strong><span>필터를 바꾸거나 새 문제 생성을 요청해 보세요.</span>';
+
+      const pages = Array.from({ length: totalPages }, (_, index) => index);
+      $('#pagination').hidden = totalPages <= 1;
+      $('#pagination').innerHTML = `<button type="button" data-page="${state.page - 1}" ${state.page === 0 ? 'disabled' : ''}>←</button>` +
+        pages.map((page) => `<button type="button" data-page="${page}" class="${page === state.page ? 'is-current' : ''}" ${page === state.page ? 'aria-current="page"' : ''}>${page + 1}</button>`).join('') +
+        `<button type="button" data-page="${state.page + 1}" ${state.page >= totalPages - 1 ? 'disabled' : ''}>→</button>`;
+    }
+
+    function showRoute(route) {
+      const isMyPage = route === 'mypage';
+      $('#dashboard-view').hidden = isMyPage;
+      $('#mypage-view').hidden = !isMyPage;
+      $$('.main-nav button').forEach((button) => button.classList.toggle('active', button.dataset.route === route));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showAuth(kind = 'login') {
+      $('#app-view').hidden = true;
+      $('#auth-view').hidden = false;
+      $('#login-card').hidden = kind !== 'login';
+      $('#signup-card').hidden = kind !== 'signup';
+      $('.demo-note').hidden = true;
+    }
+
+    function showApp() {
+      $('#auth-view').hidden = true;
+      $('#app-view').hidden = false;
+      $('.demo-note').hidden = false;
+      $('#nav-user-name').textContent = state.user.name;
+      $('#profile-name').textContent = state.user.name;
+      $('#joined-at').textContent = state.user.joinedAt;
+      $('#slack-id').value = state.user.slackId;
+      $('#slack-state').textContent = state.user.slackId ? '연결됨' : '연결 전';
+      showRoute('dashboard');
+      renderExercises();
+    }
+
+    $('#exercise-grid').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const item = state.exercises.find((exercise) => exercise.id === Number(button.dataset.id));
+      if (button.dataset.action === 'answer') {
+        const card = button.closest('.exercise-card');
+        const showing = !card.querySelector('.answer-copy').hidden;
+        card.classList.toggle('exercise-card--answer', !showing);
+        card.querySelector('h3').textContent = showing ? item.question : '해설';
+        card.querySelector('.answer-copy').hidden = showing;
+        button.textContent = showing ? '정답 확인' : '문제로 돌아가기';
+      } else if (button.dataset.action === 'save') {
+        item.saved = !item.saved;
+        renderExercises();
+      } else if (button.dataset.action === 'ban') {
+        item.banned = !item.banned;
+        renderExercises();
+      }
+    });
+
+    $$('.tabs button').forEach((button) => button.addEventListener('click', () => {
+      state.view = button.dataset.view;
+      state.page = 0;
+      $$('.tabs button').forEach((tab) => {
+        const active = tab === button;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+      renderExercises();
+    }));
+
+    $('#subject-filter').addEventListener('change', (event) => { state.subject = event.target.value; state.page = 0; renderExercises(); });
+    $('#level-filter').addEventListener('change', (event) => { state.level = event.target.value; state.page = 0; renderExercises(); });
+    $('#pagination').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-page]');
+      if (!button || button.disabled) return;
+      state.page = Number(button.dataset.page);
+      renderExercises();
+      $('#library').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    const generatedTemplates = {
+      COMPUTER_ARCHITECTURE: ['메모리 계층 구조에서 캐시가 필요한 이유를 설명하세요.', 'CPU와 주기억장치의 속도 차이를 줄여 평균 접근 시간을 단축하기 위해 자주 쓰는 데이터를 더 빠른 저장장치에 보관합니다.'],
+      OPERATING_SYSTEM: ['문맥 교환이 발생할 때 운영체제가 보존해야 하는 상태는 무엇인가요?', '프로그램 카운터, CPU 레지스터, 스택 포인터 등 현재 실행 문맥을 PCB에 저장하고 다음 프로세스의 상태를 복원합니다.'],
+      COMPUTER_NETWORK: ['DNS가 도메인 이름을 IP 주소로 변환하는 과정을 설명하세요.', '로컬 캐시를 확인한 뒤 재귀 DNS 서버가 루트, TLD, 권한 있는 네임서버를 순서대로 조회해 IP 주소를 반환합니다.'],
+      DATA_STRUCTURE: ['힙 자료구조가 우선순위 큐에 적합한 이유는 무엇인가요?', '최댓값 또는 최솟값을 루트에서 O(1)에 확인하고 삽입·삭제 후 O(log n)에 힙 속성을 복구할 수 있기 때문입니다.'],
+      ALGORITHM: ['동적 계획법을 적용할 수 있는 두 가지 핵심 조건은 무엇인가요?', '큰 문제의 최적해가 부분 문제의 최적해로 구성되는 최적 부분 구조와 같은 부분 문제가 반복되는 중복 부분 문제가 필요합니다.'],
+      DATABASE: ['정규화가 필요한 이유와 과도한 정규화의 단점을 설명하세요.', '중복과 갱신 이상을 줄이지만 테이블 분리로 조인이 늘어나 조회가 복잡해지고 성능 비용이 커질 수 있습니다.'],
+    };
+
+    $('#generation-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const subject = $('#generate-subject').value;
+      const level = $('#generate-level').value;
+      const status = $('#generation-status');
+      if (!subject || !level) {
+        status.hidden = false;
+        status.className = 'form-status form-status--error';
+        status.textContent = '분야와 난이도를 모두 선택해 주세요.';
+        return;
+      }
+      const button = event.currentTarget.querySelector('button');
+      button.disabled = true;
+      button.textContent = '요청 중...';
+      status.hidden = false;
+      status.className = 'form-status form-status--success';
+      status.textContent = '문제 생성 요청이 접수되었습니다. 현재 대기열 1건';
+      setTimeout(() => {
+        const [question, answer] = generatedTemplates[subject];
+        const id = Math.max(...state.exercises.map((item) => item.id)) + 1;
+        state.exercises.unshift({ id, subject, level, question, answer, saved: false, banned: false });
+        state.view = 'all'; state.subject = ''; state.level = ''; state.page = 0;
+        $('#subject-filter').value = ''; $('#level-filter').value = '';
+        $$('.tabs button').forEach((tab) => {
+          const active = tab.dataset.view === 'all';
+          tab.classList.toggle('is-active', active);
+          tab.setAttribute('aria-selected', String(active));
+        });
+        status.textContent = '새 문제가 생성되어 문제 보관함에 추가되었습니다.';
+        button.disabled = false;
+        button.textContent = '문제 생성 요청 →';
+        renderExercises();
+      }, 700);
+    });
+
+    $$('[data-route]').forEach((button) => button.addEventListener('click', () => {
+      if ($('#app-view').hidden) showApp();
+      showRoute(button.dataset.route);
+    }));
+    $$('[data-auth]').forEach((button) => button.addEventListener('click', () => showAuth(button.dataset.auth)));
+    $('#logout').addEventListener('click', () => showAuth('login'));
+    $('#login-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      if (!data.get('name') || !data.get('password')) {
+        $('#login-error').hidden = false;
+        $('#login-error').textContent = '이름과 비밀번호를 입력해 주세요.';
+        return;
+      }
+      state.user.name = String(data.get('name'));
+      $('#login-error').hidden = true;
+      showApp();
+    });
+    $('#signup-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      const error = $('#signup-error');
+      if (data.get('password') !== data.get('confirm')) {
+        error.hidden = false; error.textContent = '비밀번호가 일치하지 않습니다.'; return;
+      }
+      state.user = { name: String(data.get('name')), joinedAt: new Date().toLocaleDateString('ko-KR'), slackId: '' };
+      error.hidden = true;
+      showApp();
+    });
+    $('#slack-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      state.user.slackId = $('#slack-id').value.trim();
+      $('#slack-state').textContent = state.user.slackId ? '연결됨' : '연결 전';
+      $('#slack-status').hidden = false;
+      $('#slack-status').textContent = state.user.slackId ? 'Slack ID를 저장했습니다.' : 'Slack 연동을 해제했습니다.';
+    });
+
+    fillSelects();
+    renderExercises();
+  </script>
+</body>
+</html>
