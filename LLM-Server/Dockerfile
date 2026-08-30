@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=requirements.txt,target=requirements.txt \
     uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
-    uv pip install -r requirements.txt
+    uv pip install --torch-backend cpu -r requirements.txt
 
 # 실행
 FROM python:3.13-slim
@@ -29,7 +29,8 @@ COPY app ./app
 COPY instructions ./instructions
 
 RUN adduser --disabled-password --gecos "" appuser && \
-    chown -R appuser:appuser /app
+    mkdir -p /home/appuser/.cache/huggingface && \
+    chown -R appuser:appuser /app /home/appuser
 USER appuser
 
 EXPOSE 8000

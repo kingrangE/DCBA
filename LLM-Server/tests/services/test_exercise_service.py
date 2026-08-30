@@ -83,24 +83,34 @@ def test_parse_content_with_only_two_lines_A():
     assert parsed_dict["question"] == ""
     assert parsed_dict["answer"] == ""
 
+
+def test_parse_content_with_multiline_kanana_answer():
+    content = """Q: 데이터베이스 트랜잭션의 ACID 특성이 무엇인가요?
+
+
+A: ACID는 안전한 데이터 처리를 위한 핵심 특성입니다.
+
+Atomicity는 모든 작업이 전부 성공하거나 실패함을 의미합니다.
+
+Durability는 커밋된 데이터가 장애 이후에도 보존됨을 의미합니다."""
+
+    parsed_dict = exercise_service.parse_content(content)
+
+    assert parsed_dict["question"] == "데이터베이스 트랜잭션의 ACID 특성이 무엇인가요?"
+    assert parsed_dict["answer"] == (
+        "ACID는 안전한 데이터 처리를 위한 핵심 특성입니다. "
+        "Atomicity는 모든 작업이 전부 성공하거나 실패함을 의미합니다. "
+        "Durability는 커밋된 데이터가 장애 이후에도 보존됨을 의미합니다."
+    )
+
 def test_generate_exercise_success(mocker):
     """문제 생성을 한 번에 잘 한 경우"""
     # =========== given =========== 
-    mock_completion = mocker.Mock()
-    # 함수 return 값을 생성 결과 mock로 연결 (그럼 content가 이거다 가정)
-    mocker.patch.object(exercise_service.client.chat.completions, 
-                        "create", 
-                        # completion.choices[0].message.content 형태
-                        return_value=mocker.Mock(
-                            choices = [
-                                    mocker.Mock(
-                                        message=mocker.Mock(
-                                            content="Q: 1123 \nA:456"
-                                        )
-                                    )
-                                ]
-                            )
-                        )
+    mock_generate = mocker.patch.object(
+        exercise_service.client,
+        "generate",
+        return_value="Q: 1123 \nA:456",
+    )
 
     # parse_content의 return 값을 정해줌
     mocker.patch.object(exercise_service, "parse_content", return_value={"question":"1123","answer":"456"})
@@ -116,25 +126,16 @@ def test_generate_exercise_success(mocker):
 
     # =========== then =========== 
     assert result == "Q: 1123 \nA:456"
+    mock_generate.assert_called_once()
 
 def test_generate_exercise_success_within_max_tries(mocker):
     """문제 생성을 maximum try이내로 잘 한 경우"""
     # =========== given =========== 
-    mock_completion = mocker.Mock()
-    # 함수 return 값을 생성 결과 mock로 연결 (그럼 content가 이거다 가정)
-    mocker.patch.object(exercise_service.client.chat.completions, 
-                        "create", 
-                        # completion.choices[0].message.content 형태
-                        return_value=mocker.Mock(
-                            choices = [
-                                    mocker.Mock(
-                                        message=mocker.Mock(
-                                            content="Q: 1123 \nA:456"
-                                        )
-                                    )
-                                ]
-                            )
-                        )
+    mocker.patch.object(
+        exercise_service.client,
+        "generate",
+        return_value="Q: 1123 \nA:456",
+    )
     # parse_content의 return 값을 이상하게 정해줌 (try : 1~5)
     mocker.patch.object(exercise_service, "parse_content",side_effect=[
         {"question":"", "answer":""},
@@ -161,21 +162,11 @@ def test_generate_exercise_success_within_max_tries(mocker):
     # =========== given =========== 
     mock_dedup = mocker.patch("app.services.deduplication_service.deduplication_service") 
     mock_dedup.is_duplicate.side_effect = [True,True,False] # 2번 중복 후 3번재 통과
-    mock_completion = mocker.Mock()
-    # 함수 return 값을 생성 결과 mock로 연결 (그럼 content가 이거다 가정)
-    mocker.patch.object(exercise_service.client.chat.completions, 
-                        "create", 
-                        # completion.choices[0].message.content 형태
-                        return_value=mocker.Mock(
-                            choices = [
-                                    mocker.Mock(
-                                        message=mocker.Mock(
-                                            content="Q: 1123 \nA:456"
-                                        )
-                                    )
-                                ]
-                            )
-                        )
+    mocker.patch.object(
+        exercise_service.client,
+        "generate",
+        return_value="Q: 1123 \nA:456",
+    )
     mocker.patch.object(exercise_service,"parse_content",return_value={"question":"1123","answer":"456"})
 
     # =========== when =========== 
@@ -188,25 +179,16 @@ def test_generate_exercise_success_within_max_tries(mocker):
 
 def test_generate_exercise_success_within_max_tries(mocker):
     """무한 중복으로 인한 취소"""
-    # =========== given =========== 
+    # =========== given ===========
+    mocker.patch.object(exercise_service, "deduplication_enabled", True)
     mock_dedup = mocker.patch("app.services.deduplication_service.deduplication_service") 
     mock_dedup.is_duplicate.side_effect = [True]*10 # 2번 중복 후 3번재 통과
-    mock_completion = mocker.Mock()
-
     # 값은 정상적으로 잘 제작 됐는데 무한 중복으로 인해 취소되는걸 확인
-    mocker.patch.object(exercise_service.client.chat.completions, 
-                        "create", 
-                        # completion.choices[0].message.content 형태
-                        return_value=mocker.Mock(
-                            choices = [
-                                    mocker.Mock(
-                                        message=mocker.Mock(
-                                            content="Q: 1123 \nA:456"
-                                        )
-                                    )
-                                ]
-                            )
-                        )
+    mocker.patch.object(
+        exercise_service.client,
+        "generate",
+        return_value="Q: 1123 \nA:456",
+    )
     
     mocker.patch.object(exercise_service,"parse_content",return_value={"question":"1123","answer":"456"})
 
