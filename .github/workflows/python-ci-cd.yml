@@ -5,12 +5,14 @@ on:
     branches: ["main", "LLM-Server"]
     paths:
       - "LLM-Server/**"
-      - "!README.md"
+      - ".github/workflows/python-ci-cd.yml"
+      - "!LLM-Server/**/*.md"
   pull_request:
     branches: ["main"]
     paths:
       - "LLM-Server/**"
-      - "!README.md"
+      - ".github/workflows/python-ci-cd.yml"
+      - "!LLM-Server/**/*.md"
 
 concurrency:
   group: ${{github.workflow}}-${{github.ref}}

@@ -5,12 +5,14 @@ on:
     branches: ["main", "JavaApp"]
     paths:
       - "DCBA/**"
-      - "!README.md"
+      - ".github/workflows/java-ci-cd.yml"
+      - "!DCBA/**/*.md"
   pull_request:
     branches: ["main"]
     paths:
       - "DCBA/**"
-      - "!README.md"
+      - ".github/workflows/java-ci-cd.yml"
+      - "!DCBA/**/*.md"
 concurrency:
   group: ${{github.workflow}}-${{github.ref }}
   cancel-in-progress: true
