@@ -1,60 +1,110 @@
 # DCBA
-Daily CS, Base to Advanced
-LLM-Server/app/services/automation_service.py:68
-# Domain
-[DCBA Service](https://DCBA.kingrange.site) <- You can access DCBA procject via this link.
+> CS 학습을 위한 LLM CS 문제 생성 서비스
+## 목차
+1. [기능](#기능)
+2. [요약](#요약)
+3. [실행 조건](#1-실행-조건)
+4. [실행 방법](#2-전체-서비스-실행)
+5. [접속 주소](#3-접속-주소)
+6. [실행 확인](#4-정상-실행-확인)
+7. [주요 명령어](#5-주요-명령)
+8. [선택 설정](#6-선택-설정)
+9. [서비스 이미지 확인](#서비스-이미지) 
 
-# Tech Stack
-1. **`Java Spring Boot`**
-2. **`FastAPI`**
-3. **`MariaDB`**
-4. **`Redis`**
-5. **`Elastic Search`**
-5. **`Docker`**
-6. **`Kubernetes`**
-7. **`Grafana/Prometheus`**
 
-# Service Flow
-1. LLM-Server   
-    - 60초마다 문제 생성 작업을 등록하고, 생성 결과를 MariaDB Server에 저장
-        - `kakaocorp/kanana-2-3b-instruct`를 로컬에서 지연 로딩하여 문제 생성
-        - 첫 생성 시 Hugging Face 모델 가중치를 내려받으며, 이후에는 Docker 볼륨 캐시를 재사용
-        - 생성된 문제를 koNLPy를 이용하여 형태소 분석
-            - 문제에서 명사를 추출하여 Redis에 저장
-            - Jaccard 유사도 검사를 통해 Redis에 공통된 문제가 존재하는지 검사함.
-    - Redis에 Token을 저장하여, 유사도 검사 수행
-    
-2. DCBA (Spring Web Application)
-    - Web Service 제공
-        - `유저 로그인 / 회원가입 / 대시보드 제공`
-            - 유저는 대시보드에서 문제 Pool 조회 가능
-            - 유저는 대시보드에서 자신이 공부하고 싶은 **문제를 저장**할 수 있음
-            - 유저는 대시보드에서 더 이상 보고 싶지 않은 **문제를 차단**할 수 있음
-            - 유저는 대시보드에서 자신이 공부하고 싶은 내용을 **검색하여 문제를 조회**할 수 있음
+## 기능
+1. 문제 자동 생성 (1분)
+2. 원하는 문제 생성 요청
+3. 문제 중복 생성 방지
+4. 문제 저장 및 차단 기능
+    - 저장 : 원하는 문제만 따로 모아보기
+    - 차단 : 문제 전체 확인 시 안 보이도록 설정
+5. 웹을 통해 문제 확인 가능
+    - 정답 확인 버튼을 통해 정답 확인 가능
 
-# File 
-- DCBA : Java Spring Boot Web Application
-- LLM-Server : LLM Python Server for DCBA 
+## 요약
+| 항목 | 내용 |
+|---|---|
+| Web | React |
+| API | Spring Boot |
+| LLM | FastAPI + `kakaocorp/kanana-2-3b-instruct` |
+| Data | MariaDB + Redis |
+| 실행 | Docker Compose |
 
-## Kanana LLM 실행
+## 1. 실행 조건
 
-Kanana-2-3B는 모델 메모리가 필요한 로컬 추론 모델입니다. Docker Desktop에 충분한 메모리를 할당한 뒤 LLM 프로필을 실행합니다.
+| 필수 항목 | 기준 |
+|---|---|
+| Docker | Docker Desktop 또는 Docker Engine + Compose |
+| 메모리 | Kanana 실행 시 Docker 메모리 12GB 이상 권장 |
+| 디스크 | 최초 모델 다운로드용 여유 공간 7GB 이상 |
+
+## 2. 전체 서비스 실행
 
 ```bash
-docker compose --profile llm up -d --build llm-server
+docker compose --profile llm up -d --build
 ```
 
-모델과 생성 옵션은 `.env`의 `KANANA_MODEL_NAME`, `KANANA_DEVICE_MAP`, `KANANA_MAX_NEW_TOKENS`, `KANANA_TEMPERATURE`, `KANANA_TOP_P`로 조정할 수 있습니다. 첫 문제 생성은 모델 다운로드와 로딩 때문에 오래 걸릴 수 있습니다.
+| 최초 실행 | 내용 |
+|---|---|
+| 모델 다운로드 | Kanana 가중치 약 6.5GB 다운로드 |
+| 모델 캐시 | `huggingface_cache` Docker 볼륨에 보관 |
+| 문제 생성 | CPU 환경에서는 첫 생성에 시간이 오래 걸릴 수 있음 |
 
-## Why did I decouple the LLM Service from the Main Server?
-1. **`Leveraging the LLM Ecosystem`**
-    - To fully utilize the Python-based AI ecosystem, including advanced libraries like koNLPy and various vector databases.
+## 3. 접속 주소
 
-2.  **`Resource Isolation & Stability`**
-    - By separating the CPU-intensive LLM processing from the main Java server, I ensured that high LLM loads do not degrade the performance or availability of the core web service.
+| 서비스 | 주소 |
+|---|---|
+| Web | http://localhost |
+| Spring API | http://localhost:8080 |
+| LLM API 문서 | http://localhost:8000/docs |
+| LLM 상태 확인 | http://localhost:8000/health |
 
-3. **`Independent Scalability (Scale-out)`**
-    - This architecture allows me to scale the LLM server independently based on its specific workload, which differs significantly from the main application's resource demands.
+## 4. 정상 실행 확인
 
-4. **`Technical Proficiency`**
-    - I leveraged my extensive experience with FastAPI to rapidly build and iterate on a high-performance asynchronous API server.
+```bash
+docker compose --profile llm ps
+docker logs -f llm-server
+```
+
+| 로그 | 상태 |
+|---|---|
+| `[Kanana] Model loaded: kakaocorp/kanana-2-3b-instruct` | 모델 준비 완료 |
+| `[Consumer] Processing: ...` | 문제 생성 중 |
+| `[Consumer] Saved : ... (ID : ...)` | DB 저장 완료 |
+
+## 5. 주요 명령
+
+| 작업 | 명령 |
+|---|---|
+| 기본 서비스만 실행 | `docker compose up -d --build` |
+| LLM 포함 실행 | `docker compose --profile llm up -d --build` |
+| 모니터링 포함 실행 | `docker compose --profile llm --profile monitoring up -d --build` |
+| 전체 상태 확인 | `docker compose --profile llm ps` |
+| LLM 로그 확인 | `docker logs -f llm-server` |
+| 생성 대기 작업 수 확인 | `docker exec redis-cache redis-cli LLEN exercise:generation_queue` |
+| 전체 중지 | `docker compose down` |
+
+## 6. 선택 설정
+
+| 조건 | 설정 |
+|---|---|
+| 기본값으로 실행 | `.env` 파일 불필요 |
+| 포트·모델·중복검사 변경 | `.env.example`을 `.env`로 복사 후 수정 |
+
+```bash
+cp .env.example .env
+```
+
+| 변수 | 기본값 | 용도 |
+|---|---|---|
+| `KANANA_MODEL_NAME` | `kakaocorp/kanana-2-3b-instruct` | 생성 모델 |
+| `DEDUPLICATION_ENABLED` | `false` | 중복 검사 활성화 여부 |
+| `OPENAI_API_KEY` | 없음 | 중복 검사 활성화 시 필요 |
+| `FRONTEND_PORT` | `80` | Web 외부 포트 |
+| `DCBA_SERVER_PORT` | `8080` | Spring API 외부 포트 |
+| `LLM_SERVER_PORT` | `8000` | LLM API 외부 포트 |
+
+## 서비스 이미지
+![](assets/main_image.png)
+![](assets/save_image.png)
