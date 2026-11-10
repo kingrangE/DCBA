@@ -1,9 +1,12 @@
 import os
 import secrets
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.models.exercise import ExerciseRequest
 from app.services.exercise_service import exercise_service
+
+logger = logging.getLogger(__name__)
 
 def require_api_key(credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False))):
     expected = os.getenv("LLM_API_KEY")
@@ -24,4 +27,5 @@ def generate_exercise(request: ExerciseRequest):
     try:
         return exercise_service.generate_and_save(request.subject.value, request.level.value)
     except Exception:
-        raise HTTPException(status_code=503, detail="Generation is temporarily unavailable")
+        logger.exception("Exercise generation failed: subject=%s level=%s", request.subject.value, request.level.value)
+        raise HTTPException(status_code=503, detail="Generation is temporarily unavailable") from None

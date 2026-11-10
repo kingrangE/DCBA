@@ -4,6 +4,19 @@ import pytest
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
+def test_generation_failure_logs_cause_without_exposing_it_to_client(client, mocker, caplog):
+    failure = RuntimeError("private storage detail")
+    mocker.patch("app.routers.exercise.exercise_service.generate_and_save", side_effect=failure)
+    with caplog.at_level("ERROR", logger="app.routers.exercise"):
+        response = client.post("/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Generation is temporarily unavailable"}
+    record = next(record for record in caplog.records if record.name == "app.routers.exercise")
+    assert record.exc_info[1] is failure
+    assert "subject=ALGORITHM level=EASY" in record.getMessage()
+    assert "private storage detail" not in response.text
+    assert "test-generation-key" not in caplog.text
+
 def test_health_responds_while_generation_waits(client, mocker):
     started, release = Event(), Event()
     def slow_generation(*args):
