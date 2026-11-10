@@ -1,6 +1,16 @@
 from unittest.mock import MagicMock
 from app.models.exercise import Exercise
 
+def test_generate_requires_credentials(client):
+    client.headers.pop("Authorization")
+    response = client.post("/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+    assert response.status_code == 401
+
+def test_generate_disabled_without_key(client, monkeypatch):
+    monkeypatch.delenv("LLM_API_KEY")
+    response = client.post("/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+    assert response.status_code == 503
+
 def test_generate_exercise(client, mocker):
     # =========== given ===========
     # exercise_service 대신 응답할 mock 제작

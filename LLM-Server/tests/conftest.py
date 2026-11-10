@@ -16,12 +16,13 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client():
     with pytest.MonkeyPatch.context() as m:
+        m.setenv("LLM_API_KEY", "test-generation-key")
         # 테스트 전, producer와 consumer 기능을 대체 (with에서만 가짜가 적용)
         m.setattr("app.services.automation_service.automation_service.start_producer", MagicMock())
         m.setattr("app.services.automation_service.automation_service.start_consumer", AsyncMock()) # 비동기 함수에 사용할 Mock
         
         # 서버가 꺼지면 곧바로 
-        with TestClient(app) as test_client:
+        with TestClient(app, headers={"Authorization": "Bearer test-generation-key"}) as test_client:
             yield test_client
 
 @pytest.fixture
