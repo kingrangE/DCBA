@@ -52,6 +52,7 @@ services:
 
   redis:
     image: redis:alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
     container_name: redis-cache
     ports:
       - "${EXTERNAL_REDIS_PORT}:6379"

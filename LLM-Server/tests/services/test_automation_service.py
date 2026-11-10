@@ -1,85 +1,65 @@
-import pytest
-import asyncio
 import json
+import pytest
 from unittest.mock import MagicMock
 from app.services.automation_service import automation_service, RedisQueue
 
-def test_redis_queue_enqueue():
-    # =========== given =========== 
-    # conftest에서 정의한 Redis Mock Get
-    queue = RedisQueue() 
-    task = {"subject": "ALGORITHM", "level": "EASY"}
-    
-    # =========== when =========== 
-    # queue에 task mock 삽입
-    queue.enqueue(task) 
-    
-    # =========== then =========== 
-    # 1개를 삽입했으므로 rpush가 한 번 동작한게 맞는지 확인
-    queue.redis_client.rpush.assert_called_once()
-    # rpsuh에 들어온 인자 확인
-    args = queue.redis_client.rpush.call_args
-    # 인자 첫 값은 queue_key(exercise:generation_queue) 고정
-    assert args[0][0] == "exercise:generation_queue"
-    # 두 번째값은 task를 문자열로 반환한거임
-    assert "ALGORITHM" == json.loads(args[0][1])["subject"]
-    assert "EASY" == json.loads(args[0][1])["level"]
 
-def test_redis_queue_dequeue():
-    # =========== given =========== 
-    # Mock 객체 생성
+def test_enqueue_is_bounded_and_gives_each_task_an_identity():
     queue = RedisQueue()
-    # blpop 실행 시, return 값 설정
-    queue.redis_client.blpop.return_value = ("queue_key", '{"subject": "TEST", "level": "HARD"}')
-    
-    # =========== when =========== 
-    # 넣은거 하나 빼기 
-    result = queue.dequeue()
-    
-    # =========== then =========== 
-    # 결과가 있어야 하고
-    assert result is not None
-    # 결과 dictionary 형태가 다음과 같아야 함
-    assert result["subject"] == "TEST"
-    assert result["level"] == "HARD"
+    queue.redis_client.eval.return_value = "1-0"
+    queue.enqueue({"subject": "ALGORITHM", "level": "EASY"})
+    payload = json.loads(queue.redis_client.eval.call_args.args[-1])
+    assert payload["subject"] == "ALGORITHM" and payload["task_id"]
+    queue.redis_client.eval.return_value = None
+    with pytest.raises(RuntimeError, match="full"):
+        queue.enqueue({"subject": "ALGORITHM", "level": "EASY"})
 
-    # deque에서 pop은 한 번만 호출되어야 함
-    queue.redis_client.blpop.assert_called_once()
 
-@pytest.mark.asyncio
-async def test_automation_service_produce_job(mocker):
-    # =========== given =========== 
+def test_unfinished_task_is_reclaimed_without_removal():
+    queue = RedisQueue()
+    queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": json.dumps({"subject": "ALGORITHM", "level": "EASY", "task_id": "original"})})], []]
+    task = queue.dequeue()
+    assert task["task_id"] == "original" and task["_message_id"] == "1-0"
+    queue.redis_client.xreadgroup.assert_not_called()
+    queue.redis_client.xdel.assert_not_called()
+    queue.acknowledge(task)
+    transaction = queue.redis_client.pipeline.return_value.__enter__.return_value
+    transaction.xack.assert_called_once_with(queue.queue_key, queue.group, "1-0")
+    transaction.xdel.assert_called_once_with(queue.queue_key, "1-0")
+    transaction.execute.assert_called_once()
+
+
+def test_dequeue_reads_new_work_and_preserves_legacy_identity():
+    queue = RedisQueue()
+    queue.redis_client.xautoclaim.return_value = ["0-0", [], []]
+    queue.redis_client.xreadgroup.return_value = [(queue.queue_key, [("2-0", {"payload": '{"subject":"DATABASE","level":"HARD"}'})])]
+    assert queue.dequeue()["task_id"] == "legacy:2-0"
+
+
+def test_produce_job(mocker):
     mocker.patch("random.choice", side_effect=["ALGORITHM", "EASY"])
-    mock_enqueue = mocker.patch.object(automation_service.queue, "enqueue")
-
-    # =========== when =========== 
+    enqueue = mocker.patch.object(automation_service.queue, "enqueue")
     automation_service._produce_job()
-    
-    # =========== then =========== 
-    mock_enqueue.assert_called_once()
-    call_arg = mock_enqueue.call_args[0][0]
-    assert call_arg["subject"] == "ALGORITHM"
-    assert call_arg["level"] == "EASY"
+    enqueue.assert_called_once_with({"subject": "ALGORITHM", "level": "EASY"})
+
 
 @pytest.mark.asyncio
-async def test_automation_service_consumer(mocker):
-    # =========== given =========== 
-    automation_service.is_running = True
-    
-    task_payload = {
-        "subject": "DATABASE", "level": "HARD", 
-        "subject_display": "Database", "level_display": "Advanced"
-    }
-    
-    
-    # is_running이 켜져있으면 계속 돌아가기에 dequeue Mock 구현
-    def side_effect_dequeue(*args, **kwargs):
-        automation_service.is_running = False 
-        return task_payload
-    # object mock
-    mocker.patch.object(automation_service.queue, "dequeue", side_effect=side_effect_dequeue)
-
-    mock_service = mocker.patch("app.services.automation_service.exercise_service")
-    mock_service.generate_and_save.return_value = MagicMock(id=123)
+@pytest.mark.parametrize("fails", [False, True])
+async def test_consumer_acknowledges_only_committed_tasks(mocker, fails):
+    task = {"subject": "DATABASE", "level": "HARD", "task_id": "task-1", "_message_id": "1-0"}
+    def dequeue(*args):
+        automation_service.is_running = False
+        return task
+    mocker.patch.object(automation_service.queue, "dequeue", side_effect=dequeue)
+    acknowledge = mocker.patch.object(automation_service.queue, "acknowledge")
+    service = mocker.patch("app.services.automation_service.exercise_service")
+    if fails:
+        service.generate_and_save.side_effect = RuntimeError("database unavailable")
+    else:
+        service.generate_and_save.return_value = MagicMock(id=123)
     await automation_service.start_consumer()
-    mock_service.generate_and_save.assert_called_once_with("DATABASE", "HARD")
+    service.generate_and_save.assert_called_once_with("DATABASE", "HARD", "task-1")
+    if fails:
+        acknowledge.assert_not_called()
+    else:
+        acknowledge.assert_called_once_with(task)

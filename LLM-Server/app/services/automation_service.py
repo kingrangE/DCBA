@@ -3,36 +3,73 @@ import json
 import redis
 import asyncio
 import random
+import uuid
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.exercise_service import exercise_service
-from app.models.exercise import SUBJECT_LABELS, LEVEL_LABELS
+from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
 
 class RedisQueue:
     def __init__(self, host="localhost", port=6379, db=0):
-        self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True)
-        self.queue_key = "exercise:generation_queue"
+        self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True,
+                                        socket_connect_timeout=5, socket_timeout=10)
+        self.queue_key = "exercise:generation_stream"
+        self.legacy_key = "exercise:generation_queue"
+        self.group = "exercise-generators"
+        self.consumer = str(uuid.uuid4())
+        self.retry_idle_ms = 600_000
+        self.claim_cursor = "0-0"
 
     def enqueue(self, task: dict):
-        # Producer 역할, task가 들어오면 queue에 삽입 (LLM이 이전 요청을 모두 처리하지 못했는데, 요청이 오는경우 여기서 처리)
-        try:
-            self.redis_client.rpush(self.queue_key, json.dumps(task))
-            print(f"[Producer] Enqueued task: {task['subject']} - {task['level']}")
-        except Exception as e:
-            print(f"[Producer Error] Failed to enqueue: {e}")
+        request = ExerciseRequest(**task)
+        payload = {**request.model_dump(mode="json"), "task_id": str(uuid.uuid4())}
+        result = self.redis_client.eval("""
+            if redis.call('XLEN', KEYS[1]) + redis.call('LLEN', KEYS[2]) >= 1000 then return false end
+            return redis.call('XADD', KEYS[1], '*', 'payload', ARGV[1])
+        """, 2, self.queue_key, self.legacy_key, json.dumps(payload))
+        if not result:
+            raise RuntimeError("Generation queue is full")
 
-    def dequeue(self, timeout=0):
-        # consumer 역할, 완료되면 queue에서 하나뺌
+    def dequeue(self, timeout=5):
         try:
-            result = self.redis_client.blpop(self.queue_key, timeout=timeout)
-            if result:
-                return json.loads(result[1])
-        except Exception as e:
-            print(f"[Consumer Error] Failed to dequeue: {e}")
-        return None
+            self.redis_client.xgroup_create(self.queue_key, self.group, id="0-0", mkstream=True)
+        except Exception as error:
+            if not str(error).startswith("BUSYGROUP"):
+                raise
+        # Move old deployments' queued work without a gap between removal and insertion.
+        self.redis_client.eval("""
+            if redis.call('XLEN', KEYS[1]) >= 1000 then return false end
+            local payload = redis.call('LINDEX', KEYS[2], 0)
+            if not payload then return false end
+            local id = redis.call('XADD', KEYS[1], '*', 'payload', payload)
+            redis.call('LPOP', KEYS[2])
+            return id
+        """, 2, self.queue_key, self.legacy_key)
+        claimed = self.redis_client.xautoclaim(
+            self.queue_key, self.group, self.consumer, self.retry_idle_ms,
+            start_id=self.claim_cursor, count=1,
+        )
+        self.claim_cursor = claimed[0]
+        messages = claimed[1]
+        if not messages:
+            result = self.redis_client.xreadgroup(self.group, self.consumer,
+                        {self.queue_key: ">"}, count=1, block=max(1, timeout * 1000))
+            messages = result[0][1] if result else []
+        if not messages:
+            return None
+        message_id, fields = messages[0]
+        task = json.loads(fields["payload"])
+        task["task_id"] = task.get("task_id") or "legacy:" + message_id
+        task["_message_id"] = message_id
+        return task
+
+    def acknowledge(self, task):
+        with self.redis_client.pipeline() as transaction:
+            transaction.xack(self.queue_key, self.group, task["_message_id"])
+            transaction.xdel(self.queue_key, task["_message_id"])
+            transaction.execute()
 
     def size(self):
-        # 현재 저장된 양 확인
-        return self.redis_client.llen(self.queue_key)
+        return self.redis_client.xlen(self.queue_key) + self.redis_client.llen(self.legacy_key)
 
 
 class AutomationService:
@@ -90,8 +127,9 @@ class AutomationService:
                     # 문제 생성 시작
                     try:
                         saved_exercise = await loop.run_in_executor(
-                            None, exercise_service.generate_and_save, task['subject'], task['level']
+                            None, exercise_service.generate_and_save, task['subject'], task['level'], task['task_id']
                         )
+                        await loop.run_in_executor(None, self.queue.acknowledge, task)
                         print(f"[Consumer] Saved exercise {saved_exercise.id}")
 
                     except Exception as e:
