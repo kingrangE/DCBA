@@ -559,25 +559,8 @@
 
     <!-- Marked Library for Markdown Rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Render Markdown for Questions
-            document.querySelectorAll('.card-title-content').forEach(el => {
-                const rawDetails = el.getAttribute('data-markdown');
-                if (rawDetails) {
-                    el.innerHTML = marked.parse(rawDetails);
-                }
-            });
-
-            // Render Markdown for Answers
-            document.querySelectorAll('.answer-content').forEach(el => {
-                const rawAnswer = el.getAttribute('data-markdown');
-                if (rawAnswer) {
-                    el.innerHTML = marked.parse(rawAnswer);
-                }
-            });
-        });
-    </script>
+    <script src="/vendor/purify.min.js"></script>
+    <script src="/js/render-exercises.js"></script>
 </body>
 
 </html>
