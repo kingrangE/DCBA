@@ -3,6 +3,7 @@ package kingrangE.DCBA.controller;
 import kingrangE.DCBA.config.SecurityConfig;
 import kingrangE.DCBA.domain.User;
 import kingrangE.DCBA.service.UserService;
+import kingrangE.DCBA.service.UserRequestException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -49,7 +50,7 @@ class WebSecurityTests {
         MockHttpSession session = new MockHttpSession();
         CsrfToken token = (CsrfToken) mvc.perform(get("/").session(session)).andReturn().getRequest().getAttribute("_csrf");
         String originalSessionId = session.getId();
-        when(userService.login("reader", "wrong")).thenThrow(new RuntimeException("Invalid credentials"));
+        when(userService.login("reader", "wrong")).thenThrow(new UserRequestException("Invalid credentials"));
 
         mvc.perform(post("/login").session(session)
                         .param(token.getParameterName(), token.getToken())
@@ -59,6 +60,33 @@ class WebSecurityTests {
                 .andExpect(request().sessionAttributeDoesNotExist("loginUser"));
 
         assertThat(session.getId()).isEqualTo(originalSessionId);
+    }
+
+    @Test
+    void signupDatabaseFailureReturnsServerErrorWithoutInternalDetails() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        CsrfToken token = (CsrfToken) mvc.perform(get("/").session(session)).andReturn().getRequest().getAttribute("_csrf");
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DataIntegrityViolationException("private SQL details"))
+                .when(userService).signUp("reader", "password");
+        mvc.perform(post("/signup").session(session)
+                        .param(token.getParameterName(), token.getToken())
+                        .param("name", "reader").param("password", "password"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private SQL details"))));
+    }
+
+    @Test
+    void signupValidationFailureUsesRequestPathWithoutReferer() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        CsrfToken token = (CsrfToken) mvc.perform(get("/").session(session)).andReturn().getRequest().getAttribute("_csrf");
+        org.mockito.Mockito.doThrow(new UserRequestException("Invalid nickname"))
+                .when(userService).signUp("reader", "password");
+        mvc.perform(post("/signup").session(session)
+                        .param(token.getParameterName(), token.getToken())
+                        .param("name", "reader").param("password", "password"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/signup?error"))
+                .andExpect(flash().attribute("errorMessage", "Invalid nickname"));
     }
 
     @Test

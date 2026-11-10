@@ -25,6 +25,20 @@ class DashboardTests {
     @Autowired MockMvc mvc;
     @MockitoBean ExerciseService service;
 
+    @org.junit.jupiter.api.Test
+    void missingExerciseReturnsNotFoundWithoutInternalDetails() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("loginUser", new User("reader", "unused"));
+        var token = (org.springframework.security.web.csrf.CsrfToken) mvc.perform(get("/js/render-exercises.js").session(session))
+                .andReturn().getRequest().getAttribute("_csrf");
+        doThrow(new jakarta.persistence.EntityNotFoundException("private resource detail"))
+                .when(service).saveExercise(any(), eq(999L));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/exercise/save")
+                        .session(session).param(token.getParameterName(), token.getToken()).param("exerciseId", "999"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("private resource detail"))));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"selected", "banned"})
     void paginationAndFiltersStayInCurrentList(String view) throws Exception {

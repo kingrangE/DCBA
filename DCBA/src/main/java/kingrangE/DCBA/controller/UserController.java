@@ -7,6 +7,7 @@ import kingrangE.DCBA.dto.LoginForm;
 import kingrangE.DCBA.dto.SignUpForm;
 import kingrangE.DCBA.repository.UserRepository;
 import kingrangE.DCBA.service.UserService;
+import kingrangE.DCBA.service.UserRequestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -84,15 +85,14 @@ public class UserController {
      * @param redirectAttributes 데이터 전달하기 위한 객체 (Error Message를 전달하기 위함)
      * @return
      */
-    @ExceptionHandler({ RuntimeException.class })
-    public String handlerException(RuntimeException e, HttpServletRequest request,
+    @ExceptionHandler(UserRequestException.class)
+    public String handlerException(UserRequestException e, HttpServletRequest request,
             RedirectAttributes redirectAttributes) {
         // Error 메시지를 같이 보내주기 위함
         redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
 
         // 현재 요청이 어디서 왔는지 확인해서 해당 페이지로 돌려보냄
-        String referer = request.getHeader("Referer");
-        if (referer != null && referer.contains("/signup")) {
+        if (request.getRequestURI().equals("/signup")) {
             return "redirect:/signup?error";
         }
         return "redirect:/?error";
