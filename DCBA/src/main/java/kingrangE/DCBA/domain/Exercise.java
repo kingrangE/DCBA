@@ -6,6 +6,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(indexes = {
+        @Index(name = "idx_exercise_subject_level", columnList = "subject,level"),
+        @Index(name = "idx_exercise_level", columnList = "level")
+})
 @Getter
 @Builder
 @ToString // 객체 print 확인을 위한 toString
@@ -15,14 +19,18 @@ public class Exercise {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(columnDefinition = "TEXT") // 질문과 답변은 길이 제한이 없어야 함
+    @Column(columnDefinition = "TEXT", nullable = false) // 질문과 답변은 길이 제한이 없어야 함
     private String question;
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String answer;
 
     @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
+    @Column(length = 30, nullable = false)
     private Subject subject;
     @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
+    @Column(length = 8, nullable = false)
     private Level level;
 
     private LocalDateTime createdAt;

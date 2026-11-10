@@ -19,8 +19,7 @@ import kingrangE.DCBA.exception.UnauthorizedException;
 import kingrangE.DCBA.service.ExerciseGenerationQueueService;
 import kingrangE.DCBA.service.ExerciseService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -46,21 +45,25 @@ public class ExerciseController {
             @RequestParam(defaultValue = "all") String view,
             @RequestParam(required = false) Subject subject,
             @RequestParam(required = false) Level level,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "9") int size,
+            @RequestParam(required = false) Long before,
+            @RequestParam(required = false) Long after,
             HttpSession session) {
         User user = requireUser(session);
-        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.max(1, Math.min(size, 50)));
-        Page<Exercise> exercisePage = switch (view) {
-            case "all" -> exerciseService.getExercises(user.getId(), subject, level, pageable);
-            case "selected" -> exerciseService.getSelectedExercises(user.getId(), pageable);
-            case "banned" -> exerciseService.getBannedExercises(user.getId(), pageable);
+        Slice<Exercise> slice = switch (view) {
+            case "all" -> exerciseService.getExercises(user.getId(), subject, level, before, after);
+            case "selected" -> exerciseService.getSelectedExercises(user.getId(), subject, level, before, after);
+            case "banned" -> exerciseService.getBannedExercises(user.getId(), subject, level, before, after);
             default -> throw new IllegalArgumentException("지원하지 않는 문제 보기 방식입니다.");
         };
-
-        Set<Long> savedIds = Set.copyOf(exerciseService.getSavedExerciseIds(user.getId()));
-        Set<Long> bannedIds = Set.copyOf(exerciseService.getBannedExerciseIds(user.getId()));
-        return PageResponse.from(exercisePage.map(exercise -> ExerciseResponse.from(exercise, savedIds, bannedIds)));
+        List<Exercise> content = after == null ? slice.getContent() : slice.getContent().reversed();
+        List<Long> ids = content.stream().map(Exercise::getId).toList();
+        Set<Long> savedIds = view.equals("selected") ? Set.copyOf(ids)
+                : Set.copyOf(exerciseService.getSavedExerciseIds(user.getId(), ids));
+        Set<Long> bannedIds = view.equals("all") ? Set.of() : view.equals("banned") ? Set.copyOf(ids)
+                : Set.copyOf(exerciseService.getBannedExerciseIds(user.getId(), ids));
+        return new PageResponse<>(content.stream().map(e -> ExerciseResponse.from(e, savedIds, bannedIds)).toList(),
+                after == null ? before != null : slice.hasNext(), after != null || slice.hasNext(),
+                content.isEmpty() ? null : ids.getFirst(), content.isEmpty() ? null : ids.getLast());
     }
 
     @GetMapping("/options")

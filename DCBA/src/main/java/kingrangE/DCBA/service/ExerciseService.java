@@ -6,13 +6,15 @@ import kingrangE.DCBA.repository.BannedExerciseRepository;
 import kingrangE.DCBA.repository.ExerciseRepository;
 import kingrangE.DCBA.repository.SelectedExerciseRepository;
 import kingrangE.DCBA.repository.UserRepository;
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 import java.util.List;
 
 @Service
@@ -28,41 +30,14 @@ public class ExerciseService {
      * @param userId 유저 Id
      * @param subject 과목명 (Enum) (optional)
      * @param level 레벨 (Enum) (optional)
-     * @param pageable 페이지 정보
-     * @return 조건에 따라 필터링된 Exercise들의 Pages
+     * @param before 이 식별자보다 오래된 문제
+     * @return 조건에 맞는 문제와 다음 구간 존재 여부
      */
-    public Page<Exercise> getExercises( Long userId,
+    public Slice<Exercise> getExercises( Long userId,
                                        @Nullable Subject subject,
                                        @Nullable Level level,
-                                        Pageable pageable) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        List<Long> bannedIds = bannedExerciseRepository.findAllByUser(user, Pageable.unpaged())
-                .stream()
-                .map(b -> b.getExercise().getId())
-                .toList();
-
-        if (bannedIds.isEmpty()) { // 밴한 문제가 없다면
-            if (subject != null && level != null) { // 필터링 둘 다 존재
-                return exerciseRepository.findBySubjectAndLevel(subject, level, pageable); // 필터링한 결과 반환
-            } else if (subject != null) { // 과목만 필터링
-                return exerciseRepository.findBySubject(subject, pageable); // 과목 필터링 결과 반환
-            } else if (level != null) { // 수준만 필터링
-                return exerciseRepository.findByLevel(level, pageable); // 수준 필터링 결과 반환
-            } else { // 필터링 없음
-                return exerciseRepository.findAll(pageable); // 전체 문제 반환
-            }
-        }
-
-        //밴한 문제가 있는 경우 (method 제외 로직은 같음)(method만 banned 문제 제외하는걸로 이용)
-        if (subject != null && level != null) {
-            return exerciseRepository.findBySubjectAndLevelAndIdNotIn(subject, level, bannedIds, pageable);
-        } else if (subject != null) {
-            return exerciseRepository.findBySubjectAndIdNotIn(subject, bannedIds, pageable);
-        } else if (level != null) {
-            return exerciseRepository.findByLevelAndIdNotIn(level, bannedIds, pageable);
-        } else {
-            return exerciseRepository.findByIdNotIn(bannedIds, pageable);
-        }
+                                        Long before, Long after) {
+        return exerciseRepository.findVisibleExercises(userId, subject, level, before, after, cursorPage(before, after));
     }
 
     /**
@@ -73,12 +48,12 @@ public class ExerciseService {
     @Transactional
     public void saveExercise( Long userId, Long exerciseId) {
         // User 정보 가져옴 (없으면 Error)
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
+                -> new jakarta.persistence.EntityNotFoundException("User not found"));
 
         // Exercise 정보 가져옴 (없으면 Error)
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Exercise not found"));
 
         // 선택된 운동을 관리하는 Repo에 이미 저장되어 있는지 확인 (있으면 중복 저장 X)
         if (selectedExerciseRepository.findByUserAndExercise(user, exercise).isPresent()) {
@@ -100,15 +75,12 @@ public class ExerciseService {
      */
     @Transactional
     public void cancelSaveExercise(Long userId, Long exerciseId) {
-        // user와 운동 정보 가져오기
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-        Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
-
-        // user와 운동 정보를 기반으로 선택된 문제들을 찾아서 있으면 삭제하도록 함.(메서드 참조 이용)
-        selectedExerciseRepository.findByUserAndExercise(user, exercise)
-                .ifPresent(selectedExerciseRepository::delete);
+        userRepository.findByIdForUpdate(userId).orElseThrow(()
+                -> new jakarta.persistence.EntityNotFoundException("User not found"));
+        if (!exerciseRepository.existsById(exerciseId)) {
+            throw new jakarta.persistence.EntityNotFoundException("Exercise not found");
+        }
+        selectedExerciseRepository.deletePreference(userId, exerciseId);
     }
 
     /**
@@ -118,10 +90,10 @@ public class ExerciseService {
      */
     @Transactional
     public void banExercise(Long userId, Long exerciseId) {
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
+                -> new jakarta.persistence.EntityNotFoundException("User not found"));
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Exercise not found"));
 
         if (bannedExerciseRepository.findByUserAndExercise(user, exercise).isPresent()) {
             return; // Already banned
@@ -138,73 +110,46 @@ public class ExerciseService {
      */
     @Transactional
     public void cancelBanExercise(Long userId, Long exerciseId) {
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-        Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
-
-        bannedExerciseRepository.findByUserAndExercise(user, exercise)
-                .ifPresent(bannedExerciseRepository::delete);
+        userRepository.findByIdForUpdate(userId).orElseThrow(()
+                -> new jakarta.persistence.EntityNotFoundException("User not found"));
+        if (!exerciseRepository.existsById(exerciseId)) {
+            throw new jakarta.persistence.EntityNotFoundException("Exercise not found");
+        }
+        bannedExerciseRepository.deletePreference(userId, exerciseId);
     }
 
     /**
      * User SelectedRepo에 저장된 문제 Page 가져오기
      * @param userId User Id
-     * @param pageable Page 정보
-     * @return 유저가 저장한 문제들의 Pages
+     * @param before 이 식별자보다 오래된 문제
+     * @return 저장한 문제와 다음 구간 존재 여부
      */
-    public Page<Exercise> getSelectedExercises(Long userId, Pageable pageable) {
-        // UserId를 기반으로 user정보 Get
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-
-        // User가 선택한 문제 목록을 가져오도록 함.
-        Page<SelectedExercise> selectedPage = selectedExerciseRepository.findAllByUser(user, pageable);
-        //메서드 참조를 이용, Page에 들어있는 SelectedExercise 각 객체에서 getExercise(return Exercise)를 수행하도록 함.
-        return selectedPage.map(SelectedExercise::getExercise);
+    public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, Long before, Long after) {
+        return selectedExerciseRepository.findExercises(userId, subject, level, before, after, cursorPage(before, after));
     }
 
     /**
      * User BannedRepo에 저장된 문제 Page 가져오기
      * @param userId 유저 Id
-     * @param pageable Page 정보
-     * @return 유저가 Ban한 문제들의 Pages
+     * @param before 이 식별자보다 오래된 문제
+     * @return 차단한 문제와 다음 구간 존재 여부
      */
-    public Page<Exercise> getBannedExercises(Long userId, Pageable pageable) {
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-        Page<BannedExercise> bannedPage = bannedExerciseRepository.findAllByUser(user, pageable);
-        return bannedPage.map(BannedExercise::getExercise);
+    public Slice<Exercise> getBannedExercises(Long userId, Subject subject, Level level, Long before, Long after) {
+        return bannedExerciseRepository.findExercises(userId, subject, level, before, after, cursorPage(before, after));
     }
 
-    /**
-     * User Selected Repo에 저장된 문제 Id들 가져오기
-     * @param userId 유저 Id
-     * @return User Selected Repo에 있는 문제 Id List
-     */
-    public List<Long> getSavedExerciseIds(Long userId) {
-        // User 정보 가져오기
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-
-        // User가 선택한 문제들 가져오도록 함.
-        return selectedExerciseRepository.findAllByUser(user, Pageable.unpaged())//Page처리 하지말고 전체를 다 읽음
-                .stream()
-                .map(e -> e.getExercise().getId())
-                .toList();
+    private Pageable cursorPage(Long before, Long after) {
+        if ((before != null && after != null) || (before != null && before <= 0) || (after != null && after <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        return PageRequest.of(0, 9, Sort.by(after == null ? Sort.Direction.DESC : Sort.Direction.ASC, "e.id"));
     }
 
-    /**
-     * User Banned Repo에 저장된 문제 Id들 가져오기
-     * @param userId 유저 Id
-     * @return User Banned Repo에 있는 문제 Id List
-     */
-    public List<Long> getBannedExerciseIds(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-        return bannedExerciseRepository.findAllByUser(user, Pageable.unpaged())
-                .stream()
-                .map(e -> e.getExercise().getId())
-                .toList();
+    public List<Long> getSavedExerciseIds(Long userId, List<Long> exerciseIds) {
+        return exerciseIds.isEmpty() ? List.of() : selectedExerciseRepository.findExerciseIds(userId, exerciseIds);
+    }
+
+    public List<Long> getBannedExerciseIds(Long userId, List<Long> exerciseIds) {
+        return exerciseIds.isEmpty() ? List.of() : bannedExerciseRepository.findExerciseIds(userId, exerciseIds);
     }
 }

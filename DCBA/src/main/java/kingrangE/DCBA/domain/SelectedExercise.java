@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity // JPA 이용을 위한 Entity 설정
+@Table(name = "selected_exercise", uniqueConstraints = @UniqueConstraint(name = "uk_selected_user_exercise", columnNames = {"user_id", "exercise_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED) //JPA를 위한 기본 생성자
 @AllArgsConstructor

@@ -43,8 +43,10 @@ export const api = {
     body: JSON.stringify({ slackId }),
   }),
   options: () => request('/api/exercises/options'),
-  exercises: ({ view, subject, level, page, size = 9 }) => {
-    const params = new URLSearchParams({ view, page: String(page), size: String(size) })
+  exercises: ({ view, subject, level, before, after }) => {
+    const params = new URLSearchParams({ view })
+    if (before) params.set('before', String(before))
+    if (after) params.set('after', String(after))
     if (subject) params.set('subject', subject)
     if (level) params.set('level', level)
     return request(`/api/exercises?${params}`)
