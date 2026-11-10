@@ -5,10 +5,7 @@ import kingrangE.DCBA.domain.Level;
 import kingrangE.DCBA.domain.Subject;
 import kingrangE.DCBA.service.ExerciseService;
 import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import java.util.List;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.RequestParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -28,45 +25,32 @@ public class ExerciseController {
      * 대시보드 메인 화면 요청 시 로직
      * @param subject 과목 이름 (Enum)
      * @param level 레벨 (Enum)
-     * @param pageable 페이지 정보
+     * @param before 이 식별자보다 오래된 문제
      * @param model 모델 객체 (HTML 파일 전달용)
      * @param session Session 정보 (Login 검사용)
      * @return dashboard.html
      */
     @GetMapping("/dashboard")
-    public String dashboardMain(@RequestParam(required = false) Subject subject, // 필터링 조건 (Optional)
-            @RequestParam(required = false) Level level, // 필터링 조건 (Optional)
-            @PageableDefault(size = 9, sort = "id", direction = Sort.Direction.DESC) Pageable pageable, // page번호와 size에 따라 Page 관리 (기본 9개)
-            Model model, // Controller 데이터를 HTML 파일에서 이용하기 위함
-            HttpSession session) { // 로그인해야 접근 가능하도록 Session정보 저장용
+    public String dashboardMain(@RequestParam(required = false) Subject subject,
+            @RequestParam(required = false) Level level,
+            @RequestParam(required = false) Long before,
+            @RequestParam(required = false) Long after,
+            Model model, HttpSession session) {
+        User user = (User) session.getAttribute("loginUser");
+        if (user == null) return "redirect:/";
 
-        if (session.getAttribute("loginUser") == null) { // login한 정보가 없으면
-            return "redirect:/"; // 처음으로
-        }
-
-        User user = (User) session.getAttribute("loginUser"); // 로그인한 유저 정보 가져옴
-
-        //현재 Pageable 정보를 기반으로 문제 페이지를 가져옴
-        Slice<Exercise> exercisePage = exerciseService.getExercises(user.getId(), subject, level, pageable); //
-
-        // 현재 페이지 정보 추가 ( 페이지 정보를 전체로 바꿔서, ... 을 나타낼 수 있게 하면 더 좋을듯)
-        model.addAttribute("exercises", exercisePage.getContent()); // List<Exercise> 객체 저장
-        model.addAttribute("page", exercisePage);
+        Slice<Exercise> slice = exerciseService.getExercises(user.getId(), subject, level, before, after);
+        List<Exercise> exercises = after == null ? slice.getContent() : slice.getContent().reversed();
+        addNavigation(model, slice, exercises, before, after);
         model.addAttribute("viewType", "all");
         model.addAttribute("dashboardPath", "/dashboard");
         model.addAttribute("currentSubject", subject);
         model.addAttribute("currentLevel", level);
-
-        // 현재 과목 및 레벨 정보 추가
         model.addAttribute("subjects", Subject.values());
         model.addAttribute("levels", Level.values());
-
-        // 저장한 문제들과 banned한 문제들을 표시하기 위한 id들 추가
-        List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
+        List<Long> pageIds = exercises.stream().map(Exercise::getId).toList();
         model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId(), pageIds));
         model.addAttribute("bannedIds", List.of());
-
-        // dashboard.html view resolver 전달ㄴ
         return "dashboard";
     }
 
@@ -156,76 +140,73 @@ public class ExerciseController {
 
     /**
      * 선택한 문제들 확인 화면 요청시 로직
-     * @param pageable 페이지 정보
+     * @param before 이 식별자보다 오래된 문제
      * @param model 모델 객체(HTML 전달용)
      * @param session Session 정보 (로그인 확인)
      * @return dashboard.html
      */
     @GetMapping("/dashboard/selected")
     public String dashboardSelected(@RequestParam(required = false) Subject subject,
-                                    @RequestParam(required = false) Level level, @PageableDefault(size = 9, sort = "id", direction = Sort.Direction.DESC) Pageable pageable, // 페이지 정보
-                                    Model model, // HTML에 전달할 모델 정보
-                                    HttpSession session) { //Session 관리를 위한 Session정보
-        // Session에서 유저 정보 가져옴
+            @RequestParam(required = false) Level level,
+            @RequestParam(required = false) Long before,
+            @RequestParam(required = false) Long after,
+            Model model, HttpSession session) {
         User user = (User) session.getAttribute("loginUser");
-        if (user == null) { //로그인 안 했으면 해
-            return "redirect:/";
-        }
+        if (user == null) return "redirect:/";
 
-        // 선택한 문제 가져와
-        Slice<Exercise> exercisePage = exerciseService.getSelectedExercises(user.getId(), subject, level, pageable);
-
-        // 문제를 보여주기 위해 Model에 정보 추가
-        model.addAttribute("exercises", exercisePage.getContent());
-        model.addAttribute("page", exercisePage);
-
-        // 다 같은 HTML 파일을 사용하기에 viewType 파라미터 설정해서 다르게 보이도록 함
+        Slice<Exercise> slice = exerciseService.getSelectedExercises(user.getId(), subject, level, before, after);
+        List<Exercise> exercises = after == null ? slice.getContent() : slice.getContent().reversed();
+        addNavigation(model, slice, exercises, before, after);
         model.addAttribute("viewType", "selected");
         model.addAttribute("dashboardPath", "/dashboard/selected");
         model.addAttribute("currentSubject", subject);
         model.addAttribute("currentLevel", level);
         model.addAttribute("subjects", Subject.values());
         model.addAttribute("levels", Level.values());
-
-        // 저장한거랑 밴한거 정보 가져와서 표시하도록 함.
-        List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
+        List<Long> pageIds = exercises.stream().map(Exercise::getId).toList();
         model.addAttribute("savedIds", pageIds);
         model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId(), pageIds));
-
         return "dashboard";
     }
 
     /**
      * 금지한 문제들 화면 요청시 로직
-     * @param pageable 페이지 정보
+     * @param before 이 식별자보다 오래된 문제
      * @param model 모델 객체(HTML 전달용)
      * @param session Session 정보 (로그인 확인)
      * @return dashboard.html
      */
     @GetMapping("/dashboard/banned")
     public String dashboardBanned(@RequestParam(required = false) Subject subject,
-                                  @RequestParam(required = false) Level level, @PageableDefault(size = 9, sort = "id", direction = Sort.Direction.DESC) Pageable pageable, Model model, HttpSession session) {
+            @RequestParam(required = false) Level level,
+            @RequestParam(required = false) Long before,
+            @RequestParam(required = false) Long after,
+            Model model, HttpSession session) {
         User user = (User) session.getAttribute("loginUser");
-        if (user == null) {
-            return "redirect:/";
-        }
+        if (user == null) return "redirect:/";
 
-        Slice<Exercise> exercisePage = exerciseService.getBannedExercises(user.getId(), subject, level, pageable);
-
-        model.addAttribute("exercises", exercisePage.getContent());
-        model.addAttribute("page", exercisePage);
+        Slice<Exercise> slice = exerciseService.getBannedExercises(user.getId(), subject, level, before, after);
+        List<Exercise> exercises = after == null ? slice.getContent() : slice.getContent().reversed();
+        addNavigation(model, slice, exercises, before, after);
         model.addAttribute("viewType", "banned");
         model.addAttribute("dashboardPath", "/dashboard/banned");
         model.addAttribute("currentSubject", subject);
         model.addAttribute("currentLevel", level);
-
         model.addAttribute("subjects", Subject.values());
         model.addAttribute("levels", Level.values());
-
-        List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
+        List<Long> pageIds = exercises.stream().map(Exercise::getId).toList();
         model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId(), pageIds));
         model.addAttribute("bannedIds", pageIds);
-
         return "dashboard";
     }
+
+    private void addNavigation(Model model, Slice<Exercise> slice, List<Exercise> exercises, Long before, Long after) {
+        model.addAttribute("exercises", exercises);
+        model.addAttribute("hasCursor", before != null || after != null);
+        model.addAttribute("hasPrevious", after == null ? before != null : slice.hasNext());
+        model.addAttribute("hasNext", after != null || slice.hasNext());
+        model.addAttribute("previousCursor", exercises.isEmpty() ? null : exercises.getFirst().getId());
+        model.addAttribute("nextCursor", exercises.isEmpty() ? null : exercises.getLast().getId());
+    }
+
 }

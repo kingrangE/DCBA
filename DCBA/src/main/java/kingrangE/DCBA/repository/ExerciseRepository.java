@@ -53,10 +53,12 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
             select e from Exercise e
             where (:subject is null or e.subject = :subject)
               and (:level is null or e.level = :level)
+              and (:before is null or e.id < :before)
+              and (:after is null or e.id > :after)
               and not exists (select b.id from BannedExercise b
                               where b.user.id = :userId and b.exercise = e)
             """)
-    Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, Pageable pageable);
+    Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, Long before, Long after, Pageable pageable);
 
     /**
      * 과목 기반 필터링 조회 (List 반환)

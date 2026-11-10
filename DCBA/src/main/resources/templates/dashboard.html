@@ -545,12 +545,14 @@
         </div>
 
         <!-- Pagination -->
-        <div class="pagination" th:if="${page.hasPrevious() or page.hasNext()}">
-            <a th:if="${page.hasPrevious()}"
-                th:href="@{${dashboardPath}(page=${page.number - 1}, subject=${currentSubject}, level=${currentLevel})}"
+        <div class="pagination" th:if="${hasCursor or hasNext}">
+            <a th:if="${hasCursor}" th:href="@{${dashboardPath}(subject=${currentSubject}, level=${currentLevel})}"
+                class="page-link">First</a>
+            <a th:if="${hasPrevious and previousCursor != null}"
+                th:href="@{${dashboardPath}(after=${previousCursor}, subject=${currentSubject}, level=${currentLevel})}"
                 class="page-link">&laquo; Prev</a>
-            <a th:if="${page.hasNext()}"
-                th:href="@{${dashboardPath}(page=${page.number + 1}, subject=${currentSubject}, level=${currentLevel})}"
+            <a th:if="${hasNext and nextCursor != null}"
+                th:href="@{${dashboardPath}(before=${nextCursor}, subject=${currentSubject}, level=${currentLevel})}"
                 class="page-link">Next &raquo;</a>
         </div>
     </div>

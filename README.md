@@ -77,3 +77,13 @@ External notification delivery is not configured in this repository because no r
 ## Problem filter indexes
 
 The count and page queries retain their current filter and banned-problem semantics. In a separate MariaDB with 54,000 synthetic problems, filtered count queries changed from full table scans to indexed lookups after adding `(subject, level)` and `(level)` indexes. All four combinations of subject and difficulty filters returned the same counts and latest problem identifiers, including banned-problem exclusions. This checks the query plan and result preservation; production latency and data distribution have not been measured. Additional indexes were not added because these two cover the measured filter paths.
+
+## Request and generation performance
+
+Each dashboard derives the state already implied by its membership instead of querying it again: visible problems are not banned, saved-list entries are saved, and banned-list entries are banned. Cancellation retains the user lock and missing-problem checks, but uses an existence check and one conditional relationship deletion rather than loading the problem body and preference entity.
+
+Generation reuses the accepted candidate's embedding after the database commit. The vector index checkpoint advances only after recording that vector. If saving fails, the candidate is not indexed; if the process stops or checkpoint recording fails after commit, the existing database synchronization can rebuild the missing index entry. The shared generation lock remains required.
+
+Dashboards now show nine problems at a time, newest first, with First/Prev/Next navigation instead of page numbers or a final-page link. They fetch one extra problem to detect continuation and do not count the whole result. Next uses a positive `before` problem ID; Prev uses a positive `after` ID and reverses the query direction. Both cannot be supplied together. Links retain the active list, subject and difficulty; changing filters starts from the first result. Old page/size/sort query parameters no longer select a page. Empty cursor results retain a First link for recovery.
+
+In the separate 54,000-problem MariaDB fixture, obtaining the same ten eligible rows at a deep position read 45,465 problem rows with OFFSET and ten with the cursor range. This is an actual-row-count comparison for that fixture, not a production latency or throughput benchmark. Forward/backward traversal, preference ownership, filters, new insertions, and single-query list loading are covered by the Java checks.

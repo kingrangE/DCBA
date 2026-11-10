@@ -26,9 +26,11 @@ public interface SelectedExerciseRepository extends JpaRepository<SelectedExerci
             where preference.user.id = :userId
               and (:subject is null or e.subject = :subject)
               and (:level is null or e.level = :level)
+              and (:before is null or e.id < :before)
+              and (:after is null or e.id > :after)
             """)
     Slice<kingrangE.DCBA.domain.Exercise> findExercises(Long userId,
-            kingrangE.DCBA.domain.Subject subject, kingrangE.DCBA.domain.Level level, Pageable pageable);
+            kingrangE.DCBA.domain.Subject subject, kingrangE.DCBA.domain.Level level, Long before, Long after, Pageable pageable);
 
     /**
      * User가 선택한 전체 문제 Page 찾기

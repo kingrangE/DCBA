@@ -10,7 +10,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 import java.util.List;
 
 @Service
@@ -26,14 +30,14 @@ public class ExerciseService {
      * @param userId 유저 Id
      * @param subject 과목명 (Enum) (optional)
      * @param level 레벨 (Enum) (optional)
-     * @param pageable 페이지 정보
-     * @return 조건에 따라 필터링된 Exercise들의 Pages
+     * @param before 이 식별자보다 오래된 문제
+     * @return 조건에 맞는 문제와 다음 구간 존재 여부
      */
     public Slice<Exercise> getExercises( Long userId,
                                        @Nullable Subject subject,
                                        @Nullable Level level,
-                                        Pageable pageable) {
-        return exerciseRepository.findVisibleExercises(userId, subject, level, pageable);
+                                        Long before, Long after) {
+        return exerciseRepository.findVisibleExercises(userId, subject, level, before, after, cursorPage(before, after));
     }
 
     /**
@@ -117,21 +121,28 @@ public class ExerciseService {
     /**
      * User SelectedRepo에 저장된 문제 Page 가져오기
      * @param userId User Id
-     * @param pageable Page 정보
-     * @return 유저가 저장한 문제들의 Pages
+     * @param before 이 식별자보다 오래된 문제
+     * @return 저장한 문제와 다음 구간 존재 여부
      */
-    public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, Pageable pageable) {
-        return selectedExerciseRepository.findExercises(userId, subject, level, pageable);
+    public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, Long before, Long after) {
+        return selectedExerciseRepository.findExercises(userId, subject, level, before, after, cursorPage(before, after));
     }
 
     /**
      * User BannedRepo에 저장된 문제 Page 가져오기
      * @param userId 유저 Id
-     * @param pageable Page 정보
-     * @return 유저가 Ban한 문제들의 Pages
+     * @param before 이 식별자보다 오래된 문제
+     * @return 차단한 문제와 다음 구간 존재 여부
      */
-    public Slice<Exercise> getBannedExercises(Long userId, Subject subject, Level level, Pageable pageable) {
-        return bannedExerciseRepository.findExercises(userId, subject, level, pageable);
+    public Slice<Exercise> getBannedExercises(Long userId, Subject subject, Level level, Long before, Long after) {
+        return bannedExerciseRepository.findExercises(userId, subject, level, before, after, cursorPage(before, after));
+    }
+
+    private Pageable cursorPage(Long before, Long after) {
+        if ((before != null && after != null) || (before != null && before <= 0) || (after != null && after <= 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        return PageRequest.of(0, 9, Sort.by(after == null ? Sort.Direction.DESC : Sort.Direction.ASC, "e.id"));
     }
 
     public List<Long> getSavedExerciseIds(Long userId, List<Long> exerciseIds) {

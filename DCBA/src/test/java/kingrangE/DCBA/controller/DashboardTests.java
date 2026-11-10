@@ -43,9 +43,9 @@ class DashboardTests {
         session.setAttribute("loginUser", new User(1L, "reader", "unused", null));
         Slice<Exercise> page = new SliceImpl<>(List.of(Exercise.builder().id(1L).subject(Subject.ALGORITHM)
                 .level(Level.EASY).question("Question").answer("Answer").build()), PageRequest.of(0, 9), false);
-        when(service.getExercises(eq(1L), any(), any(), any())).thenReturn(page);
-        when(service.getSelectedExercises(eq(1L), any(), any(), any())).thenReturn(page);
-        when(service.getBannedExercises(eq(1L), any(), any(), any())).thenReturn(page);
+        when(service.getExercises(eq(1L), any(), any(), any(), any())).thenReturn(page);
+        when(service.getSelectedExercises(eq(1L), any(), any(), any(), any())).thenReturn(page);
+        when(service.getBannedExercises(eq(1L), any(), any(), any(), any())).thenReturn(page);
         mvc.perform(get(view.equals("all") ? "/dashboard" : "/dashboard/" + view).session(session))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("savedIds", view.equals("selected") ? List.of(1L) : List.of()))
@@ -57,6 +57,16 @@ class DashboardTests {
             verify(service, never()).getBannedExerciseIds(any(), any());
             verify(service).getSavedExerciseIds(1L, List.of(1L));
         }
+    }
+
+    @org.junit.jupiter.api.Test
+    void invalidCursorKeepsBadRequestStatus() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("loginUser", new User(1L, "reader", "unused", null));
+        when(service.getExercises(1L, null, null, 0L, null))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST));
+        mvc.perform(get("/dashboard").session(session).param("before", "0"))
+                .andExpect(status().isBadRequest());
     }
 
     @org.junit.jupiter.api.Test
@@ -73,19 +83,33 @@ class DashboardTests {
                 .andExpect(content().string(org.hamcrest.Matchers.not(containsString("private resource detail"))));
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(ints = {0, 5000, 9999, 2000000})
-    void slicesRenderOnlyPreviousAndNextWithoutPageTotals(int pageNumber) throws Exception {
+    @org.junit.jupiter.api.Test
+    void backwardSliceIsDisplayedNewestFirstAndUsesDirectionCursors() throws Exception {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("loginUser", new User(1L, "reader", "unused", null));
-        Slice<Exercise> page = new SliceImpl<>(pageNumber > 9999 ? List.of() : List.of(Exercise.builder().id(1L).subject(Subject.ALGORITHM)
-                .level(Level.EASY).question("Question").answer("Answer").build()), PageRequest.of(pageNumber, 9), pageNumber < 9999);
-        when(service.getExercises(eq(1L), any(), any(), any())).thenReturn(page);
-        String html = mvc.perform(get("/dashboard").session(session).param("page", String.valueOf(pageNumber)))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        long links = java.util.regex.Pattern.compile("class=\"page-link").matcher(html).results().count();
-        org.assertj.core.api.Assertions.assertThat(links).isLessThanOrEqualTo(2);
-        org.assertj.core.api.Assertions.assertThat(html).doesNotContain(">Last</a>");
+        List<Exercise> ascending = java.util.stream.LongStream.of(11, 12).mapToObj(id -> Exercise.builder()
+                .id(id).subject(Subject.ALGORITHM).level(Level.EASY).question("Question").answer("Answer").build()).toList();
+        when(service.getExercises(1L, null, null, null, 10L))
+                .thenReturn(new SliceImpl<>(ascending, PageRequest.of(0, 9), false));
+        mvc.perform(get("/dashboard").session(session).param("after", "10"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("exercises", ascending.reversed()))
+                .andExpect(model().attribute("hasPrevious", false))
+                .andExpect(model().attribute("hasNext", true))
+                .andExpect(content().string(containsString("/dashboard?before=11")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("page="))));
+    }
+
+    @org.junit.jupiter.api.Test
+    void emptyCursorResultStillOffersFirstPage() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("loginUser", new User(1L, "reader", "unused", null));
+        when(service.getExercises(1L, null, null, 1L, null))
+                .thenReturn(new SliceImpl<>(List.of()));
+        mvc.perform(get("/dashboard").session(session).param("before", "1"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(">First</a>")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("before="))));
     }
 
     @ParameterizedTest
@@ -97,12 +121,12 @@ class DashboardTests {
         Exercise exercise = Exercise.builder().id(1L).subject(Subject.ALGORITHM)
                 .level(Level.EASY).question("Question").answer("Answer").build();
         Slice<Exercise> page = new SliceImpl<>(List.of(exercise), PageRequest.of(0, 9), true);
-        when(service.getSelectedExercises(eq(1L), eq(Subject.ALGORITHM), eq(Level.EASY), any())).thenReturn(page);
-        when(service.getBannedExercises(eq(1L), eq(Subject.ALGORITHM), eq(Level.EASY), any())).thenReturn(page);
+        when(service.getSelectedExercises(eq(1L), eq(Subject.ALGORITHM), eq(Level.EASY), any(), any())).thenReturn(page);
+        when(service.getBannedExercises(eq(1L), eq(Subject.ALGORITHM), eq(Level.EASY), any(), any())).thenReturn(page);
         mvc.perform(get("/dashboard/" + view).session(session).param("subject", "ALGORITHM").param("level", "EASY"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("action=\"/dashboard/" + view + "\"")))
-                .andExpect(content().string(containsString("/dashboard/" + view + "?page=1")))
+                .andExpect(content().string(containsString("/dashboard/" + view + "?before=1")))
                 .andExpect(content().string(containsString("subject=ALGORITHM")))
                 .andExpect(content().string(containsString("name=\"_csrf\"")));
     }

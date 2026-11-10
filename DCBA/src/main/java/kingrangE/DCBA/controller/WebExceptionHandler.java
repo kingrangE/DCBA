@@ -1,6 +1,8 @@
 package kingrangE.DCBA.controller;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.TypeMismatchException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -13,6 +15,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 @Slf4j
 @ControllerAdvice(annotations = Controller.class)
 public class WebExceptionHandler {
+    @ExceptionHandler(ResponseStatusException.class)
+    public String requestStatus(ResponseStatusException exception,
+            HttpServletResponse response, Model model) {
+        response.setStatus(exception.getStatusCode().value());
+        model.addAttribute("message", "요청을 처리할 수 없습니다.");
+        return "error";
+    }
+
     @ExceptionHandler(TypeMismatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String invalidInput(Model model) {

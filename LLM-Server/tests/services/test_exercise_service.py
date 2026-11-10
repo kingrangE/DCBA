@@ -227,7 +227,7 @@ def test_generate_exercise_success_within_max_tries(mocker):
 
     # =========== then =========== 
     # 10번 시도한거 맞는지 확인
-    assert mock_dedup.check_duplicate.call_count == 10  
+    assert mock_dedup.check_duplicate.call_count == 10
     # Error Message 확인
     assert "Failed to generate unique content after multiple retries." in str(excinfo.value)
 
