@@ -1,6 +1,6 @@
 import os
 import pymysql
-from app.models.exercise import Exercise
+from app.models.exercise import Exercise, ExerciseRequest
 from datetime import datetime
 
 class ExerciseRepository:
@@ -58,12 +58,13 @@ class ExerciseRepository:
     
     # 문제 저장
     def save_exercise(self, subject: str, level: str, question: str, answer: str) -> Exercise:
+        request = ExerciseRequest(subject=subject, level=level)
         conn = self.get_connection()
         try:
             # Insert 실행
             with conn.cursor() as cursor:
                 sql = "INSERT INTO exercise (subject, level, question, answer) VALUES (%s, %s, %s, %s)"
-                cursor.execute(sql, (subject.upper(), level.upper(), question, answer))
+                cursor.execute(sql, (request.subject.value, request.level.value, question, answer))
                 exercise_id = cursor.lastrowid
                 
             return Exercise(

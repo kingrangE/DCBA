@@ -1,5 +1,13 @@
 from unittest.mock import MagicMock
 from app.models.exercise import Exercise
+import pytest
+
+@pytest.mark.parametrize("field,value", [("subject", "UNKNOWN"), ("level", "UNKNOWN"), ("subject", ""), ("level", "easy")])
+def test_generate_rejects_invalid_category(client, mocker, field, value):
+    service = mocker.patch("app.routers.exercise.exercise_service")
+    payload = {"subject": "ALGORITHM", "level": "EASY", field: value}
+    assert client.post("/exercise/generate", json=payload).status_code == 422
+    service.generate_exercise.assert_not_called()
 
 def test_generate_requires_credentials(client):
     client.headers.pop("Authorization")
