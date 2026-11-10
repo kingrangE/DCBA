@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: llm-server
+    volumes:
+      - chroma_data:/app/chroma_db
 
     expose:
       - "8000"
@@ -12,6 +14,7 @@ services:
       - .env
 
     environment:
+      - CHROMA_PERSIST_DIRECTORY=/app/chroma_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - MARIADB_HOST=mariadb
@@ -49,5 +52,6 @@ services:
     restart: always
 
 volumes:
+  chroma_data:
   redis_tokens:
   mariadb_data:

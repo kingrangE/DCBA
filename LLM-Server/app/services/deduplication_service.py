@@ -14,7 +14,7 @@ class DeduplicationService:
                                            api_key=os.getenv("OPENAI_API_KEY"))
 
         # Chroma DB 초기화
-        self.persist_directory = "./chroma_db"
+        self.persist_directory = os.getenv("CHROMA_PERSIST_DIRECTORY", "./chroma_db")
         self.vector_store = Chroma(
             collection_name="exercise_deduplication",
             embedding_function=self.embeddings,

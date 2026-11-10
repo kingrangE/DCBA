@@ -28,7 +28,8 @@ COPY --from=builder /opt/venv /opt/venv
 COPY app ./app
 COPY instructions ./instructions
 
-RUN adduser --disabled-password --gecos "" appuser && \
+RUN mkdir -p /app/chroma_db && \
+    adduser --disabled-password --gecos "" appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
