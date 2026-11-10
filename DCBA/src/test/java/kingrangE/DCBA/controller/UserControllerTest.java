@@ -37,7 +37,9 @@ class UserControllerTest {
         MockHttpSession session = new MockHttpSession();
         when(userService.login("tester", "password")).thenReturn(user);
 
-        UserResponse response = controller.login(form, session);
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.setSession(session);
+        UserResponse response = controller.login(form, session, request);
 
         assertThat(response.name()).isEqualTo("tester");
         assertThat(session.getAttribute("loginUser")).isSameAs(user);

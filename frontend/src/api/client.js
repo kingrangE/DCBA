@@ -10,6 +10,14 @@ export async function request(path, options = {}) {
   const headers = { ...options.headers }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
 
+  const method = (options.method || 'GET').toUpperCase()
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'include' })
+    if (!csrfResponse.ok) throw new ApiError('요청 인증 정보를 가져오지 못했습니다.', csrfResponse.status)
+    const csrf = await csrfResponse.json()
+    headers[csrf.headerName] = csrf.token
+  }
+
   const response = await fetch(path, {
     credentials: 'include',
     ...options,
