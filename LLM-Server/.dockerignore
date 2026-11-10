@@ -9,3 +9,8 @@ venv/
 .DS_Store
 .git
 .gitignore
+DCBA-LLM/
+.venv/
+.pytest_cache/
+chroma_db/
+tests/
