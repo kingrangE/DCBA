@@ -428,7 +428,9 @@
             </div>
         </div>
         <div class="user-info">
-            <a href="/logout" class="logout-btn">Logout</a>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="logout-btn">Logout</button>
+            </form>
         </div>
     </nav>
 
