@@ -53,3 +53,7 @@ For an existing deployment, stop both application containers and back up MariaDB
 
 4. **`Technical Proficiency`**
     - I leveraged my extensive experience with FastAPI to rapidly build and iterate on a high-performance asynchronous API server.
+
+## Internal service access
+
+Redis is available only on the Compose network. MariaDB and Prometheus host ports bind to loopback; use an SSH tunnel for remote administration. Production Java management endpoints use the separate internal port 9091, which is not published by Compose. Application traffic continues to use port 8080.

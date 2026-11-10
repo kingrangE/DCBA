@@ -72,8 +72,6 @@ services:
     image: redis:alpine
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
     container_name: redis-cache
-    ports:
-      - "${EXTERNAL_REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -89,7 +87,7 @@ services:
     image: mariadb:10.11
     container_name: mariadb-server
     ports:
-      - "${EXTERNAL_MARIADB_PORT}:3306"
+      - "127.0.0.1:${EXTERNAL_MARIADB_PORT}:3306"
     env_file:
       - .env
     environment:
@@ -113,7 +111,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - dcba-network
     restart: always

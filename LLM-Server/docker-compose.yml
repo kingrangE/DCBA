@@ -47,8 +47,6 @@ services:
     image: redis:alpine
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
     container_name: redis-cache
-    ports:
-      - "${REDIS_PORT}:6379"
     volumes:
       - redis_tokens:/data
     restart: always
@@ -62,7 +60,7 @@ services:
     image: mariadb:10.11
     container_name: mariadb-server
     ports:
-      - "${MARIADB_PORT}:3306"
+      - "127.0.0.1:${MARIADB_PORT}:3306"
     env_file:
       - .env
     environment:
