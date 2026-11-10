@@ -10,6 +10,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface SelectedExerciseRepository extends JpaRepository<SelectedExercise, Long> {
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("delete from SelectedExercise p where p.user.id = :userId and p.exercise.id = :exerciseId")
+    int deletePreference(Long userId, Long exerciseId);
+
     @org.springframework.data.jpa.repository.Query("""
             select p.exercise.id from SelectedExercise p
             where p.user.id = :userId and p.exercise.id in :exerciseIds

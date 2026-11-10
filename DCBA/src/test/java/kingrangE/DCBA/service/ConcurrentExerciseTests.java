@@ -14,10 +14,11 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.datasource.url=jdbc:h2:mem:concurrent;MODE=MariaDB;NON_KEYWORDS=USER;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa", "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.properties.hibernate.generate_statistics=true"
 })
 class ConcurrentExerciseTests {
     @Autowired ExerciseService service;
+    @Autowired jakarta.persistence.EntityManagerFactory entityManagerFactory;
     @Autowired UserRepository users;
     @Autowired ExerciseRepository exercises;
     @Autowired SelectedExerciseRepository selected;
@@ -46,6 +47,37 @@ class ConcurrentExerciseTests {
         });
         assertThat(selected.findAllByUser(user, Pageable.unpaged()).getTotalElements()).isZero();
         assertThat(banned.findAllByUser(user, Pageable.unpaged()).getTotalElements()).isZero();
+    }
+
+    @Test
+    void cancellationUsesThreeStatementsAndKeepsOtherUsersPreferences() {
+        User owner = users.saveAndFlush(new User("owner", "test"));
+        User other = users.saveAndFlush(new User("other", "test"));
+        Exercise exercise = exercises.saveAndFlush(Exercise.builder().subject(Subject.ALGORITHM)
+                .level(Level.EASY).question("Question").answer("Answer").build());
+        for (User user : java.util.List.of(owner, other)) {
+            service.saveExercise(user.getId(), exercise.getId());
+            service.banExercise(user.getId(), exercise.getId());
+        }
+        var statistics = entityManagerFactory.unwrap(org.hibernate.SessionFactory.class).getStatistics();
+        statistics.clear();
+        service.cancelSaveExercise(owner.getId(), exercise.getId());
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+        assertThat(statistics.getEntityLoadCount()).isEqualTo(1);
+        statistics.clear();
+        service.cancelBanExercise(owner.getId(), exercise.getId());
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+        assertThat(statistics.getEntityLoadCount()).isEqualTo(1);
+        service.cancelSaveExercise(owner.getId(), exercise.getId());
+        service.cancelBanExercise(owner.getId(), exercise.getId());
+        assertThat(service.getSelectedExercises(owner.getId(), null, null, Pageable.ofSize(9))).isEmpty();
+        assertThat(service.getBannedExercises(owner.getId(), null, null, Pageable.ofSize(9))).isEmpty();
+        assertThat(service.getSelectedExercises(other.getId(), null, null, Pageable.ofSize(9))).hasSize(1);
+        assertThat(service.getBannedExercises(other.getId(), null, null, Pageable.ofSize(9))).hasSize(1);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.cancelSaveExercise(owner.getId(), Long.MAX_VALUE))
+                .isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.cancelBanExercise(Long.MAX_VALUE, exercise.getId()))
+                .isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
     }
 
     private void runTogether(Runnable action) throws Exception {

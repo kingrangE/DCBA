@@ -71,15 +71,12 @@ public class ExerciseService {
      */
     @Transactional
     public void cancelSaveExercise(Long userId, Long exerciseId) {
-        // user와 운동 정보 가져오기
-        User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
+        userRepository.findByIdForUpdate(userId).orElseThrow(()
                 -> new jakarta.persistence.EntityNotFoundException("User not found"));
-        Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Exercise not found"));
-
-        // user와 운동 정보를 기반으로 선택된 문제들을 찾아서 있으면 삭제하도록 함.(메서드 참조 이용)
-        selectedExerciseRepository.findByUserAndExercise(user, exercise)
-                .ifPresent(selectedExerciseRepository::delete);
+        if (!exerciseRepository.existsById(exerciseId)) {
+            throw new jakarta.persistence.EntityNotFoundException("Exercise not found");
+        }
+        selectedExerciseRepository.deletePreference(userId, exerciseId);
     }
 
     /**
@@ -109,13 +106,12 @@ public class ExerciseService {
      */
     @Transactional
     public void cancelBanExercise(Long userId, Long exerciseId) {
-        User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
+        userRepository.findByIdForUpdate(userId).orElseThrow(()
                 -> new jakarta.persistence.EntityNotFoundException("User not found"));
-        Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Exercise not found"));
-
-        bannedExerciseRepository.findByUserAndExercise(user, exercise)
-                .ifPresent(bannedExerciseRepository::delete);
+        if (!exerciseRepository.existsById(exerciseId)) {
+            throw new jakarta.persistence.EntityNotFoundException("Exercise not found");
+        }
+        bannedExerciseRepository.deletePreference(userId, exerciseId);
     }
 
     /**
