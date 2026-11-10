@@ -7,6 +7,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BannedExerciseRepository extends JpaRepository<BannedExercise, Long> {
+    @org.springframework.data.jpa.repository.Query("""
+            select e from BannedExercise preference join preference.exercise e
+            where preference.user.id = :userId
+              and (:subject is null or e.subject = :subject)
+              and (:level is null or e.level = :level)
+            """)
+    Page<kingrangE.DCBA.domain.Exercise> findExercises(Long userId,
+            kingrangE.DCBA.domain.Subject subject, kingrangE.DCBA.domain.Level level, Pageable pageable);
+
     /**
      * User가 밴한 전체 문제 Page 찾기
      * @param user 유저 객체

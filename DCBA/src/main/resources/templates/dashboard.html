@@ -441,7 +441,7 @@
         </div>
 
         <!-- Filter Form -->
-        <form action="/dashboard" method="get" class="filter-form">
+        <form th:action="${dashboardPath}" method="get" class="filter-form">
             <select name="subject">
                 <option value="">All Subjects</option>
                 <option th:each="sub : ${subjects}" th:value="${sub}" th:text="${sub.subjectName}"
@@ -546,15 +546,15 @@
 
         <!-- Pagination -->
         <div class="pagination" th:if="${page.totalPages > 0}">
-            <a th:href="@{/dashboard(page=${page.number - 1}, subject=${currentSubject}, level=${currentLevel})}"
+            <a th:href="@{${dashboardPath}(page=${page.number - 1}, subject=${currentSubject}, level=${currentLevel})}"
                 th:classappend="${page.first} ? 'disabled'" class="page-link">&laquo; Prev</a>
 
             <span th:each="i : ${#numbers.sequence(0, page.totalPages - 1)}">
-                <a th:href="@{/dashboard(page=${i}, subject=${currentSubject}, level=${currentLevel})}"
+                <a th:href="@{${dashboardPath}(page=${i}, subject=${currentSubject}, level=${currentLevel})}"
                     th:text="${i + 1}" th:classappend="${i == page.number} ? 'active'" class="page-link">1</a>
             </span>
 
-            <a th:href="@{/dashboard(page=${page.number + 1}, subject=${currentSubject}, level=${currentLevel})}"
+            <a th:href="@{${dashboardPath}(page=${page.number + 1}, subject=${currentSubject}, level=${currentLevel})}"
                 th:classappend="${page.last} ? 'disabled'" class="page-link">Next &raquo;</a>
         </div>
     </div>

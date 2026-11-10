@@ -153,15 +153,8 @@ public class ExerciseService {
      * @param pageable Page 정보
      * @return 유저가 저장한 문제들의 Pages
      */
-    public Page<Exercise> getSelectedExercises(Long userId, Pageable pageable) {
-        // UserId를 기반으로 user정보 Get
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-
-        // User가 선택한 문제 목록을 가져오도록 함.
-        Page<SelectedExercise> selectedPage = selectedExerciseRepository.findAllByUser(user, pageable);
-        //메서드 참조를 이용, Page에 들어있는 SelectedExercise 각 객체에서 getExercise(return Exercise)를 수행하도록 함.
-        return selectedPage.map(SelectedExercise::getExercise);
+    public Page<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, Pageable pageable) {
+        return selectedExerciseRepository.findExercises(userId, subject, level, pageable);
     }
 
     /**
@@ -170,11 +163,8 @@ public class ExerciseService {
      * @param pageable Page 정보
      * @return 유저가 Ban한 문제들의 Pages
      */
-    public Page<Exercise> getBannedExercises(Long userId, Pageable pageable) {
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-        Page<BannedExercise> bannedPage = bannedExerciseRepository.findAllByUser(user, pageable);
-        return bannedPage.map(BannedExercise::getExercise);
+    public Page<Exercise> getBannedExercises(Long userId, Subject subject, Level level, Pageable pageable) {
+        return bannedExerciseRepository.findExercises(userId, subject, level, pageable);
     }
 
     /**

@@ -6,6 +6,7 @@ import kingrangE.DCBA.domain.Subject;
 import kingrangE.DCBA.service.ExerciseService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.RequestParam;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +35,7 @@ public class ExerciseController {
     @GetMapping("/dashboard")
     public String dashboardMain(@RequestParam(required = false) Subject subject, // 필터링 조건 (Optional)
             @RequestParam(required = false) Level level, // 필터링 조건 (Optional)
-            @PageableDefault(size = 9) Pageable pageable, // page번호와 size에 따라 Page 관리 (기본 9개)
+            @PageableDefault(size = 9, sort = "id", direction = Sort.Direction.DESC) Pageable pageable, // page번호와 size에 따라 Page 관리 (기본 9개)
             Model model, // Controller 데이터를 HTML 파일에서 이용하기 위함
             HttpSession session) { // 로그인해야 접근 가능하도록 Session정보 저장용
 
@@ -50,6 +51,8 @@ public class ExerciseController {
         // 현재 페이지 정보 추가 ( 페이지 정보를 전체로 바꿔서, ... 을 나타낼 수 있게 하면 더 좋을듯)
         model.addAttribute("exercises", exercisePage.getContent()); // List<Exercise> 객체 저장
         model.addAttribute("page", exercisePage);
+        model.addAttribute("viewType", "all");
+        model.addAttribute("dashboardPath", "/dashboard");
         model.addAttribute("currentSubject", subject);
         model.addAttribute("currentLevel", level);
 
@@ -157,7 +160,8 @@ public class ExerciseController {
      * @return dashboard.html
      */
     @GetMapping("/dashboard/selected")
-    public String dashboardSelected(@PageableDefault(size = 9) Pageable pageable, // 페이지 정보
+    public String dashboardSelected(@RequestParam(required = false) Subject subject,
+                                    @RequestParam(required = false) Level level, @PageableDefault(size = 9, sort = "id", direction = Sort.Direction.DESC) Pageable pageable, // 페이지 정보
                                     Model model, // HTML에 전달할 모델 정보
                                     HttpSession session) { //Session 관리를 위한 Session정보
         // Session에서 유저 정보 가져옴
@@ -167,7 +171,7 @@ public class ExerciseController {
         }
 
         // 선택한 문제 가져와
-        Page<Exercise> exercisePage = exerciseService.getSelectedExercises(user.getId(), pageable);
+        Page<Exercise> exercisePage = exerciseService.getSelectedExercises(user.getId(), subject, level, pageable);
 
         // 문제를 보여주기 위해 Model에 정보 추가
         model.addAttribute("exercises", exercisePage.getContent());
@@ -175,6 +179,9 @@ public class ExerciseController {
 
         // 다 같은 HTML 파일을 사용하기에 viewType 파라미터 설정해서 다르게 보이도록 함
         model.addAttribute("viewType", "selected");
+        model.addAttribute("dashboardPath", "/dashboard/selected");
+        model.addAttribute("currentSubject", subject);
+        model.addAttribute("currentLevel", level);
         model.addAttribute("subjects", Subject.values());
         model.addAttribute("levels", Level.values());
 
@@ -193,17 +200,21 @@ public class ExerciseController {
      * @return dashboard.html
      */
     @GetMapping("/dashboard/banned")
-    public String dashboardBanned(@PageableDefault(size = 9) Pageable pageable, Model model, HttpSession session) {
+    public String dashboardBanned(@RequestParam(required = false) Subject subject,
+                                  @RequestParam(required = false) Level level, @PageableDefault(size = 9, sort = "id", direction = Sort.Direction.DESC) Pageable pageable, Model model, HttpSession session) {
         User user = (User) session.getAttribute("loginUser");
         if (user == null) {
             return "redirect:/";
         }
 
-        Page<Exercise> exercisePage = exerciseService.getBannedExercises(user.getId(), pageable);
+        Page<Exercise> exercisePage = exerciseService.getBannedExercises(user.getId(), subject, level, pageable);
 
         model.addAttribute("exercises", exercisePage.getContent());
         model.addAttribute("page", exercisePage);
         model.addAttribute("viewType", "banned");
+        model.addAttribute("dashboardPath", "/dashboard/banned");
+        model.addAttribute("currentSubject", subject);
+        model.addAttribute("currentLevel", level);
 
         model.addAttribute("subjects", Subject.values());
         model.addAttribute("levels", Level.values());

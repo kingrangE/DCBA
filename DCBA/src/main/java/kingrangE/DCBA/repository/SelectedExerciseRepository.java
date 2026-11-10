@@ -10,6 +10,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface SelectedExerciseRepository extends JpaRepository<SelectedExercise, Long> {
+    @org.springframework.data.jpa.repository.Query("""
+            select e from SelectedExercise preference join preference.exercise e
+            where preference.user.id = :userId
+              and (:subject is null or e.subject = :subject)
+              and (:level is null or e.level = :level)
+            """)
+    Page<kingrangE.DCBA.domain.Exercise> findExercises(Long userId,
+            kingrangE.DCBA.domain.Subject subject, kingrangE.DCBA.domain.Level level, Pageable pageable);
+
     /**
      * User가 선택한 전체 문제 Page 찾기
      * @param user 유저 객체
