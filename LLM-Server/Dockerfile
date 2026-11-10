@@ -1,3 +1,12 @@
+# Schema migration runs without installing model inference packages.
+FROM python:3.13-slim AS migration
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+RUN uv pip install --system pymysql
+WORKDIR /app
+COPY app/migrate.py ./app/migrate.py
+COPY migrations ./migrations
+CMD ["python", "-m", "app.migrate"]
+
 # 1단계
 FROM python:3.13-slim AS builder
 
@@ -27,9 +36,10 @@ COPY --from=builder /opt/venv /opt/venv
 
 COPY app ./app
 COPY instructions ./instructions
+COPY migrations ./migrations
 
 RUN adduser --disabled-password --gecos "" appuser && \
-    mkdir -p /home/appuser/.cache/huggingface && \
+    mkdir -p /home/appuser/.cache/huggingface /app/chroma_db && \
     chown -R appuser:appuser /app /home/appuser
 USER appuser
 

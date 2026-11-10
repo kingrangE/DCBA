@@ -57,8 +57,8 @@ docker compose --profile llm up -d --build
 |---|---|
 | Web | http://localhost |
 | Spring API | http://localhost:8080 |
-| LLM API 문서 | http://localhost:8000/docs |
-| LLM 상태 확인 | http://localhost:8000/health |
+| LLM API 문서 | 내부 네트워크 `http://llm-server:8000/docs` |
+| LLM 상태 확인 | 내부 네트워크 `http://llm-server:8000/health` |
 
 ## 4. 정상 실행 확인
 
@@ -103,8 +103,19 @@ cp .env.example .env
 | `OPENAI_API_KEY` | 없음 | 중복 검사 활성화 시 필요 |
 | `FRONTEND_PORT` | `80` | Web 외부 포트 |
 | `DCBA_SERVER_PORT` | `8080` | Spring API 외부 포트 |
-| `LLM_SERVER_PORT` | `8000` | LLM API 외부 포트 |
+| `LLM_API_KEY` | 비어 있음 | 내부 직접 생성 API 인증 키, 미설정 시 해당 API 비활성화 |
 
 ## 서비스 이미지
 ![](assets/main_image.png)
 ![](assets/save_image.png)
+
+
+### 안정성 개선 통합 시 배포
+
+React·REST API·Slack·Kanana 및 선택적 중복 검사는 유지됩니다. 문제 목록은 전체 건수와 번호 페이지 대신 이전·다음 이동을 사용합니다. 배포 전에 기존 MariaDB와 Redis 데이터를 백업하세요. 공통 스키마 마이그레이션이 성공한 뒤 Java와 LLM 서버가 시작되며 Java 운영 설정은 스키마를 검증만 합니다. 중복 저장 기록, 고아 참조, 필수 값 누락이 발견되면 데이터를 삭제하지 않고 마이그레이션을 중단하므로 운영자가 기존 자료를 확인해야 합니다. Slack 정보는 유지됩니다.
+
+Redis는 내부 네트워크에서만 접근하며 AOF를 매 쓰기마다 동기화합니다. 디스크 지연이 큐 처리 지연에 반영됩니다. MariaDB와 Prometheus 관리 포트는 로컬에만 열고 Java 지표는 내부 9091 포트로 분리합니다. LLM의 직접 생성 API는 내부 접근과 별도 `LLM_API_KEY`가 필요하며 키가 없으면 비활성화됩니다. React의 로그인 사용자 생성 요청은 기존 Java 큐 API로 계속 동작합니다. 임베딩 중복 검사를 사용할 때만 `DEDUPLICATION_ENABLED=true`와 유효한 OpenAI 키가 필요합니다. 모델 캐시와 중복 검사 인덱스는 각각 영구 볼륨에 보관합니다.
+
+LLM의 `/health`는 프로세스 생존, `/ready`는 실제 생성 성공·큐·DB 상태를 확인합니다. Kanana 최초 다운로드와 CPU 추론 중에는 첫 생성이 완료될 때까지 준비되지 않은 상태가 정상입니다. 마지막 성공이 1시간보다 오래되면 준비 상태를 해제하므로 실제 장비의 추론 시간을 고려해 운영하세요. 준비 상태는 프로세스 재시작 조건으로 사용하지 않습니다. 실패 작업은 Redis의 `exercise:generation_failed`에 원문과 함께 남고 자동 삭제되지 않습니다. 원인 수정 후 확인하여 재등록하고, 보관량과 디스크를 관리해야 합니다.
+
+기존 목록 큐의 작업은 원자적으로 Stream으로 이전합니다. DB 저장과 작업 완료 기록은 같은 트랜잭션으로 반영되어 재처리 시 중복 저장을 방지합니다. 중복 검사 인덱스는 DB의 확정된 문제를 기준으로 복구합니다. 로컬 벡터 저장소는 단일 생성 서버를 전제로 하며 여러 생성 서버를 운영하려면 공용 벡터 서버가 필요합니다. 인증 요청 제한은 프록시가 전달한 임의 주소를 신뢰하지 않으므로 기본 nginx 배포에서는 같은 프록시를 경유한 요청이 제한 예산을 공유합니다. 사용자별 제한이 필요하면 신뢰할 수 있는 진입점에서 적용해야 합니다.

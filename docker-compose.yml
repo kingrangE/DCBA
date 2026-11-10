@@ -13,6 +13,23 @@ services:
       - dcba-network
     restart: always
 
+  schema-migrate:
+    build:
+      context: ./LLM-Server
+      target: migration
+    environment:
+      - MARIADB_HOST=mariadb
+      - MARIADB_PORT=3306
+      - MARIADB_USER=${MARIADB_USER:-dcba}
+      - MARIADB_PASSWORD=${MARIADB_PASSWORD:-dcba_password}
+      - MARIADB_DATABASE=${MARIADB_DATABASE:-dcba}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - dcba-network
+    restart: "no"
+
   llm-server:
     profiles: ["llm"]
     build:
@@ -20,8 +37,8 @@ services:
       dockerfile: Dockerfile
     image: kingrange/dcba-llm-server:latest
     container_name: llm-server
-    ports:
-      - "${LLM_SERVER_PORT:-8000}:8000"
+    expose:
+      - "8000"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -38,9 +55,14 @@ services:
       - HF_HOME=/home/appuser/.cache/huggingface
       - DEDUPLICATION_ENABLED=${DEDUPLICATION_ENABLED:-false}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - CHROMA_PERSIST_DIRECTORY=/app/chroma_db
     volumes:
       - huggingface_cache:/home/appuser/.cache/huggingface
+      - chroma_data:/app/chroma_db
     depends_on:
+      schema-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       mariadb:
@@ -67,6 +89,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
+      schema-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       mariadb:
@@ -78,8 +102,9 @@ services:
   redis:
     image: redis:alpine
     container_name: redis-cache
-    ports:
-      - "${EXTERNAL_REDIS_PORT:-6379}:6379"
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     networks:
@@ -95,7 +120,7 @@ services:
     image: mariadb:10.11
     container_name: mariadb-server
     ports:
-      - "${EXTERNAL_MARIADB_PORT:-3306}:3306"
+      - "127.0.0.1:${EXTERNAL_MARIADB_PORT:-3306}:3306"
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-dcba_root_password}
       MARIADB_DATABASE: ${MARIADB_DATABASE:-dcba}
@@ -118,12 +143,13 @@ services:
     container_name: prometheus
     volumes:
       - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
     command: 
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - dcba-network
     restart: always
@@ -161,6 +187,7 @@ volumes:
   redis_data:
   mariadb_data:
   huggingface_cache:
+  chroma_data:
   prometheus_data:
   grafana_data:
 
