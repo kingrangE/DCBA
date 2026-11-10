@@ -7,6 +7,7 @@ import kingrangE.DCBA.service.ExerciseService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import java.util.List;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.RequestParam;
 import lombok.RequiredArgsConstructor;
@@ -61,8 +62,9 @@ public class ExerciseController {
         model.addAttribute("levels", Level.values());
 
         // 저장한 문제들과 banned한 문제들을 표시하기 위한 id들 추가
-        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId()));
-        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId()));
+        List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
+        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId(), pageIds));
+        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId(), pageIds));
 
         // dashboard.html view resolver 전달ㄴ
         return "dashboard";
@@ -186,8 +188,9 @@ public class ExerciseController {
         model.addAttribute("levels", Level.values());
 
         // 저장한거랑 밴한거 정보 가져와서 표시하도록 함.
-        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId()));
-        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId()));
+        List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
+        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId(), pageIds));
+        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId(), pageIds));
 
         return "dashboard";
     }
@@ -219,8 +222,9 @@ public class ExerciseController {
         model.addAttribute("subjects", Subject.values());
         model.addAttribute("levels", Level.values());
 
-        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId()));
-        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId()));
+        List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
+        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId(), pageIds));
+        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId(), pageIds));
 
         return "dashboard";
     }

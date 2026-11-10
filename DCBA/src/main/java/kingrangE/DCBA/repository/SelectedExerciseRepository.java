@@ -11,6 +11,12 @@ import java.util.Optional;
 
 public interface SelectedExerciseRepository extends JpaRepository<SelectedExercise, Long> {
     @org.springframework.data.jpa.repository.Query("""
+            select p.exercise.id from SelectedExercise p
+            where p.user.id = :userId and p.exercise.id in :exerciseIds
+            """)
+    java.util.List<Long> findExerciseIds(Long userId, java.util.List<Long> exerciseIds);
+
+    @org.springframework.data.jpa.repository.Query("""
             select e from SelectedExercise preference join preference.exercise e
             where preference.user.id = :userId
               and (:subject is null or e.subject = :subject)

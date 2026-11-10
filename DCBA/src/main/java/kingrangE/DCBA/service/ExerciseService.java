@@ -6,12 +6,10 @@ import kingrangE.DCBA.repository.BannedExerciseRepository;
 import kingrangE.DCBA.repository.ExerciseRepository;
 import kingrangE.DCBA.repository.SelectedExerciseRepository;
 import kingrangE.DCBA.repository.UserRepository;
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -35,34 +33,7 @@ public class ExerciseService {
                                        @Nullable Subject subject,
                                        @Nullable Level level,
                                         Pageable pageable) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        List<Long> bannedIds = bannedExerciseRepository.findAllByUser(user, Pageable.unpaged())
-                .stream()
-                .map(b -> b.getExercise().getId())
-                .toList();
-
-        if (bannedIds.isEmpty()) { // 밴한 문제가 없다면
-            if (subject != null && level != null) { // 필터링 둘 다 존재
-                return exerciseRepository.findBySubjectAndLevel(subject, level, pageable); // 필터링한 결과 반환
-            } else if (subject != null) { // 과목만 필터링
-                return exerciseRepository.findBySubject(subject, pageable); // 과목 필터링 결과 반환
-            } else if (level != null) { // 수준만 필터링
-                return exerciseRepository.findByLevel(level, pageable); // 수준 필터링 결과 반환
-            } else { // 필터링 없음
-                return exerciseRepository.findAll(pageable); // 전체 문제 반환
-            }
-        }
-
-        //밴한 문제가 있는 경우 (method 제외 로직은 같음)(method만 banned 문제 제외하는걸로 이용)
-        if (subject != null && level != null) {
-            return exerciseRepository.findBySubjectAndLevelAndIdNotIn(subject, level, bannedIds, pageable);
-        } else if (subject != null) {
-            return exerciseRepository.findBySubjectAndIdNotIn(subject, bannedIds, pageable);
-        } else if (level != null) {
-            return exerciseRepository.findByLevelAndIdNotIn(level, bannedIds, pageable);
-        } else {
-            return exerciseRepository.findByIdNotIn(bannedIds, pageable);
-        }
+        return exerciseRepository.findVisibleExercises(userId, subject, level, pageable);
     }
 
     /**
@@ -167,34 +138,11 @@ public class ExerciseService {
         return bannedExerciseRepository.findExercises(userId, subject, level, pageable);
     }
 
-    /**
-     * User Selected Repo에 저장된 문제 Id들 가져오기
-     * @param userId 유저 Id
-     * @return User Selected Repo에 있는 문제 Id List
-     */
-    public List<Long> getSavedExerciseIds(Long userId) {
-        // User 정보 가져오기
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-
-        // User가 선택한 문제들 가져오도록 함.
-        return selectedExerciseRepository.findAllByUser(user, Pageable.unpaged())//Page처리 하지말고 전체를 다 읽음
-                .stream()
-                .map(e -> e.getExercise().getId())
-                .toList();
+    public List<Long> getSavedExerciseIds(Long userId, List<Long> exerciseIds) {
+        return exerciseIds.isEmpty() ? List.of() : selectedExerciseRepository.findExerciseIds(userId, exerciseIds);
     }
 
-    /**
-     * User Banned Repo에 저장된 문제 Id들 가져오기
-     * @param userId 유저 Id
-     * @return User Banned Repo에 있는 문제 Id List
-     */
-    public List<Long> getBannedExerciseIds(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(()
-                -> new IllegalArgumentException("User not found"));
-        return bannedExerciseRepository.findAllByUser(user, Pageable.unpaged())
-                .stream()
-                .map(e -> e.getExercise().getId())
-                .toList();
+    public List<Long> getBannedExerciseIds(Long userId, List<Long> exerciseIds) {
+        return exerciseIds.isEmpty() ? List.of() : bannedExerciseRepository.findExerciseIds(userId, exerciseIds);
     }
 }

@@ -8,6 +8,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BannedExerciseRepository extends JpaRepository<BannedExercise, Long> {
     @org.springframework.data.jpa.repository.Query("""
+            select p.exercise.id from BannedExercise p
+            where p.user.id = :userId and p.exercise.id in :exerciseIds
+            """)
+    java.util.List<Long> findExerciseIds(Long userId, java.util.List<Long> exerciseIds);
+
+    @org.springframework.data.jpa.repository.Query("""
             select e from BannedExercise preference join preference.exercise e
             where preference.user.id = :userId
               and (:subject is null or e.subject = :subject)

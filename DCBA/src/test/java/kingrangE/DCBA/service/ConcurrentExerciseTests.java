@@ -34,6 +34,12 @@ class ConcurrentExerciseTests {
         });
         assertThat(selected.findAllByUser(user, Pageable.unpaged()).getTotalElements()).isEqualTo(1);
         assertThat(banned.findAllByUser(user, Pageable.unpaged()).getTotalElements()).isEqualTo(1);
+        assertThat(service.getExercises(user.getId(), null, null, Pageable.ofSize(9)).getContent())
+                .extracting(Exercise::getId).doesNotContain(exercise.getId());
+        assertThat(service.getSelectedExercises(user.getId(), Subject.ALGORITHM, Level.EASY, Pageable.ofSize(9)).getContent()).hasSize(1);
+        assertThat(service.getSelectedExercises(user.getId(), Subject.DATABASE, null, Pageable.ofSize(9)).getContent()).isEmpty();
+        assertThat(service.getSavedExerciseIds(user.getId(), java.util.List.of(exercise.getId()))).containsExactly(exercise.getId());
+        assertThat(service.getBannedExerciseIds(user.getId(), java.util.List.of())).isEmpty();
         runTogether(() -> {
             service.cancelSaveExercise(user.getId(), exercise.getId());
             service.cancelBanExercise(user.getId(), exercise.getId());
