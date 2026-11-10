@@ -4,6 +4,10 @@ import redis
 import asyncio
 import random
 import uuid
+import time
+from prometheus_client import Counter
+
+TASK_RESULTS = Counter("dcba_generation_tasks_total", "Generation task outcomes", ["result"])
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.exercise_service import exercise_service
 from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
@@ -84,6 +88,10 @@ class AutomationService:
 
         # 현재 scheduler 실행 여부 상태
         self.is_running = False
+        self.last_success_at = None
+        self.consecutive_failures = 0
+        self.producer_failed = False
+        self.queue_depth = -1
         
         self.subject_map = SUBJECT_LABELS
         self.level_map = LEVEL_LABELS
@@ -107,7 +115,14 @@ class AutomationService:
             "subject": selected_subject_key, # DB 저장용 (Java Enum)
             "level": selected_level_key,     # DB 저장용 (Java Enum)
         }
-        self.queue.enqueue(task)
+        try:
+            self.queue.enqueue(task)
+            self.queue_depth = self.queue.size()
+            self.producer_failed = False
+        except Exception:
+            self.producer_failed = True
+            TASK_RESULTS.labels("enqueue_failure").inc()
+            raise
 
     async def start_consumer(self):
         # consumer
@@ -130,14 +145,23 @@ class AutomationService:
                             None, exercise_service.generate_and_save, task['subject'], task['level'], task['task_id']
                         )
                         await loop.run_in_executor(None, self.queue.acknowledge, task)
+                        self.last_success_at = time.time()
+                        self.consecutive_failures = 0
+                        TASK_RESULTS.labels("success").inc()
+                        self.queue_depth = await loop.run_in_executor(None, self.queue.size)
                         print(f"[Consumer] Saved exercise {saved_exercise.id}")
 
                     except Exception as e:
+                        self.consecutive_failures += 1
+                        TASK_RESULTS.labels("failure").inc()
                         print(f"[Consumer] Failed generation: {e}")
                 
                 await asyncio.sleep(0.1) 
                 
             except Exception as e:
+                self.consecutive_failures += 1
+                self.queue_depth = -1
+                TASK_RESULTS.labels("queue_failure").inc()
                 print(f"[Error] {e}")
                 await asyncio.sleep(1)
 
