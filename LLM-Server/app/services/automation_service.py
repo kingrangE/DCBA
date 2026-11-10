@@ -108,6 +108,9 @@ class RedisQueue:
         if isinstance(error, ValueError) or permanent_api_error or task["_attempt"] >= 5:
             self.reject(task, type(error).__name__)
 
+    def failed_size(self):
+        return self.redis_client.xlen(self.failed_key)
+
     def size(self):
         return self.redis_client.xlen(self.queue_key) + self.redis_client.llen(self.legacy_key)
 
@@ -128,6 +131,7 @@ class AutomationService:
         self.consecutive_failures = 0
         self.producer_failed = False
         self.queue_depth = -1
+        self.quarantined_tasks = -1
         
         self.subject_map = SUBJECT_LABELS
         self.level_map = LEVEL_LABELS

@@ -1,0 +1,59 @@
+groups:
+  - name: dcba-backend
+    rules:
+      - alert: DCBABackendUnavailable
+        expr: up{job=~"java-app|llm-server"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DCBA backend cannot be scraped"
+      - alert: DCBAGenerationStopped
+        expr: (time() - dcba_generation_last_success_timestamp_seconds > 600) and (dcba_generation_last_success_timestamp_seconds > 0)
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DCBA has not generated a problem for over ten minutes"
+      - alert: DCBAGenerationNeverSucceeded
+        expr: dcba_generation_last_success_timestamp_seconds == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DCBA has not completed its first generation"
+      - alert: DCBAGenerationFailures
+        expr: dcba_generation_consecutive_failures > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DCBA generation is failing"
+      - alert: DCBAGenerationBacklog
+        expr: dcba_generation_queue_depth > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DCBA generation queue is accumulating work"
+      - alert: DCBAGenerationProducerFailed
+        expr: dcba_generation_producer_failed == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DCBA cannot enqueue generation work"
+      - alert: DCBAGenerationQuarantined
+        expr: dcba_generation_quarantined_tasks > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DCBA has failed tasks waiting for operator review"
+      - alert: DCBAGenerationNotReady
+        expr: dcba_generation_ready == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DCBA generation dependencies or consumer remain unhealthy"

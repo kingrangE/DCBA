@@ -1,0 +1,58 @@
+rule_files:
+  - alerts.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'dcba_generation_last_success_timestamp_seconds{job="llm-server"}'
+        values: '1+0x15'
+    alert_rule_test:
+      - eval_time: 13m
+        alertname: DCBAGenerationStopped
+        exp_alerts:
+          - exp_labels:
+              job: llm-server
+              severity: critical
+            exp_annotations:
+              summary: "DCBA has not generated a problem for over ten minutes"
+  - interval: 1m
+    input_series:
+      - series: 'dcba_generation_quarantined_tasks{job="llm-server"}'
+        values: '1+0x3'
+      - series: 'dcba_generation_queue_depth{job="llm-server"}'
+        values: '21+0x6'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: DCBAGenerationQuarantined
+        exp_alerts:
+          - exp_labels:
+              job: llm-server
+              severity: warning
+            exp_annotations:
+              summary: "DCBA has failed tasks waiting for operator review"
+      - eval_time: 6m
+        alertname: DCBAGenerationBacklog
+        exp_alerts:
+          - exp_labels:
+              job: llm-server
+              severity: warning
+            exp_annotations:
+              summary: "DCBA generation queue is accumulating work"
+  - interval: 1m
+    input_series:
+      - series: 'dcba_generation_last_success_timestamp_seconds{job="llm-server"}'
+        values: '1+60x15'
+      - series: 'dcba_generation_queue_depth{job="llm-server"}'
+        values: '0+0x15'
+      - series: 'dcba_generation_quarantined_tasks{job="llm-server"}'
+        values: '0+0x15'
+    alert_rule_test:
+      - eval_time: 13m
+        alertname: DCBAGenerationStopped
+        exp_alerts: []
+      - eval_time: 13m
+        alertname: DCBAGenerationQuarantined
+        exp_alerts: []
+      - eval_time: 13m
+        alertname: DCBAGenerationBacklog
+        exp_alerts: []
