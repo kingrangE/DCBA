@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity //JPA를 사용하기 위함
+@Table(name = "banned_exercise", uniqueConstraints = @UniqueConstraint(name = "uk_banned_user_exercise", columnNames = {"user_id", "exercise_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA를 위한 기본 생성자
 @AllArgsConstructor

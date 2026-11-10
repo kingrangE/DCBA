@@ -73,7 +73,7 @@ public class ExerciseService {
     @Transactional
     public void saveExercise( Long userId, Long exerciseId) {
         // User 정보 가져옴 (없으면 Error)
-        User user = userRepository.findById(userId).orElseThrow(()
+        User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
                 -> new IllegalArgumentException("User not found"));
 
         // Exercise 정보 가져옴 (없으면 Error)
@@ -101,7 +101,7 @@ public class ExerciseService {
     @Transactional
     public void cancelSaveExercise(Long userId, Long exerciseId) {
         // user와 운동 정보 가져오기
-        User user = userRepository.findById(userId).orElseThrow(()
+        User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
                 -> new IllegalArgumentException("User not found"));
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
@@ -118,7 +118,7 @@ public class ExerciseService {
      */
     @Transactional
     public void banExercise(Long userId, Long exerciseId) {
-        User user = userRepository.findById(userId).orElseThrow(()
+        User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
                 -> new IllegalArgumentException("User not found"));
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
@@ -138,7 +138,7 @@ public class ExerciseService {
      */
     @Transactional
     public void cancelBanExercise(Long userId, Long exerciseId) {
-        User user = userRepository.findById(userId).orElseThrow(()
+        User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
                 -> new IllegalArgumentException("User not found"));
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
