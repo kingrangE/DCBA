@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +21,14 @@ public class UserService {
      * @param password 비번
      */
     public void signUp(String name, String password) {
+        if (name == null || name.isBlank() || !name.equals(name.strip())
+                || name.codePointCount(0, name.length()) > 10) {
+            throw new IllegalArgumentException("닉네임은 앞뒤 공백 없이 1~10자로 입력해주세요.");
+        }
+        if (password == null || password.isBlank()
+                || password.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new IllegalArgumentException("비밀번호는 공백만 사용할 수 없으며 UTF-8 기준 72바이트 이하여야 합니다.");
+        }
         // 이미 사용 중인 경우 Error
         if (userRepo.findByName(name).orElse(null) != null) {
             throw new RuntimeException("해당 닉네임을 사용하는 유저가 존재합니다.");
