@@ -1,0 +1,126 @@
+from unittest.mock import MagicMock, patch
+import pytest
+from app.models.exercise import Exercise
+from app.services.exercise_service import exercise_service
+from app.services.deduplication_service import DeduplicationService
+
+
+def test_duplicate_check_failure_stops_without_repeated_paid_generation(mocker):
+    completion = mocker.patch.object(exercise_service.client, "generate")
+    completion.return_value = "Q: Question\nA: Answer"
+    dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
+    dedup.check_duplicate.side_effect = RuntimeError("embedding unavailable")
+    with pytest.raises(RuntimeError, match="embedding unavailable"):
+        exercise_service.generate_exercise("ALGORITHM", "EASY")
+    assert completion.call_count == 1
+
+
+def test_index_failure_prevents_generation_and_save(mocker):
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
+    dedup.synchronize.side_effect = RuntimeError("index unavailable")
+    generate = mocker.patch.object(exercise_service, "generate_exercise")
+    with pytest.raises(RuntimeError, match="index unavailable"):
+        exercise_service.generate_and_save("ALGORITHM", "EASY")
+    generate.assert_not_called()
+    repository.save_exercise.assert_not_called()
+
+
+def test_completed_task_returns_saved_problem_without_regeneration(mocker):
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    saved = Exercise(id=1, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
+    repository.find_task.return_value = saved
+    generate = mocker.patch.object(exercise_service, "generate_exercise")
+    assert exercise_service.generate_and_save("ALGORITHM", "EASY", "task-1") == saved
+    generate.assert_not_called()
+    repository.save_exercise.assert_not_called()
+
+
+def test_index_rebuild_resumes_after_committed_batch(tmp_path, monkeypatch, mocker):
+    monkeypatch.setenv("CHROMA_PERSIST_DIRECTORY", str(tmp_path))
+    embeddings = mocker.patch("app.services.deduplication_service.OpenAIEmbeddings").return_value
+    embeddings.embed_documents.return_value = [[1.0, 0.0]]
+    embeddings.embed_query.return_value = [1.0, 0.0]
+    repository = MagicMock()
+    repository.find_after.side_effect = [[{"id": 7, "subject": "ALGORITHM", "level": "EASY", "question": "Question", "answer": "Answer"}], []]
+    store = DeduplicationService()
+    store.synchronize(repository, None)
+    assert store.check_duplicate("ALGORITHM", "EASY", "Question")[0]
+    assert not store.check_duplicate("DATABASE", "EASY", "Question")[0]
+    reopened = DeduplicationService()
+    repository.find_after.side_effect = [[]]
+    reopened.synchronize(repository, None)
+    repository.find_after.assert_called_with(7, None)
+    assert reopened.collection.count() == 1
+
+
+def test_failed_embedding_does_not_advance_rebuild_cursor(mocker):
+    store = DeduplicationService.__new__(DeduplicationService)
+    store.client = MagicMock()
+    store.collection_name = "test"
+    store.client.get_collection.return_value.metadata = None
+    store.embeddings = MagicMock()
+    store.embeddings.embed_documents.side_effect = RuntimeError("embedding unavailable")
+    repository = MagicMock()
+    repository.find_after.return_value = [{"id": 1, "subject": "ALGORITHM", "level": "EASY", "question": "Question", "answer": "Answer"}]
+    with pytest.raises(RuntimeError):
+        store.synchronize(repository, None)
+    store.client.get_collection.return_value.modify.assert_not_called()
+
+
+def test_accepted_embedding_is_recorded_once_and_not_embedded_again(tmp_path, monkeypatch, mocker):
+    monkeypatch.setenv("CHROMA_PERSIST_DIRECTORY", str(tmp_path))
+    embeddings = mocker.patch("app.services.deduplication_service.OpenAIEmbeddings").return_value
+    embeddings.embed_query.return_value = [1.0, 0.0]
+    store = DeduplicationService()
+    mocker.patch("app.services.deduplication_service.deduplication_service", store)
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    repository.find_after.return_value = []
+    saved = Exercise(id=11, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
+    repository.save_exercise.return_value = saved
+    completion = mocker.patch.object(exercise_service.client, "generate")
+    completion.return_value = "Q: Question\nA: Answer"
+    assert exercise_service.generate_and_save("ALGORITHM", "EASY") == saved
+    store.synchronize(repository, None)
+    embeddings.embed_query.assert_called_once_with("Q: Question\nA: Answer")
+    embeddings.embed_documents.assert_not_called()
+    assert store.collection.metadata["last_exercise_id"] == 11
+    assert list(store.collection.get(ids=["11"], include=["embeddings"])["embeddings"][0]) == [1.0, 0.0]
+
+
+def test_database_failure_never_records_candidate_embedding(mocker):
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    repository.save_exercise.side_effect = RuntimeError("database failed")
+    dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
+    mocker.patch.object(exercise_service, "generate_exercise", return_value=("Q: Question\nA: Answer", [1.0, 0.0]))
+    with pytest.raises(RuntimeError, match="database failed"):
+        exercise_service.generate_and_save("ALGORITHM", "EASY")
+    dedup.record.assert_not_called()
+
+
+def test_checkpoint_failure_recovers_committed_problem_from_database(tmp_path, monkeypatch, mocker):
+    monkeypatch.setenv("CHROMA_PERSIST_DIRECTORY", str(tmp_path))
+    embeddings = mocker.patch("app.services.deduplication_service.OpenAIEmbeddings").return_value
+    embeddings.embed_query.return_value = [1.0, 0.0]
+    embeddings.embed_documents.return_value = [[1.0, 0.0]]
+    store = DeduplicationService()
+    mocker.patch("app.services.deduplication_service.deduplication_service", store)
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    repository.find_after.return_value = []
+    saved = Exercise(id=12, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
+    repository.save_exercise.return_value = saved
+    mocker.patch.object(exercise_service, "generate_exercise", return_value=("Q: Question\nA: Answer", [1.0, 0.0]))
+    # synchronize reopens the collection, so fail the checkpoint at the collection class boundary.
+    with patch.object(type(store.collection), "modify", side_effect=RuntimeError("checkpoint failed")):
+        with pytest.raises(RuntimeError, match="checkpoint failed"):
+            exercise_service.generate_and_save("ALGORITHM", "EASY")
+    repository.save_exercise.assert_called_once()
+    assert not (store.collection.metadata or {}).get("last_exercise_id")
+    repository.find_after.side_effect = [[saved.model_dump()], []]
+    store.synchronize(repository, None)
+    assert store.collection.metadata["last_exercise_id"] == 12
+    assert store.collection.count() == 1
+
+@pytest.fixture(autouse=True)
+def enable_deduplication(monkeypatch):
+    monkeypatch.setattr(exercise_service, "deduplication_enabled", True)

@@ -1,82 +1,58 @@
 import os
-from langchain_chroma import Chroma
+import chromadb
 from langchain_openai import OpenAIEmbeddings
-from langchain_core.documents import Document
-from dotenv import load_dotenv
+from app.models.exercise import ExerciseRequest
 
-load_dotenv()
 
 class DeduplicationService:
     def __init__(self):
         self.similarity_threshold = 0.7
-        # Cosine Similarity를 위한 Embedding 모델
-        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small",
-                                           api_key=os.getenv("OPENAI_API_KEY"))
-
-        # Chroma DB 초기화
-        self.persist_directory = "./chroma_db"
-        self.vector_store = Chroma(
-            collection_name="exercise_deduplication",
-            embedding_function=self.embeddings,
-            persist_directory=self.persist_directory,
+        self.embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"),
+            request_timeout=30, max_retries=0,
+        )
+        self.persist_directory = os.getenv("CHROMA_PERSIST_DIRECTORY", "./chroma_db")
+        self.client = chromadb.PersistentClient(path=self.persist_directory)
+        # A new collection excludes legacy entries saved before the problem DB was committed.
+        self.collection_name = "exercise_deduplication_v2"
+        self.collection = self.client.get_or_create_collection(
+            self.collection_name, configuration={"hnsw": {"space": "cosine"}},
+            embedding_function=None,
         )
 
-    def is_duplicate(self, subject: str, level: str, text: str) -> bool:
-        """
-        text 중복 결과 반환 (True: 중복 / False: 중복 아님)
-        """
-        
-        if not text: # 결과가 없으면 중복일 수 없음 (예외처리)
-            return False
-
-        try:
-            # Metadata를 사용하여 효율 높여 비교
-            results = self.vector_store.similarity_search_with_relevance_scores(
-                query=text,
-                k=1,
-                filter={
-                    "$and": [
-                        {"subject": {"$eq": subject}},
-                        {"level": {"$eq": level}}
-                    ]
-                }
+    def synchronize(self, repository, connection):
+        self.collection = self.client.get_collection(self.collection_name, embedding_function=None)
+        after_id = int((self.collection.metadata or {}).get("last_exercise_id", 0))
+        while rows := repository.find_after(after_id, connection):
+            requests = [ExerciseRequest(subject=row["subject"], level=row["level"]) for row in rows]
+            documents = [f"Q: {row['question']}\nA: {row['answer']}" for row in rows]
+            self.collection.upsert(
+                ids=[str(row["id"]) for row in rows], documents=documents,
+                embeddings=self.embeddings.embed_documents(documents),
+                metadatas=[{"subject": request.subject.value, "level": request.level.value} for request in requests],
             )
+            after_id = rows[-1]["id"]
+            self.collection.modify(metadata={"last_exercise_id": after_id})
 
-            if not results: # 없으면 중복이 아님 (예외 처리)
-                return False
+    def check_duplicate(self, subject: str, level: str, text: str) -> tuple[bool, list[float]]:
+        request = ExerciseRequest(subject=subject, level=level)
+        embedding = self.embeddings.embed_query(text)
+        results = self.collection.query(
+            query_embeddings=[embedding], n_results=1,
+            where={"$and": [{"subject": request.subject.value}, {"level": request.level.value}]},
+            include=["distances"],
+        )
+        distances = results["distances"][0]
+        return bool(distances and 1 - distances[0] >= self.similarity_threshold), embedding
 
-            # 가장 높은 값 확인
-            best_doc, score = results[0]
-            
-            # threshold 넘으면 중복 (로그 출력 후 중복 처리)
-            if score >= self.similarity_threshold:
-                print(f"[Duplicate Detected] Score: {score:.4f} \n Existing Content[:30]: {best_doc.page_content[:30]}... \n New Content[:30]: {text[:30]}...")
-                return True
-            
-            return False
+    def record(self, exercise, embedding):
+        self.collection.upsert(
+            ids=[str(exercise.id)], documents=[f"Q: {exercise.question}\nA: {exercise.answer}"],
+            embeddings=[embedding], metadatas=[{"subject": exercise.subject.value, "level": exercise.level.value}],
+        )
+        # The shared generation lock keeps the committed DB prefix in the same order as this checkpoint.
+        self.collection.modify(metadata={"last_exercise_id": exercise.id})
 
-        except Exception as e:
-            print(f"[Error] Deduplication check failed: {e}")
-            return False
 
-    def save(self, subject: str, level: str, text: str):
-        """
-        Chroma DB에 Document 추가
-        """
-
-        try:
-            document = Document(
-                page_content=text,
-                metadata={
-                    "subject": subject,
-                    "level": level
-                }
-            )
-            self.vector_store.add_documents([document])
-            print(f"[Saved] Subject: {subject}, Level: {level}, Content[:30]: {text[:30]}..")
-
-        except Exception as e:
-            print(f"[Error] Failed to save document: {e}")
-
-# 싱글톤 객체 생성
-deduplication_service = DeduplicationService()
+deduplication_service = (DeduplicationService() if os.getenv("DEDUPLICATION_ENABLED", "false").lower()
+                         in {"1", "true", "yes", "on"} else None)

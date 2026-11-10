@@ -61,7 +61,6 @@ def migrate():
                     if not cursor.fetchone():
                         cursor.execute(f"ALTER TABLE `{table}` ADD CONSTRAINT fk_{prefix}_user FOREIGN KEY (user_id) REFERENCES user(id)")
                 cursor.execute("INSERT INTO schema_migration (version) VALUES (1)")
-            cursor.execute("ALTER TABLE user ADD COLUMN IF NOT EXISTS slack_id VARCHAR(255)")
             cursor.execute("SELECT version FROM schema_migration WHERE version = 2")
             if not cursor.fetchone():
                 sql = (Path(__file__).resolve().parent.parent / "migrations/002_exercise_filter_indexes.sql").read_text()
@@ -69,6 +68,10 @@ def migrate():
                     if statement.strip():
                         cursor.execute(statement)
                 cursor.execute("INSERT INTO schema_migration (version) VALUES (2)")
+            cursor.execute("SELECT version FROM schema_migration WHERE version = 3")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE user ADD COLUMN IF NOT EXISTS slack_id VARCHAR(255)")
+                cursor.execute("INSERT INTO schema_migration (version) VALUES (3)")
     finally:
         connection.close()
 

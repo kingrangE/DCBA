@@ -1,48 +1,62 @@
 from unittest.mock import MagicMock
 from app.models.exercise import Exercise
+import pytest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+
+def test_generation_failure_logs_cause_without_exposing_it_to_client(client, mocker, caplog):
+    failure = RuntimeError("private storage detail")
+    mocker.patch("app.routers.exercise.exercise_service.generate_and_save", side_effect=failure)
+    with caplog.at_level("ERROR", logger="app.routers.exercise"):
+        response = client.post("/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Generation is temporarily unavailable"}
+    record = next(record for record in caplog.records if record.name == "app.routers.exercise")
+    assert record.exc_info[1] is failure
+    assert "subject=ALGORITHM level=EASY" in record.getMessage()
+    assert "private storage detail" not in response.text
+    assert "test-generation-key" not in caplog.text
+
+def test_health_responds_while_generation_waits(client, mocker):
+    started, release = Event(), Event()
+    def slow_generation(*args):
+        started.set()
+        release.wait(3)
+        return Exercise(id=1, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
+    mocker.patch("app.routers.exercise.exercise_service.generate_and_save", side_effect=slow_generation)
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    repository.save_exercise.return_value = Exercise(id=1, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
+    with ThreadPoolExecutor() as pool:
+        request = pool.submit(client.post, "/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+        try:
+            assert started.wait(2)
+            assert client.get("/health").status_code == 200
+            assert not request.done()
+        finally:
+            release.set()
+        assert request.result().status_code == 200
+
+@pytest.mark.parametrize("field,value", [("subject", "UNKNOWN"), ("level", "UNKNOWN"), ("subject", ""), ("level", "easy")])
+def test_generate_rejects_invalid_category(client, mocker, field, value):
+    service = mocker.patch("app.routers.exercise.exercise_service")
+    payload = {"subject": "ALGORITHM", "level": "EASY", field: value}
+    assert client.post("/exercise/generate", json=payload).status_code == 422
+    service.generate_and_save.assert_not_called()
+
+def test_generate_requires_credentials(client):
+    client.headers.pop("Authorization")
+    response = client.post("/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+    assert response.status_code == 401
+
+def test_generate_disabled_without_key(client, monkeypatch):
+    monkeypatch.delenv("LLM_API_KEY")
+    response = client.post("/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+    assert response.status_code == 503
 
 def test_generate_exercise(client, mocker):
-    # =========== given ===========
-    # exercise_service 대신 응답할 mock 제작
-    mock_service = mocker.patch("app.routers.exercise.exercise_service")
-    mock_service.generate_exercise.return_value = "Mocked LLM Content" # 문제 생성 고정 return 값
-    mock_service.parse_content.return_value = { # 파싱 고정 리턴 값
-        "question": "What is 1+1?",
-        "answer": "2"
-    }
-    
-    # exercise repo mock 제작
-    mock_repo_cls = mocker.patch("app.repositories.exercise_repository.exercise_repository")
-    mock_saved_exercise = Exercise(
-        id=1,
-        subject="ALGORITHM",
-        level="EASY",
-        question="What is 1+1?",
-        answer="2"
-    )
-    mock_repo_cls.save_exercise.return_value = mock_saved_exercise # 위 객체를 고정으로 return
-    
-    # =========== when ===========
-    # 확인을 위해 전송할 값
-    payload = { 
-        "subject": "ALGORITHM",
-        "level": "EASY"
-    }
-
-    response = client.post("/exercise/generate", json=payload) # API 경로로 payload 보내서, 실제 HTTP 전송처럼 Test
-
-    # =========== then ===========
-    if response.status_code != 200: # 응답을 제대로 받는지 확인
-        print(response.json()) # 제대로 받지 못했다면, 받은 응답 출력
-        
-
-    # 정상적으로 응답을 전달 받은는지 확인
-    assert response.status_code == 200 
-    data = response.json()
-    assert data["subject"] == "ALGORITHM"
-    assert data["question"] == "What is 1+1?"
-    assert data["id"] == 1
-
-    # mock가 제대로 호출되었는지 확인
-    mock_service.generate_exercise.assert_called_once()
-    mock_repo_cls.save_exercise.assert_called_once()
+    service = mocker.patch("app.routers.exercise.exercise_service")
+    service.generate_and_save.return_value = Exercise(id=1, subject="ALGORITHM", level="EASY", question="What is 1+1?", answer="2")
+    response = client.post("/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+    assert response.status_code == 200
+    assert response.json()["question"] == "What is 1+1?"
+    service.generate_and_save.assert_called_once_with("ALGORITHM", "EASY")

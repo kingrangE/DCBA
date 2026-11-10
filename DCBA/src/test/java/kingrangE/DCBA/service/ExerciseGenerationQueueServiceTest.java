@@ -39,13 +39,13 @@ class ExerciseGenerationQueueServiceTest {
 
     @Test
     void enqueueUsesPythonConsumerQueueContract() throws Exception {
-        when(redisTemplate.opsForList()).thenReturn(listOperations);
-        when(listOperations.rightPush(eq(ExerciseGenerationQueueService.QUEUE_KEY), anyString())).thenReturn(3L);
+        when(redisTemplate.execute(org.mockito.ArgumentMatchers.any(org.springframework.data.redis.core.script.RedisScript.class), org.mockito.ArgumentMatchers.anyList(), anyString())).thenReturn(3L);
 
         Long queueSize = queueService.enqueue(Subject.COMPUTER_NETWORK, Level.HARD);
 
         ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
-        verify(listOperations).rightPush(eq("exercise:generation_queue"), payloadCaptor.capture());
+        verify(redisTemplate).execute(org.mockito.ArgumentMatchers.any(org.springframework.data.redis.core.script.RedisScript.class), eq(java.util.List.of("exercise:generation_stream", "exercise:generation_queue")), payloadCaptor.capture());
+        assertThat(payloadCaptor.getValue()).contains("task_id");
 
         JsonNode payload = objectMapper.readTree(payloadCaptor.getValue());
         assertThat(payload.get("subject").asText()).isEqualTo("COMPUTER_NETWORK");
