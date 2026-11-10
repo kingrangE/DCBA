@@ -27,6 +27,7 @@ COPY --from=builder /opt/venv /opt/venv
 
 COPY app ./app
 COPY instructions ./instructions
+COPY migrations ./migrations
 
 RUN mkdir -p /app/chroma_db && \
     adduser --disabled-password --gecos "" appuser && \

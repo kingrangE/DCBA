@@ -1,4 +1,19 @@
 services:
+  schema-migrate:
+    image: kingrange/dcba-llm-server:latest
+    command: ["python", "-m", "app.migrate"]
+    env_file:
+      - .env
+    environment:
+      - MARIADB_HOST=mariadb
+      - MARIADB_PORT=3306
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - dcba-network
+    restart: "no"
+
   llm-server:
     # build: 
     #   context: ./LLM-Server
@@ -21,8 +36,10 @@ services:
       - MARIADB_PASSWORD=${MARIADB_PASSWORD}
       - MARIADB_DATABASE=${MARIADB_DATABASE}
     depends_on:
-      - redis
-      - mariadb
+      redis:
+        condition: service_started
+      schema-migrate:
+        condition: service_completed_successfully
     networks:
       - dcba-network
     restart: always
@@ -45,7 +62,8 @@ services:
       - MARIADB_PASSWORD=${MARIADB_PASSWORD}
       - MARIADB_DATABASE=${MARIADB_DATABASE}
     depends_on:
-      - mariadb
+      schema-migrate:
+        condition: service_completed_successfully
     networks:
       - dcba-network
     restart: always
@@ -63,6 +81,11 @@ services:
     restart: always
 
   mariadb:
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     image: mariadb:10.11
     container_name: mariadb-server
     ports:

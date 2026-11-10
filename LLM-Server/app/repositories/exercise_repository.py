@@ -11,7 +11,6 @@ class ExerciseRepository:
         self.password = os.getenv("MARIADB_PASSWORD", "password")
         self.db_name = os.getenv("MARIADB_DATABASE", "dcba")
 
-        self.initialize_db()
 
     def get_connection(self):
         return pymysql.connect(
@@ -25,45 +24,6 @@ class ExerciseRepository:
             connect_timeout=5, read_timeout=30, write_timeout=30,
         )
 
-    def initialize_db(self):
-        conn = pymysql.connect(
-            host=self.host,
-            port=self.port,
-            user=self.user,
-            password=self.password,
-            autocommit=True,
-            connect_timeout=5, read_timeout=30, write_timeout=30,
-        )
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("CREATE DATABASE IF NOT EXISTS `" + self.db_name.replace("`", "``") + "`")
-        finally:
-            conn.close()
-
-        # DB 연결
-        conn = self.get_connection()
-        try:
-            with conn.cursor() as cursor:
-                # 테이블 없으면 생성
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS exercise (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        subject VARCHAR(30) NOT NULL,
-                        level VARCHAR(8) NOT NULL,
-                        question TEXT NOT NULL,
-                        answer TEXT NOT NULL,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP  
-                    )
-                """)
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS generation_task (
-                        task_id VARCHAR(128) PRIMARY KEY,
-                        exercise_id BIGINT NOT NULL
-                    )
-                """)
-        finally:
-            conn.close()
-    
     @contextmanager
     def generation_lock(self):
         connection = self.get_connection()

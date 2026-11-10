@@ -1,0 +1,33 @@
+CREATE TABLE IF NOT EXISTS user (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name CHAR(10) NOT NULL UNIQUE,
+    password VARCHAR(60) NOT NULL,
+    created_at DATETIME(6)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS exercise (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    subject VARCHAR(30) NOT NULL,
+    level VARCHAR(8) NOT NULL,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS selected_exercise (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT,
+    exercise_id BIGINT,
+    custom_answer TEXT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS banned_exercise (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT,
+    exercise_id BIGINT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS generation_task (
+    task_id VARCHAR(128) NOT NULL PRIMARY KEY,
+    exercise_id BIGINT NOT NULL
+) ENGINE=InnoDB;

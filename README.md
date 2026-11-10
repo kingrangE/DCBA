@@ -35,6 +35,12 @@ Daily CS, Base to Advanced
 - DCBA : Java Spring Boot Web Application
 - LLM-Server : LLM Python Server for DCBA 
 
+## Database deployment
+
+The `schema-migrate` Compose service owns schema changes. It waits for MariaDB, applies the versioned schema, and must finish successfully before either application starts. Java validates the schema in production; Python no longer creates tables while serving requests. Include `LLM-Server/migrations` when building the generation server image.
+
+For an existing deployment, stop both application containers and back up MariaDB before upgrading. The first migration preserves rows, upgrades legacy problem identifiers to BIGINT, and applies preference uniqueness and foreign keys. Duplicate preferences, orphaned references, incomplete problems, or unexpected external references stop migration; review and repair those records before retrying. MariaDB schema changes commit individually, so keep applications stopped until migration succeeds. Completed migrations are recorded in `schema_migration` and reruns skip them. Do not set schema auto-update or auto-create in production.
+
 ## Why did I decouple the LLM Service from the Main Server?
 1. **`Leveraging the LLM Ecosystem`**
     - To fully utilize the Python-based AI ecosystem, including advanced libraries like koNLPy and various vector databases.
