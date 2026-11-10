@@ -64,7 +64,7 @@ public class ExerciseController {
         // 저장한 문제들과 banned한 문제들을 표시하기 위한 id들 추가
         List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
         model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId(), pageIds));
-        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId(), pageIds));
+        model.addAttribute("bannedIds", List.of());
 
         // dashboard.html view resolver 전달ㄴ
         return "dashboard";
@@ -189,7 +189,7 @@ public class ExerciseController {
 
         // 저장한거랑 밴한거 정보 가져와서 표시하도록 함.
         List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
-        model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId(), pageIds));
+        model.addAttribute("savedIds", pageIds);
         model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId(), pageIds));
 
         return "dashboard";
@@ -224,7 +224,7 @@ public class ExerciseController {
 
         List<Long> pageIds = exercisePage.getContent().stream().map(Exercise::getId).toList();
         model.addAttribute("savedIds", exerciseService.getSavedExerciseIds(user.getId(), pageIds));
-        model.addAttribute("bannedIds", exerciseService.getBannedExerciseIds(user.getId(), pageIds));
+        model.addAttribute("bannedIds", pageIds);
 
         return "dashboard";
     }

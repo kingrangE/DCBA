@@ -36,6 +36,29 @@ class DashboardTests {
         verifyNoInteractions(service);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"all", "selected", "banned"})
+    void listMembershipSuppliesKnownFlagsWithoutAnotherLookup(String view) throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("loginUser", new User(1L, "reader", "unused", null));
+        Page<Exercise> page = new PageImpl<>(List.of(Exercise.builder().id(1L).subject(Subject.ALGORITHM)
+                .level(Level.EASY).question("Question").answer("Answer").build()));
+        when(service.getExercises(eq(1L), any(), any(), any())).thenReturn(page);
+        when(service.getSelectedExercises(eq(1L), any(), any(), any())).thenReturn(page);
+        when(service.getBannedExercises(eq(1L), any(), any(), any())).thenReturn(page);
+        mvc.perform(get(view.equals("all") ? "/dashboard" : "/dashboard/" + view).session(session))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("savedIds", view.equals("selected") ? List.of(1L) : List.of()))
+                .andExpect(model().attribute("bannedIds", view.equals("banned") ? List.of(1L) : List.of()));
+        if (view.equals("selected")) {
+            verify(service, never()).getSavedExerciseIds(any(), any());
+            verify(service).getBannedExerciseIds(1L, List.of(1L));
+        } else {
+            verify(service, never()).getBannedExerciseIds(any(), any());
+            verify(service).getSavedExerciseIds(1L, List.of(1L));
+        }
+    }
+
     @org.junit.jupiter.api.Test
     void missingExerciseReturnsNotFoundWithoutInternalDetails() throws Exception {
         MockHttpSession session = new MockHttpSession();
