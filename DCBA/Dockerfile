@@ -1,17 +1,14 @@
-# 1단계
-FROM gradle:8.14-jdk21 AS builder
+FROM eclipse-temurin:21-jre-alpine AS runtime
+WORKDIR /app
+ENTRYPOINT ["java", "-jar", "app.jar"]
+
+FROM gradle:9.3.0-jdk21 AS builder
 WORKDIR /app
 COPY . .
-# build 진행
-RUN gradle clean bootJar --no-daemon
+RUN gradle bootJar --no-daemon --build-cache
 
-# 테스트
-FROM builder AS tester
-RUN gradle test --no-daemon
+FROM runtime AS ci
+COPY app.jar app.jar
 
-# 아티팩트 가져와서 실행
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
+FROM runtime AS final
 COPY --from=builder /app/build/libs/app.jar app.jar
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
