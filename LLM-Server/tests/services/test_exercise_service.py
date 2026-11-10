@@ -8,11 +8,11 @@ def test_generation_uses_canonical_categories_and_display_labels(mocker):
     completion = mocker.patch.object(exercise_service.client.chat.completions, "create")
     completion.return_value.choices[0].message.content = "Q: Question\nA: Answer"
     dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
-    dedup.is_duplicate.return_value = False
+    dedup.check_duplicate.return_value = (False, [1.0, 0.0])
     exercise_service.generate_exercise("DATA_STRUCTURE", "EASY")
     prompt = completion.call_args.kwargs["messages"][1]["content"]
     assert "자료구조" in prompt and "난이도 1 (기초)" in prompt
-    dedup.is_duplicate.assert_called_once_with("DATA_STRUCTURE", "EASY", "Q: Question\nA: Answer")
+    dedup.check_duplicate.assert_called_once_with("DATA_STRUCTURE", "EASY", "Q: Question\nA: Answer")
 
 def test_parse_content():
     # =========== given =========== 
@@ -118,14 +118,14 @@ def test_generate_exercise_success(mocker):
     # 중복 검사 객체 mock
     mock_dedup = mocker.patch("app.services.deduplication_service.deduplication_service") 
     # return 값을 False로 설정(중복 X 가정)
-    mock_dedup.is_duplicate.return_value=False
+    mock_dedup.check_duplicate.return_value=(False, [1.0, 0.0])
 
     # =========== when =========== 
     # ALGORITHM EASY로 입력 받았다 가정
     result = exercise_service.generate_exercise("ALGORITHM","EASY")
 
     # =========== then =========== 
-    assert result == "Q: 1123 \nA:456"
+    assert result == ("Q: 1123 \nA:456", [1.0, 0.0])
 
 def test_generate_exercise_after_parse_retries(mocker):
     """문제 생성을 maximum try이내로 잘 한 경우"""
@@ -157,20 +157,20 @@ def test_generate_exercise_after_parse_retries(mocker):
     # 중복 검사 객체 mock
     mock_dedup = mocker.patch("app.services.deduplication_service.deduplication_service") 
     # return 값을 False로 설정(중복 X 가정)
-    mock_dedup.is_duplicate.return_value=False
+    mock_dedup.check_duplicate.return_value=(False, [1.0, 0.0])
 
     # =========== when =========== 
     # ALGORITHM EASY로 입력 받았다 가정
     result = exercise_service.generate_exercise("ALGORITHM","EASY")
 
     # =========== then =========== 
-    assert result == "Q: 1123 \nA:456"
+    assert result == ("Q: 1123 \nA:456", [1.0, 0.0])
 
 def test_generate_exercise_after_duplicate_retries(mocker):
     """중복 검사 3번째에 통과되는 경우"""
     # =========== given =========== 
     mock_dedup = mocker.patch("app.services.deduplication_service.deduplication_service") 
-    mock_dedup.is_duplicate.side_effect = [True,True,False] # 2번 중복 후 3번재 통과
+    mock_dedup.check_duplicate.side_effect = [(True, [1.0, 0.0]), (True, [1.0, 0.0]), (False, [1.0, 0.0])] # 2번 중복 후 3번재 통과
     mock_completion = mocker.Mock()
     # 함수 return 값을 생성 결과 mock로 연결 (그럼 content가 이거다 가정)
     mocker.patch.object(exercise_service.client.chat.completions, 
@@ -194,13 +194,13 @@ def test_generate_exercise_after_duplicate_retries(mocker):
 
     # =========== then =========== 
     # 2번 호출됨
-    assert mock_dedup.is_duplicate.call_count == 3
+    assert mock_dedup.check_duplicate.call_count == 3
 
 def test_generate_exercise_success_within_max_tries(mocker):
     """무한 중복으로 인한 취소"""
     # =========== given =========== 
     mock_dedup = mocker.patch("app.services.deduplication_service.deduplication_service") 
-    mock_dedup.is_duplicate.side_effect = [True]*10 # 2번 중복 후 3번재 통과
+    mock_dedup.check_duplicate.side_effect = [(True, [1.0, 0.0])]*10 # 2번 중복 후 3번재 통과
     mock_completion = mocker.Mock()
 
     # 값은 정상적으로 잘 제작 됐는데 무한 중복으로 인해 취소되는걸 확인
@@ -227,7 +227,7 @@ def test_generate_exercise_success_within_max_tries(mocker):
 
     # =========== then =========== 
     # 10번 시도한거 맞는지 확인
-    assert mock_dedup.is_duplicate.call_count == 10  
+    assert mock_dedup.check_duplicate.call_count == 10  
     # Error Message 확인
     assert "Failed to generate unique content after multiple retries." in str(excinfo.value)
 
@@ -256,8 +256,8 @@ def test_transient_api_errors_retry_with_backoff(mocker, status):
     generate = mocker.patch.object(exercise_service.client.chat.completions, "create",
                                   side_effect=[APIStatusError("temporary", response=response, body=None), completion])
     sleep = mocker.patch("app.services.exercise_service.time.sleep")
-    mocker.patch("app.services.deduplication_service.deduplication_service").is_duplicate.return_value = False
-    assert exercise_service.generate_exercise("ALGORITHM", "EASY") == "Q: Question\nA: Answer"
+    mocker.patch("app.services.deduplication_service.deduplication_service").check_duplicate.return_value = (False, [1.0, 0.0])
+    assert exercise_service.generate_exercise("ALGORITHM", "EASY") == ("Q: Question\nA: Answer", [1.0, 0.0])
     assert generate.call_count == 2
     sleep.assert_called_once_with(1)
 
@@ -291,8 +291,8 @@ def test_multiline_generation_is_checked_and_saved_without_regeneration(mocker):
     repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
     repository.find_task.return_value = None
     dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
-    dedup.is_duplicate.return_value = False
+    dedup.check_duplicate.return_value = (False, [1.0, 0.0])
     exercise_service.generate_and_save("ALGORITHM", "EASY")
     assert generate.call_count == 1
-    dedup.is_duplicate.assert_called_once_with("ALGORITHM", "EASY", content)
+    dedup.check_duplicate.assert_called_once_with("ALGORITHM", "EASY", content)
     assert repository.save_exercise.call_args.args == ("ALGORITHM", "EASY", "Question Q: body", "Answer A: body\nSecond line")

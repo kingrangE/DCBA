@@ -34,15 +34,24 @@ class DeduplicationService:
             after_id = rows[-1]["id"]
             self.collection.modify(metadata={"last_exercise_id": after_id})
 
-    def is_duplicate(self, subject: str, level: str, text: str) -> bool:
+    def check_duplicate(self, subject: str, level: str, text: str) -> tuple[bool, list[float]]:
         request = ExerciseRequest(subject=subject, level=level)
+        embedding = self.embeddings.embed_query(text)
         results = self.collection.query(
-            query_embeddings=[self.embeddings.embed_query(text)], n_results=1,
+            query_embeddings=[embedding], n_results=1,
             where={"$and": [{"subject": request.subject.value}, {"level": request.level.value}]},
             include=["distances"],
         )
         distances = results["distances"][0]
-        return bool(distances and 1 - distances[0] >= self.similarity_threshold)
+        return bool(distances and 1 - distances[0] >= self.similarity_threshold), embedding
+
+    def record(self, exercise, embedding):
+        self.collection.upsert(
+            ids=[str(exercise.id)], documents=[f"Q: {exercise.question}\nA: {exercise.answer}"],
+            embeddings=[embedding], metadatas=[{"subject": exercise.subject.value, "level": exercise.level.value}],
+        )
+        # The shared generation lock keeps the committed DB prefix in the same order as this checkpoint.
+        self.collection.modify(metadata={"last_exercise_id": exercise.id})
 
 
 deduplication_service = DeduplicationService()

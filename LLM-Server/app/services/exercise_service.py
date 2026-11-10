@@ -55,14 +55,16 @@ class ExerciseService:
                 if saved is not None:
                     return saved
             deduplication_service.synchronize(exercise_repository, connection)
-            content = self.generate_exercise(request.subject.value, request.level.value)
+            content, embedding = self.generate_exercise(request.subject.value, request.level.value)
             parsed = self.parse_content(content)
-            return exercise_repository.save_exercise(
+            saved = exercise_repository.save_exercise(
                 request.subject.value, request.level.value, parsed["question"], parsed["answer"],
                 task_id=task_id, connection=connection,
             )
+            deduplication_service.record(saved, embedding)
+            return saved
 
-    def generate_exercise(self, subject: str, level: str) -> str:
+    def generate_exercise(self, subject: str, level: str) -> tuple[str, list[float]]:
         from app.services.deduplication_service import deduplication_service
         request = ExerciseRequest(subject=subject, level=level)
         subject, level = request.subject.value, request.level.value
@@ -120,11 +122,12 @@ class ExerciseService:
                 continue
 
             canonical_content = f"Q: {parsed_data['question']}\nA: {parsed_data['answer']}"
-            if deduplication_service.is_duplicate(subject, level, canonical_content):
+            duplicate, embedding = deduplication_service.check_duplicate(subject, level, canonical_content)
+            if duplicate:
                 print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
                 time.sleep(1)
                 continue
-            return content
+            return content, embedding
 
         raise Exception("Failed to generate unique content after multiple retries.")
 
