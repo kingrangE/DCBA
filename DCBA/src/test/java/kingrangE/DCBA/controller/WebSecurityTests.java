@@ -12,6 +12,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import org.springframework.security.web.csrf.CsrfToken;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
@@ -24,10 +26,24 @@ class WebSecurityTests {
     void logoutInvalidatesLoginSession() throws Exception {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("loginUser", "signed-in-user");
-        mvc.perform(post("/logout").session(session))
+        CsrfToken token = (CsrfToken) mvc.perform(get("/").session(session)).andReturn().getRequest().getAttribute("_csrf");
+        mvc.perform(post("/logout").session(session).param(token.getParameterName(), token.getToken()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
                 .andExpect(cookie().maxAge("JSESSIONID", 0));
         assertThat(session.isInvalid()).isTrue();
+    }
+    @Test
+    void rejectsStateChangesWithoutCsrfToken() throws Exception {
+        for (String path : new String[]{"/login", "/signup", "/logout", "/exercise/save", "/exercise/ban"}) {
+            mvc.perform(post(path)).andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void loginFormContainsCsrfToken() throws Exception {
+        mvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")));
     }
 }

@@ -471,7 +471,7 @@
                             <div class="action-buttons">
                                 <!-- Save / Unsave -->
                                 <form th:if="${savedIds != null and savedIds.contains(exercise.id)}"
-                                    action="/exercise/save/cancel" method="post" onclick="event.stopPropagation()">
+                                    th:action="@{/exercise/save/cancel}" method="post" onclick="event.stopPropagation()">
                                     <input type="hidden" name="exerciseId" th:value="${exercise.id}">
                                     <button type="submit" class="btn-icon btn-save" title="Unsave (Remove from Saved)"
                                         style="color: #059669;">
@@ -482,7 +482,7 @@
                                     </button>
                                 </form>
                                 <form th:unless="${savedIds != null and savedIds.contains(exercise.id)}"
-                                    action="/exercise/save" method="post" onclick="event.stopPropagation()">
+                                    th:action="@{/exercise/save}" method="post" onclick="event.stopPropagation()">
                                     <input type="hidden" name="exerciseId" th:value="${exercise.id}">
                                     <button type="submit" class="btn-icon btn-save" title="Save Exercise">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
@@ -495,7 +495,7 @@
 
                                 <!-- Ban / Unban -->
                                 <form th:if="${bannedIds != null and bannedIds.contains(exercise.id)}"
-                                    action="/exercise/ban/cancel" method="post" onclick="event.stopPropagation()">
+                                    th:action="@{/exercise/ban/cancel}" method="post" onclick="event.stopPropagation()">
                                     <input type="hidden" name="exerciseId" th:value="${exercise.id}">
                                     <button type="submit" class="btn-icon btn-ban" title="Unban (Restore from Trash)"
                                         style="color: #DC2626;">
@@ -507,7 +507,7 @@
                                     </button>
                                 </form>
                                 <form th:unless="${bannedIds != null and bannedIds.contains(exercise.id)}"
-                                    action="/exercise/ban" method="post" onclick="event.stopPropagation()">
+                                    th:action="@{/exercise/ban}" method="post" onclick="event.stopPropagation()">
                                     <input type="hidden" name="exerciseId" th:value="${exercise.id}">
                                     <button type="submit" class="btn-icon btn-ban" title="Ban (Move to Trash)">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
