@@ -39,6 +39,21 @@ class DashboardTests {
                 .andExpect(content().string(org.hamcrest.Matchers.not(containsString("private resource detail"))));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {0, 5000, 9999, 2000000})
+    void largeResultSetsRenderOnlyNearbyPageNumbers(int pageNumber) throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("loginUser", new User(1L, "reader", "unused", null));
+        Page<Exercise> page = new PageImpl<>(pageNumber > 9999 ? List.of() : List.of(Exercise.builder().id(1L).subject(Subject.ALGORITHM)
+                .level(Level.EASY).question("Question").answer("Answer").build()), PageRequest.of(pageNumber, 9), 90000);
+        when(service.getExercises(eq(1L), any(), any(), any())).thenReturn(page);
+        String html = mvc.perform(get("/dashboard").session(session).param("page", String.valueOf(pageNumber)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        long links = java.util.regex.Pattern.compile("class=\"page-link").matcher(html).results().count();
+        org.assertj.core.api.Assertions.assertThat(links).isLessThanOrEqualTo(9);
+        if (pageNumber <= 9999) org.assertj.core.api.Assertions.assertThat(html).contains(">" + (pageNumber + 1) + "</a>");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"selected", "banned"})
     void paginationAndFiltersStayInCurrentList(String view) throws Exception {
