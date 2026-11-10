@@ -57,3 +57,7 @@ For an existing deployment, stop both application containers and back up MariaDB
 ## Internal service access
 
 Redis is available only on the Compose network. MariaDB and Prometheus host ports bind to loopback; use an SSH tunnel for remote administration. Production Java management endpoints use the separate internal port 9091, which is not published by Compose. Application traffic continues to use port 8080.
+
+## Authentication traffic
+
+Login and signup share a limit of 10 POST attempts per client IP per minute, after CSRF validation. Rejected requests receive HTTP 429 and a retry delay. Counters hold at most 10,000 addresses per minute and run in memory for the current single Java server. The application uses the peer address and does not trust arbitrary forwarded headers. If a reverse proxy is used, configure trusted client-address handling there; before adding Java replicas, enforce shared limits at the trusted ingress. Users sharing one public IP share the same budget.

@@ -13,6 +13,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                .addFilterAfter(new AuthRateLimitFilter(), org.springframework.security.web.csrf.CsrfFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll())
                 .formLogin(login -> login.disable())
