@@ -1,6 +1,7 @@
 package kingrangE.DCBA.controller;
 
 import kingrangE.DCBA.config.SecurityConfig;
+import kingrangE.DCBA.domain.User;
 import kingrangE.DCBA.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -21,6 +23,43 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WebSecurityTests {
     @Autowired MockMvc mvc;
     @MockitoBean UserService userService;
+
+    @Test
+    void successfulLoginRotatesSessionIdAndPreservesSessionAttributes() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("existingAttribute", "preserved");
+        CsrfToken token = (CsrfToken) mvc.perform(get("/").session(session)).andReturn().getRequest().getAttribute("_csrf");
+        String originalSessionId = session.getId();
+        User user = new User("reader", "hashed-password");
+        when(userService.login("reader", "password")).thenReturn(user);
+
+        mvc.perform(post("/login").session(session)
+                        .param(token.getParameterName(), token.getToken())
+                        .param("name", "reader").param("password", "password"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/dashboard"))
+                .andExpect(request().sessionAttribute("loginUser", user))
+                .andExpect(request().sessionAttribute("existingAttribute", "preserved"));
+
+        assertThat(session.getId()).isNotEqualTo(originalSessionId);
+    }
+
+    @Test
+    void failedLoginDoesNotRotateSessionOrSignIn() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        CsrfToken token = (CsrfToken) mvc.perform(get("/").session(session)).andReturn().getRequest().getAttribute("_csrf");
+        String originalSessionId = session.getId();
+        when(userService.login("reader", "wrong")).thenThrow(new RuntimeException("Invalid credentials"));
+
+        mvc.perform(post("/login").session(session)
+                        .param(token.getParameterName(), token.getToken())
+                        .param("name", "reader").param("password", "wrong"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/?error"))
+                .andExpect(request().sessionAttributeDoesNotExist("loginUser"));
+
+        assertThat(session.getId()).isEqualTo(originalSessionId);
+    }
 
     @Test
     void logoutInvalidatesLoginSession() throws Exception {

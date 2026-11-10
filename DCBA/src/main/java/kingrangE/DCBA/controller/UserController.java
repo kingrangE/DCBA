@@ -39,10 +39,12 @@ public class UserController {
      * @return dashboard(redirect)
      */
     @PostMapping("/login")
-    public String login(@ModelAttribute LoginForm loginForm, HttpSession session) {
+    public String login(@ModelAttribute LoginForm loginForm, HttpSession session, HttpServletRequest request) {
 
         // 이름과 비밀번호로 로그인 진행
         User user = userService.login(loginForm.getName(), loginForm.getPassword());
+
+        request.changeSessionId();
 
         // User Login Session 유지를 위한 Attribute 추가
         session.setAttribute("loginUser", user);
