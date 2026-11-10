@@ -5,6 +5,7 @@ import asyncio
 import random
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.exercise_service import exercise_service
+from app.models.exercise import SUBJECT_LABELS, LEVEL_LABELS
 
 class RedisQueue:
     def __init__(self, host="localhost", port=6379, db=0):
@@ -47,20 +48,8 @@ class AutomationService:
         # 현재 scheduler 실행 여부 상태
         self.is_running = False
         
-        self.subject_map = {
-            "COMPUTER_ARCHITECTURE": "컴퓨터 구조",
-            "OPERATING_SYSTEM": "운영체제",
-            "COMPUTER_NETWORK": "컴퓨터 네트워크",
-            "DATA_STRUCTURE": "자료구조",
-            "ALGORITHM": "알고리즘",
-            "DATABASE": "데이터베이스"
-        }
-        
-        self.level_map = {
-            "EASY": "난이도 1 (기초)",
-            "MEDIUM": "난이도 2 (기본)",
-            "HARD": "난이도 3 (심화)"
-        }
+        self.subject_map = SUBJECT_LABELS
+        self.level_map = LEVEL_LABELS
 
     def start_producer(self):
         # 아직 안돌아가고 있으면 scheduler에 잡 넣고 시작
@@ -80,8 +69,6 @@ class AutomationService:
         task = {
             "subject": selected_subject_key, # DB 저장용 (Java Enum)
             "level": selected_level_key,     # DB 저장용 (Java Enum)
-            "subject_display": self.subject_map[selected_subject_key], # LLM 프롬프트용
-            "level_display": self.level_map[selected_level_key]       # LLM 프롬프트용
         }
         self.queue.enqueue(task)
 
@@ -108,8 +95,8 @@ class AutomationService:
                         content = await loop.run_in_executor(
                             None, 
                             exercise_service.generate_exercise, 
-                            task['subject_display'], 
-                            task['level_display']
+                            task['subject'], 
+                            task['level']
                         )
                         
                         # 파싱

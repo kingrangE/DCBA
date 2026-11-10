@@ -2,6 +2,7 @@ import os
 import time
 from openai import OpenAI
 from dotenv import load_dotenv
+from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
 
 load_dotenv()
 
@@ -56,14 +57,16 @@ class ExerciseService:
     # 문제 생성
     def generate_exercise(self, subject: str, level: str) -> str:
         from app.services.deduplication_service import deduplication_service
+        request = ExerciseRequest(subject=subject, level=level)
+        subject, level = request.subject.value, request.level.value
         
         if not self.system_prompt or not self.prompt_template: # Prompt 없으면 Error
             raise Exception("Prompt files not correctly loaded.")
 
         # Prompt에 전달받은 값 넣어 완성
         formatted_prompt = self.prompt_template.format(
-            subject=subject,
-            level=level
+            subject=SUBJECT_LABELS[subject],
+            level=LEVEL_LABELS[level]
         )
 
         # 재시도 10번

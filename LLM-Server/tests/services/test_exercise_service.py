@@ -4,6 +4,16 @@ from app.services.exercise_service import exercise_service
 import pytest
 
 # +++++++++++++ 파싱 전용 함수 테스트들 +++++++++++++ 
+def test_generation_uses_canonical_categories_and_display_labels(mocker):
+    completion = mocker.patch.object(exercise_service.client.chat.completions, "create")
+    completion.return_value.choices[0].message.content = "Q: Question\nA: Answer"
+    dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
+    dedup.is_duplicate.return_value = False
+    exercise_service.generate_exercise("DATA_STRUCTURE", "EASY")
+    prompt = completion.call_args.kwargs["messages"][1]["content"]
+    assert "자료구조" in prompt and "난이도 1 (기초)" in prompt
+    dedup.is_duplicate.assert_called_once_with("DATA_STRUCTURE", "EASY", "Q: Question\nA: Answer")
+
 def test_parse_content():
     # =========== given =========== 
     content = "Q:123 \n A:4456"

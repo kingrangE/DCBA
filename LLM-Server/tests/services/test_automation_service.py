@@ -67,7 +67,7 @@ async def test_automation_service_consumer(mocker):
     automation_service.is_running = True
     
     task_payload = {
-        "subject": "DB", "level": "HARD", 
+        "subject": "DATABASE", "level": "HARD", 
         "subject_display": "Database", "level_display": "Advanced"
     }
     
@@ -94,7 +94,7 @@ async def test_automation_service_consumer(mocker):
     
     # =========== then =========== 
     # LLM 호출에 전달하는 내용을 잘 전달했는지 확인
-    mock_exercise_service.generate_exercise.assert_called_with("Database", "Advanced")
+    mock_exercise_service.generate_exercise.assert_called_with("DATABASE", "HARD")
     # subject = DB, level = HARD니까 확인
     # 위에 service에서 question은 q answer는 a니까 Q A 를 전달받았는지 확인
-    mock_repo_cls.save_exercise.assert_called_with("DB", "HARD", "Q", "A")
+    mock_repo_cls.save_exercise.assert_called_with("DATABASE", "HARD", "Q", "A")
