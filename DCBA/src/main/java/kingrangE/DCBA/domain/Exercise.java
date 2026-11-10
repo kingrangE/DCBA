@@ -6,6 +6,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(indexes = {
+        @Index(name = "idx_exercise_subject_level", columnList = "subject,level"),
+        @Index(name = "idx_exercise_level", columnList = "level")
+})
 @Getter
 @Builder
 @ToString // 객체 print 확인을 위한 toString
