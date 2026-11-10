@@ -3,6 +3,7 @@ package kingrangE.DCBA.repository;
 import kingrangE.DCBA.domain.BannedExercise;
 import kingrangE.DCBA.domain.User;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -23,7 +24,7 @@ public interface BannedExerciseRepository extends JpaRepository<BannedExercise, 
               and (:subject is null or e.subject = :subject)
               and (:level is null or e.level = :level)
             """)
-    Page<kingrangE.DCBA.domain.Exercise> findExercises(Long userId,
+    Slice<kingrangE.DCBA.domain.Exercise> findExercises(Long userId,
             kingrangE.DCBA.domain.Subject subject, kingrangE.DCBA.domain.Level level, Pageable pageable);
 
     /**

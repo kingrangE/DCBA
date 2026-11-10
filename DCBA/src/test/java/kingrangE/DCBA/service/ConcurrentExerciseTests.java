@@ -80,6 +80,30 @@ class ConcurrentExerciseTests {
                 .isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
     }
 
+    @Test
+    void eachListLoadsOneSliceWithoutASeparateCountQuery() {
+        User owner = users.saveAndFlush(new User("sliceOwner", "test"));
+        User reader = users.saveAndFlush(new User("sliceRead", "test"));
+        for (int i = 0; i < 12; i++) {
+            Exercise exercise = exercises.saveAndFlush(Exercise.builder().subject(Subject.DATABASE)
+                    .level(Level.HARD).question("Question " + i).answer("Answer").build());
+            service.saveExercise(owner.getId(), exercise.getId());
+            service.banExercise(owner.getId(), exercise.getId());
+        }
+        var statistics = entityManagerFactory.unwrap(org.hibernate.SessionFactory.class).getStatistics();
+        for (String view : java.util.List.of("all", "selected", "banned")) {
+            statistics.clear();
+            var slice = switch (view) {
+                case "selected" -> service.getSelectedExercises(owner.getId(), Subject.DATABASE, Level.HARD, Pageable.ofSize(9));
+                case "banned" -> service.getBannedExercises(owner.getId(), Subject.DATABASE, Level.HARD, Pageable.ofSize(9));
+                default -> service.getExercises(reader.getId(), Subject.DATABASE, Level.HARD, Pageable.ofSize(9));
+            };
+            assertThat(slice.getContent()).hasSize(9);
+            assertThat(slice.hasNext()).isTrue();
+            assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+        }
+    }
+
     private void runTogether(Runnable action) throws Exception {
         CountDownLatch start = new CountDownLatch(1);
         try (ExecutorService pool = Executors.newFixedThreadPool(8)) {

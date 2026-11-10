@@ -545,25 +545,13 @@
         </div>
 
         <!-- Pagination -->
-        <div class="pagination" th:if="${page.totalPages > 0}"
-            th:with="current=${T(java.lang.Math).min(page.number, page.totalPages - 1)}, start=${T(java.lang.Math).max(0, current - 2)}, end=${T(java.lang.Math).min(page.totalPages - 1, current + 2)}">
-            <a th:href="@{${dashboardPath}(page=${page.number - 1}, subject=${currentSubject}, level=${currentLevel})}"
-                th:classappend="${page.first} ? 'disabled'" class="page-link">&laquo; Prev</a>
-
-            <a th:href="@{${dashboardPath}(page=0, subject=${currentSubject}, level=${currentLevel})}"
-                th:if="${page.number > 2}" class="page-link">1</a>
-            <span th:if="${page.number > 3}">…</span>
-            <span th:each="i : ${#numbers.sequence(start, end)}">
-                <a th:href="@{${dashboardPath}(page=${i}, subject=${currentSubject}, level=${currentLevel})}"
-                    th:text="${i + 1}" th:classappend="${i == page.number} ? 'active'" class="page-link">1</a>
-            </span>
-
-            <span th:if="${page.number < page.totalPages - 4}">…</span>
-            <a th:href="@{${dashboardPath}(page=${page.totalPages - 1}, subject=${currentSubject}, level=${currentLevel})}"
-                th:if="${page.number < page.totalPages - 3}" th:text="${page.totalPages}" class="page-link">Last</a>
-
-            <a th:href="@{${dashboardPath}(page=${page.number + 1}, subject=${currentSubject}, level=${currentLevel})}"
-                th:classappend="${page.last} ? 'disabled'" class="page-link">Next &raquo;</a>
+        <div class="pagination" th:if="${page.hasPrevious() or page.hasNext()}">
+            <a th:if="${page.hasPrevious()}"
+                th:href="@{${dashboardPath}(page=${page.number - 1}, subject=${currentSubject}, level=${currentLevel})}"
+                class="page-link">&laquo; Prev</a>
+            <a th:if="${page.hasNext()}"
+                th:href="@{${dashboardPath}(page=${page.number + 1}, subject=${currentSubject}, level=${currentLevel})}"
+                class="page-link">Next &raquo;</a>
         </div>
     </div>
 

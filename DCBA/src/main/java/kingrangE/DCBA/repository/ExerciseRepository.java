@@ -5,6 +5,7 @@ import kingrangE.DCBA.domain.Level;
 import kingrangE.DCBA.domain.Subject;
 import lombok.NonNull;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -55,7 +56,7 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
               and not exists (select b.id from BannedExercise b
                               where b.user.id = :userId and b.exercise = e)
             """)
-    Page<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, Pageable pageable);
+    Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, Pageable pageable);
 
     /**
      * 과목 기반 필터링 조회 (List 반환)

@@ -41,8 +41,8 @@ class DashboardTests {
     void listMembershipSuppliesKnownFlagsWithoutAnotherLookup(String view) throws Exception {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("loginUser", new User(1L, "reader", "unused", null));
-        Page<Exercise> page = new PageImpl<>(List.of(Exercise.builder().id(1L).subject(Subject.ALGORITHM)
-                .level(Level.EASY).question("Question").answer("Answer").build()));
+        Slice<Exercise> page = new SliceImpl<>(List.of(Exercise.builder().id(1L).subject(Subject.ALGORITHM)
+                .level(Level.EASY).question("Question").answer("Answer").build()), PageRequest.of(0, 9), false);
         when(service.getExercises(eq(1L), any(), any(), any())).thenReturn(page);
         when(service.getSelectedExercises(eq(1L), any(), any(), any())).thenReturn(page);
         when(service.getBannedExercises(eq(1L), any(), any(), any())).thenReturn(page);
@@ -75,17 +75,17 @@ class DashboardTests {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(ints = {0, 5000, 9999, 2000000})
-    void largeResultSetsRenderOnlyNearbyPageNumbers(int pageNumber) throws Exception {
+    void slicesRenderOnlyPreviousAndNextWithoutPageTotals(int pageNumber) throws Exception {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute("loginUser", new User(1L, "reader", "unused", null));
-        Page<Exercise> page = new PageImpl<>(pageNumber > 9999 ? List.of() : List.of(Exercise.builder().id(1L).subject(Subject.ALGORITHM)
-                .level(Level.EASY).question("Question").answer("Answer").build()), PageRequest.of(pageNumber, 9), 90000);
+        Slice<Exercise> page = new SliceImpl<>(pageNumber > 9999 ? List.of() : List.of(Exercise.builder().id(1L).subject(Subject.ALGORITHM)
+                .level(Level.EASY).question("Question").answer("Answer").build()), PageRequest.of(pageNumber, 9), pageNumber < 9999);
         when(service.getExercises(eq(1L), any(), any(), any())).thenReturn(page);
         String html = mvc.perform(get("/dashboard").session(session).param("page", String.valueOf(pageNumber)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         long links = java.util.regex.Pattern.compile("class=\"page-link").matcher(html).results().count();
-        org.assertj.core.api.Assertions.assertThat(links).isLessThanOrEqualTo(9);
-        if (pageNumber <= 9999) org.assertj.core.api.Assertions.assertThat(html).contains(">" + (pageNumber + 1) + "</a>");
+        org.assertj.core.api.Assertions.assertThat(links).isLessThanOrEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(html).doesNotContain(">Last</a>");
     }
 
     @ParameterizedTest
@@ -96,7 +96,7 @@ class DashboardTests {
         session.setAttribute("loginUser", user);
         Exercise exercise = Exercise.builder().id(1L).subject(Subject.ALGORITHM)
                 .level(Level.EASY).question("Question").answer("Answer").build();
-        Page<Exercise> page = new PageImpl<>(List.of(exercise), PageRequest.of(0, 9), 20);
+        Slice<Exercise> page = new SliceImpl<>(List.of(exercise), PageRequest.of(0, 9), true);
         when(service.getSelectedExercises(eq(1L), eq(Subject.ALGORITHM), eq(Level.EASY), any())).thenReturn(page);
         when(service.getBannedExercises(eq(1L), eq(Subject.ALGORITHM), eq(Level.EASY), any())).thenReturn(page);
         mvc.perform(get("/dashboard/" + view).session(session).param("subject", "ALGORITHM").param("level", "EASY"))

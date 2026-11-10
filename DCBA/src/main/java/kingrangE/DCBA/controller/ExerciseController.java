@@ -4,7 +4,7 @@ import kingrangE.DCBA.domain.Exercise;
 import kingrangE.DCBA.domain.Level;
 import kingrangE.DCBA.domain.Subject;
 import kingrangE.DCBA.service.ExerciseService;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import java.util.List;
@@ -47,7 +47,7 @@ public class ExerciseController {
         User user = (User) session.getAttribute("loginUser"); // 로그인한 유저 정보 가져옴
 
         //현재 Pageable 정보를 기반으로 문제 페이지를 가져옴
-        Page<Exercise> exercisePage = exerciseService.getExercises(user.getId(), subject, level, pageable); //
+        Slice<Exercise> exercisePage = exerciseService.getExercises(user.getId(), subject, level, pageable); //
 
         // 현재 페이지 정보 추가 ( 페이지 정보를 전체로 바꿔서, ... 을 나타낼 수 있게 하면 더 좋을듯)
         model.addAttribute("exercises", exercisePage.getContent()); // List<Exercise> 객체 저장
@@ -173,7 +173,7 @@ public class ExerciseController {
         }
 
         // 선택한 문제 가져와
-        Page<Exercise> exercisePage = exerciseService.getSelectedExercises(user.getId(), subject, level, pageable);
+        Slice<Exercise> exercisePage = exerciseService.getSelectedExercises(user.getId(), subject, level, pageable);
 
         // 문제를 보여주기 위해 Model에 정보 추가
         model.addAttribute("exercises", exercisePage.getContent());
@@ -210,7 +210,7 @@ public class ExerciseController {
             return "redirect:/";
         }
 
-        Page<Exercise> exercisePage = exerciseService.getBannedExercises(user.getId(), subject, level, pageable);
+        Slice<Exercise> exercisePage = exerciseService.getBannedExercises(user.getId(), subject, level, pageable);
 
         model.addAttribute("exercises", exercisePage.getContent());
         model.addAttribute("page", exercisePage);

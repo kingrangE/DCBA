@@ -8,7 +8,7 @@ import kingrangE.DCBA.repository.SelectedExerciseRepository;
 import kingrangE.DCBA.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -29,7 +29,7 @@ public class ExerciseService {
      * @param pageable 페이지 정보
      * @return 조건에 따라 필터링된 Exercise들의 Pages
      */
-    public Page<Exercise> getExercises( Long userId,
+    public Slice<Exercise> getExercises( Long userId,
                                        @Nullable Subject subject,
                                        @Nullable Level level,
                                         Pageable pageable) {
@@ -120,7 +120,7 @@ public class ExerciseService {
      * @param pageable Page 정보
      * @return 유저가 저장한 문제들의 Pages
      */
-    public Page<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, Pageable pageable) {
+    public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, Pageable pageable) {
         return selectedExerciseRepository.findExercises(userId, subject, level, pageable);
     }
 
@@ -130,7 +130,7 @@ public class ExerciseService {
      * @param pageable Page 정보
      * @return 유저가 Ban한 문제들의 Pages
      */
-    public Page<Exercise> getBannedExercises(Long userId, Subject subject, Level level, Pageable pageable) {
+    public Slice<Exercise> getBannedExercises(Long userId, Subject subject, Level level, Pageable pageable) {
         return bannedExerciseRepository.findExercises(userId, subject, level, pageable);
     }
 
