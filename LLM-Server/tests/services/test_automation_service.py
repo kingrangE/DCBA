@@ -6,6 +6,7 @@ from app.services.automation_service import automation_service, RedisQueue
 
 def test_enqueue_is_bounded_and_gives_each_task_an_identity():
     queue = RedisQueue()
+    queue.redis_client.hincrby.return_value = 1
     queue.redis_client.eval.return_value = "1-0"
     queue.enqueue({"subject": "ALGORITHM", "level": "EASY"})
     payload = json.loads(queue.redis_client.eval.call_args.args[-1])
@@ -17,6 +18,7 @@ def test_enqueue_is_bounded_and_gives_each_task_an_identity():
 
 def test_unfinished_task_is_reclaimed_without_removal():
     queue = RedisQueue()
+    queue.redis_client.hincrby.return_value = 1
     queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": json.dumps({"subject": "ALGORITHM", "level": "EASY", "task_id": "original"})})], []]
     task = queue.dequeue()
     assert task["task_id"] == "original" and task["_message_id"] == "1-0"
@@ -31,6 +33,7 @@ def test_unfinished_task_is_reclaimed_without_removal():
 
 def test_dequeue_reads_new_work_and_preserves_legacy_identity():
     queue = RedisQueue()
+    queue.redis_client.hincrby.return_value = 1
     queue.redis_client.xautoclaim.return_value = ["0-0", [], []]
     queue.redis_client.xreadgroup.return_value = [(queue.queue_key, [("2-0", {"payload": '{"subject":"DATABASE","level":"HARD"}'})])]
     assert queue.dequeue()["task_id"] == "legacy:2-0"
@@ -46,7 +49,7 @@ def test_produce_job(mocker):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("fails", [False, True])
 async def test_consumer_acknowledges_only_committed_tasks(mocker, fails):
-    task = {"subject": "DATABASE", "level": "HARD", "task_id": "task-1", "_message_id": "1-0"}
+    task = {"subject": "DATABASE", "level": "HARD", "task_id": "task-1", "_message_id": "1-0", "_attempt": 1, "_payload": "{}"}
     def dequeue(*args):
         automation_service.is_running = False
         return task
@@ -63,3 +66,32 @@ async def test_consumer_acknowledges_only_committed_tasks(mocker, fails):
         acknowledge.assert_not_called()
     else:
         acknowledge.assert_called_once_with(task)
+
+
+def test_failed_tasks_are_preserved_after_retry_limit():
+    queue = RedisQueue()
+    task = {"_message_id": "1-0", "_attempt": 4, "_payload": '{"subject":"DATABASE","level":"HARD"}'}
+    queue.failed(task, RuntimeError("temporary"))
+    queue.redis_client.eval.assert_not_called()
+    task["_attempt"] = 5
+    queue.failed(task, RuntimeError("permanent"))
+    args = queue.redis_client.eval.call_args.args
+    assert queue.failed_key in args and task["_payload"] in args
+    assert args[0].index("XADD") < args[0].index("XACK") < args[0].index("XDEL")
+
+
+@pytest.mark.parametrize("payload", ['not json', '[]', '{"subject":"INVALID","level":"EASY"}', '{"subject":"DATABASE","level":"EASY","task_id":42}'])
+def test_invalid_payload_is_quarantined_without_stopping_consumer(payload):
+    queue = RedisQueue()
+    queue.redis_client.hincrby.return_value = 1
+    queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": payload})], []]
+    assert queue.dequeue() is None
+    assert queue.redis_client.eval.call_args.args[-3] == payload
+
+
+def test_interrupted_tasks_stop_after_five_processing_attempts():
+    queue = RedisQueue()
+    queue.redis_client.hincrby.return_value = 6
+    queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": '{"subject":"DATABASE","level":"EASY"}'})], []]
+    assert queue.dequeue() is None
+    assert queue.redis_client.eval.call_args.args[-2] == "Retry limit reached after interrupted processing"

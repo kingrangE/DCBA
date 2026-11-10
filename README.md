@@ -61,3 +61,7 @@ Redis is available only on the Compose network. MariaDB and Prometheus host port
 ## Authentication traffic
 
 Login and signup share a limit of 10 POST attempts per client IP per minute, after CSRF validation. Rejected requests receive HTTP 429 and a retry delay. Counters hold at most 10,000 addresses per minute and run in memory for the current single Java server. The application uses the peer address and does not trust arbitrary forwarded headers. If a reverse proxy is used, configure trusted client-address handling there; before adding Java replicas, enforce shared limits at the trusted ingress. Users sharing one public IP share the same budget.
+
+## Failed generation tasks
+
+Redis persists attempt counts across consumer restarts. A task receives at most five processing attempts, with unfinished work reclaimed after ten minutes. Invalid payloads and exhausted tasks move atomically to `exercise:generation_failed`, preserving the original payload and failure category before leaving the active queue. This stream is retained for operator review; inspect it with `XRANGE exercise:generation_failed - +`. After correcting the cause, replay the stored payload into `exercise:generation_stream` without changing its original task identity so committed work remains idempotent. Do not delete quarantined tasks until their outcome has been reviewed.

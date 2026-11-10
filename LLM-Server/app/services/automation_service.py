@@ -18,6 +18,8 @@ class RedisQueue:
                                         socket_connect_timeout=5, socket_timeout=10)
         self.queue_key = "exercise:generation_stream"
         self.legacy_key = "exercise:generation_queue"
+        self.attempts_key = "exercise:generation_attempts"
+        self.failed_key = "exercise:generation_failed"
         self.group = "exercise-generators"
         self.consumer = str(uuid.uuid4())
         self.retry_idle_ms = 600_000
@@ -61,16 +63,47 @@ class RedisQueue:
         if not messages:
             return None
         message_id, fields = messages[0]
-        task = json.loads(fields["payload"])
-        task["task_id"] = task.get("task_id") or "legacy:" + message_id
-        task["_message_id"] = message_id
-        return task
+        message = {
+            "_message_id": message_id,
+            "_attempt": self.redis_client.hincrby(self.attempts_key, message_id, 1),
+            "_payload": fields.get("payload", ""),
+        }
+        if message["_attempt"] > 5:
+            self.reject(message, "Retry limit reached after interrupted processing")
+            return None
+        try:
+            payload = json.loads(message["_payload"])
+            request = ExerciseRequest(**payload)
+            task_id = payload.get("task_id") or "legacy:" + message_id
+            if not isinstance(task_id, str) or len(task_id) > 128:
+                raise ValueError("Invalid task identity")
+            return {**request.model_dump(mode="json"), "task_id": task_id, **message}
+        except (ValueError, TypeError):
+            self.reject(message, "Invalid task payload")
+            return None
 
     def acknowledge(self, task):
         with self.redis_client.pipeline() as transaction:
             transaction.xack(self.queue_key, self.group, task["_message_id"])
             transaction.xdel(self.queue_key, task["_message_id"])
+            transaction.hdel(self.attempts_key, task["_message_id"])
             transaction.execute()
+
+    def reject(self, task, reason):
+        # Preserve the original payload before removing pending work; Lua stops before removal if storage fails.
+        self.redis_client.eval("""
+            redis.call('XADD', KEYS[2], '*', 'original_id', ARGV[1], 'payload', ARGV[2], 'reason', ARGV[3])
+            redis.call('XACK', KEYS[1], ARGV[4], ARGV[1])
+            redis.call('XDEL', KEYS[1], ARGV[1])
+            redis.call('HDEL', KEYS[3], ARGV[1])
+            return 1
+        """, 3, self.queue_key, self.failed_key, self.attempts_key,
+            task["_message_id"], task["_payload"], reason, self.group)
+        TASK_RESULTS.labels("dead_letter").inc()
+
+    def failed(self, task, error):
+        if isinstance(error, ValueError) or task["_attempt"] >= 5:
+            self.reject(task, type(error).__name__)
 
     def size(self):
         return self.redis_client.xlen(self.queue_key) + self.redis_client.llen(self.legacy_key)
@@ -152,6 +185,7 @@ class AutomationService:
                         print(f"[Consumer] Saved exercise {saved_exercise.id}")
 
                     except Exception as e:
+                        await loop.run_in_executor(None, self.queue.failed, task, e)
                         self.consecutive_failures += 1
                         TASK_RESULTS.labels("failure").inc()
                         print(f"[Consumer] Failed generation: {e}")
