@@ -25,6 +25,17 @@ class DashboardTests {
     @Autowired MockMvc mvc;
     @MockitoBean ExerciseService service;
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"subject,UNKNOWN", "level,UNKNOWN"})
+    void invalidFilterReturnsBadRequestWithoutCallingService(String field, String value) throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("loginUser", new User("reader", "unused"));
+        mvc.perform(get("/dashboard").session(session).param(field, value))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("UNKNOWN"))));
+        verifyNoInteractions(service);
+    }
+
     @org.junit.jupiter.api.Test
     void missingExerciseReturnsNotFoundWithoutInternalDetails() throws Exception {
         MockHttpSession session = new MockHttpSession();
