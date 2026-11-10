@@ -118,19 +118,17 @@ class ExerciseService:
                      print(f"[Retry] Failed to parse question (Attempt {attempt+1}/{max_retries})\ncontent: {content}")
                      continue
                     
-                # 중복 검사 (중복되면 다시)
-                if deduplication_service.is_duplicate(subject, level, content):
-                    print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
-                    time.sleep(1) # Rate Limit 방지
-                    continue
-                
-                return content
-                
-            # 에러 처리
             except Exception as e:
                 print(f"[Error] Generation failed: {e}")
-                time.sleep(1) # Rate Limit 방지
-        
+                time.sleep(1)
+                continue
+
+            if deduplication_service.is_duplicate(subject, level, content):
+                print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
+                time.sleep(1)
+                continue
+            return content
+
         raise Exception("Failed to generate unique content after multiple retries.")
 
 

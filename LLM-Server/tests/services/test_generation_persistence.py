@@ -5,6 +5,16 @@ from app.services.exercise_service import exercise_service
 from app.services.deduplication_service import DeduplicationService
 
 
+def test_duplicate_check_failure_stops_without_repeated_paid_generation(mocker):
+    completion = mocker.patch.object(exercise_service.client.chat.completions, "create")
+    completion.return_value.choices[0].message.content = "Q: Question\nA: Answer"
+    dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
+    dedup.is_duplicate.side_effect = RuntimeError("embedding unavailable")
+    with pytest.raises(RuntimeError, match="embedding unavailable"):
+        exercise_service.generate_exercise("ALGORITHM", "EASY")
+    assert completion.call_count == 1
+
+
 def test_index_failure_prevents_generation_and_save(mocker):
     repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
     dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
