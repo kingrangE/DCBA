@@ -95,3 +95,14 @@ def test_interrupted_tasks_stop_after_five_processing_attempts():
     queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": '{"subject":"DATABASE","level":"EASY"}'})], []]
     assert queue.dequeue() is None
     assert queue.redis_client.eval.call_args.args[-2] == "Retry limit reached after interrupted processing"
+
+
+@pytest.mark.parametrize("status,quarantined", [(401, True), (429, False), (503, False)])
+def test_permanent_api_errors_do_not_cycle_through_queue(status, quarantined):
+    import httpx
+    from openai import APIStatusError
+    queue = RedisQueue()
+    task = {"_message_id": "1-0", "_attempt": 1, "_payload": "{}"}
+    response = httpx.Response(status, request=httpx.Request("POST", "http://example.invalid"))
+    queue.failed(task, APIStatusError("failed", response=response, body=None))
+    assert queue.redis_client.eval.called == quarantined

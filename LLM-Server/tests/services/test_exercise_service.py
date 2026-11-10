@@ -230,3 +230,46 @@ def test_generate_exercise_success_within_max_tries(mocker):
     assert mock_dedup.is_duplicate.call_count == 10  
     # Error Message 확인
     assert "Failed to generate unique content after multiple retries." in str(excinfo.value)
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+def test_permanent_api_errors_are_not_retried(mocker, status):
+    import httpx
+    from openai import APIStatusError
+    response = httpx.Response(status, request=httpx.Request("POST", "http://example.invalid"))
+    generate = mocker.patch.object(exercise_service.client.chat.completions, "create",
+                                  side_effect=APIStatusError("permanent", response=response, body=None))
+    sleep = mocker.patch("app.services.exercise_service.time.sleep")
+    with pytest.raises(APIStatusError):
+        exercise_service.generate_exercise("ALGORITHM", "EASY")
+    assert generate.call_count == 1
+    sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("status", [408, 409, 429, 500, 503])
+def test_transient_api_errors_retry_with_backoff(mocker, status):
+    import httpx
+    from openai import APIStatusError
+    response = httpx.Response(status, request=httpx.Request("POST", "http://example.invalid"))
+    completion = mocker.MagicMock()
+    completion.choices[0].message.content = "Q: Question\nA: Answer"
+    generate = mocker.patch.object(exercise_service.client.chat.completions, "create",
+                                  side_effect=[APIStatusError("temporary", response=response, body=None), completion])
+    sleep = mocker.patch("app.services.exercise_service.time.sleep")
+    mocker.patch("app.services.deduplication_service.deduplication_service").is_duplicate.return_value = False
+    assert exercise_service.generate_exercise("ALGORITHM", "EASY") == "Q: Question\nA: Answer"
+    assert generate.call_count == 2
+    sleep.assert_called_once_with(1)
+
+
+def test_connection_failure_has_bounded_backoff(mocker):
+    import httpx
+    from openai import APIConnectionError
+    generate = mocker.patch.object(exercise_service.client.chat.completions, "create",
+                                  side_effect=APIConnectionError(request=httpx.Request("POST", "http://example.invalid")))
+    sleep = mocker.patch("app.services.exercise_service.time.sleep")
+    with pytest.raises(Exception, match="Failed to generate"):
+        exercise_service.generate_exercise("ALGORITHM", "EASY")
+    assert generate.call_count == 10
+    assert sleep.call_count == 9
+    assert max(call.args[0] for call in sleep.call_args_list) <= 30

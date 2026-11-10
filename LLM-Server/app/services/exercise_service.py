@@ -1,6 +1,6 @@
 import os
 import time
-from openai import OpenAI
+from openai import OpenAI, APIConnectionError, APIStatusError
 from dotenv import load_dotenv
 from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
 
@@ -109,6 +109,8 @@ class ExerciseService:
                 )
                 # 응답에서 content 꺼냄
                 content = completion.choices[0].message.content
+                if not isinstance(content, str):
+                    continue
                 
                 # 생성된 내용 파싱
                 parsed_data = self.parse_content(content)
@@ -118,9 +120,15 @@ class ExerciseService:
                      print(f"[Retry] Failed to parse question (Attempt {attempt+1}/{max_retries})\ncontent: {content}")
                      continue
                     
-            except Exception as e:
-                print(f"[Error] Generation failed: {e}")
-                time.sleep(1)
+            except APIConnectionError:
+                if attempt + 1 < max_retries:
+                    time.sleep(min(2 ** attempt, 30))
+                continue
+            except APIStatusError as error:
+                if error.status_code not in (408, 409, 429) and error.status_code < 500:
+                    raise
+                if attempt + 1 < max_retries:
+                    time.sleep(min(2 ** attempt, 30))
                 continue
 
             if deduplication_service.is_duplicate(subject, level, content):

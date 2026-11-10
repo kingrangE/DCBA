@@ -65,3 +65,5 @@ Login and signup share a limit of 10 POST attempts per client IP per minute, aft
 ## Failed generation tasks
 
 Redis persists attempt counts across consumer restarts. A task receives at most five processing attempts, with unfinished work reclaimed after ten minutes. Invalid payloads and exhausted tasks move atomically to `exercise:generation_failed`, preserving the original payload and failure category before leaving the active queue. This stream is retained for operator review; inspect it with `XRANGE exercise:generation_failed - +`. After correcting the cause, replay the stored payload into `exercise:generation_stream` without changing its original task identity so committed work remains idempotent. Do not delete quarantined tasks until their outcome has been reviewed.
+
+Generation retries apply only to connection failures, request timeouts, temporary conflicts, rate limits, and upstream server errors, using capped exponential delays. Authentication, authorization, invalid model/request errors, and other permanent client errors stop immediately and the background task is quarantined for review.

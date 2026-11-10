@@ -6,6 +6,7 @@ import random
 import uuid
 import time
 from prometheus_client import Counter
+from openai import APIStatusError
 
 TASK_RESULTS = Counter("dcba_generation_tasks_total", "Generation task outcomes", ["result"])
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -102,7 +103,9 @@ class RedisQueue:
         TASK_RESULTS.labels("dead_letter").inc()
 
     def failed(self, task, error):
-        if isinstance(error, ValueError) or task["_attempt"] >= 5:
+        permanent_api_error = (isinstance(error, APIStatusError)
+                               and error.status_code < 500 and error.status_code not in (408, 409, 429))
+        if isinstance(error, ValueError) or permanent_api_error or task["_attempt"] >= 5:
             self.reject(task, type(error).__name__)
 
     def size(self):
