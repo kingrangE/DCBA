@@ -20,7 +20,7 @@ router = APIRouter(
 )
 
 @router.post("/generate") # /exercise/generate
-async def generate_exercise(request: ExerciseRequest): 
+def generate_exercise(request: ExerciseRequest):
     try:
         from app.repositories.exercise_repository import exercise_repository
         

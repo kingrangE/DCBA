@@ -1,6 +1,27 @@
 from unittest.mock import MagicMock
 from app.models.exercise import Exercise
 import pytest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+
+def test_health_responds_while_generation_waits(client, mocker):
+    started, release = Event(), Event()
+    def slow_generation(*args):
+        started.set()
+        release.wait(3)
+        return "Q: Question\nA: Answer"
+    mocker.patch("app.routers.exercise.exercise_service.generate_exercise", side_effect=slow_generation)
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    repository.save_exercise.return_value = Exercise(id=1, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
+    with ThreadPoolExecutor() as pool:
+        request = pool.submit(client.post, "/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+        try:
+            assert started.wait(2)
+            assert client.get("/health").status_code == 200
+            assert not request.done()
+        finally:
+            release.set()
+        assert request.result().status_code == 200
 
 @pytest.mark.parametrize("field,value", [("subject", "UNKNOWN"), ("level", "UNKNOWN"), ("subject", ""), ("level", "easy")])
 def test_generate_rejects_invalid_category(client, mocker, field, value):
