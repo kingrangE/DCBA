@@ -89,35 +89,10 @@ class AutomationService:
                     print(f"[Consumer] Processing: {task['subject']} ({task['level']})")
                     # 문제 생성 시작
                     try:
-                        from app.repositories.exercise_repository import exercise_repository
-                        
-                        # 문제 생성 
-                        content = await loop.run_in_executor(
-                            None, 
-                            exercise_service.generate_exercise, 
-                            task['subject'], 
-                            task['level']
+                        saved_exercise = await loop.run_in_executor(
+                            None, exercise_service.generate_and_save, task['subject'], task['level']
                         )
-                        
-                        # 파싱
-                        parsed_data = exercise_service.parse_content(content)
-                        question = parsed_data["question"]
-                        answer = parsed_data["answer"]
-                        
-                        # 결과 잘 있으면 저장 
-                        if question and answer:
-                            saved_exercise = await loop.run_in_executor(
-                                None, 
-                                exercise_repository.save_exercise, 
-                                task['subject'], 
-                                task['level'], 
-                                question, 
-                                answer
-                            )
-                            print(f"[Consumer] Saved : {saved_exercise.question} (ID : {saved_exercise.id})")
-                            
-                        else: # 결과 잘 없으면 로그찍고 저장없이 다음
-                            print(f"[Consumer] Failed to parse content: {content[:50]}...")
+                        print(f"[Consumer] Saved exercise {saved_exercise.id}")
 
                     except Exception as e:
                         print(f"[Consumer] Failed generation: {e}")

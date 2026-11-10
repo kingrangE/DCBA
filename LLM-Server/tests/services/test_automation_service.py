@@ -79,22 +79,7 @@ async def test_automation_service_consumer(mocker):
     # object mock
     mocker.patch.object(automation_service.queue, "dequeue", side_effect=side_effect_dequeue)
 
-    # Service Mock 제작
-    mock_exercise_service = mocker.patch("app.services.automation_service.exercise_service")
-    mock_exercise_service.generate_exercise.return_value = "Mocked content"
-    mock_exercise_service.parse_content.return_value = {"question": "Q", "answer": "A"}
-
-    # Repository Mock 제작
-    mock_repo_cls = mocker.patch("app.repositories.exercise_repository.exercise_repository")
-    mock_saved_exercise = MagicMock(id=123, question="Q")
-    mock_repo_cls.save_exercise.return_value = mock_saved_exercise
-
-    # =========== when =========== 
+    mock_service = mocker.patch("app.services.automation_service.exercise_service")
+    mock_service.generate_and_save.return_value = MagicMock(id=123)
     await automation_service.start_consumer()
-    
-    # =========== then =========== 
-    # LLM 호출에 전달하는 내용을 잘 전달했는지 확인
-    mock_exercise_service.generate_exercise.assert_called_with("DATABASE", "HARD")
-    # subject = DB, level = HARD니까 확인
-    # 위에 service에서 question은 q answer는 a니까 Q A 를 전달받았는지 확인
-    mock_repo_cls.save_exercise.assert_called_with("DATABASE", "HARD", "Q", "A")
+    mock_service.generate_and_save.assert_called_once_with("DATABASE", "HARD")

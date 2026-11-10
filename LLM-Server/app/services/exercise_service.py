@@ -16,6 +16,8 @@ class ExerciseService:
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
+            timeout=30,
+            max_retries=0,
         )
         
         # Prompt load
@@ -55,6 +57,23 @@ class ExerciseService:
         return {"question": question, "answer": answer}
 
     # 문제 생성
+    def generate_and_save(self, subject: str, level: str, task_id=None):
+        from app.repositories.exercise_repository import exercise_repository
+        from app.services.deduplication_service import deduplication_service
+        request = ExerciseRequest(subject=subject, level=level)
+        with exercise_repository.generation_lock() as connection:
+            if task_id is not None:
+                saved = exercise_repository.find_task(task_id, connection)
+                if saved is not None:
+                    return saved
+            deduplication_service.synchronize(exercise_repository, connection)
+            content = self.generate_exercise(request.subject.value, request.level.value)
+            parsed = self.parse_content(content)
+            return exercise_repository.save_exercise(
+                request.subject.value, request.level.value, parsed["question"], parsed["answer"],
+                task_id=task_id, connection=connection,
+            )
+
     def generate_exercise(self, subject: str, level: str) -> str:
         from app.services.deduplication_service import deduplication_service
         request = ExerciseRequest(subject=subject, level=level)
@@ -105,8 +124,6 @@ class ExerciseService:
                     time.sleep(1) # Rate Limit 방지
                     continue
                 
-                # 중복 검사 통과하면 저장
-                deduplication_service.save(subject, level, content)
                 return content
                 
             # 에러 처리
