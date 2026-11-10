@@ -1,6 +1,10 @@
 package kingrangE.DCBA.controller;
 
+import java.util.Map;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.web.csrf.CsrfToken;
+import kingrangE.DCBA.service.UserRequestException;
 import kingrangE.DCBA.domain.User;
 import kingrangE.DCBA.dto.LoginForm;
 import kingrangE.DCBA.dto.SignUpForm;
@@ -29,15 +33,21 @@ public class UserController {
 
     private final UserService userService;
 
+    @GetMapping("/auth/csrf")
+    public Map<String, String> csrf(CsrfToken token) {
+        return Map.of("token", token.getToken(), "headerName", token.getHeaderName());
+    }
+
     @PostMapping("/auth/login")
-    public UserResponse login(@RequestBody LoginForm loginForm, HttpSession session) {
+    public UserResponse login(@RequestBody LoginForm loginForm, HttpSession session, HttpServletRequest request) {
         validateCredentials(loginForm.getName(), loginForm.getPassword());
 
         try {
             User user = userService.login(loginForm.getName().trim(), loginForm.getPassword());
+            request.changeSessionId();
             session.setAttribute(LOGIN_USER, user);
             return UserResponse.from(user);
-        } catch (RuntimeException exception) {
+        } catch (UserRequestException exception) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, exception.getMessage(), exception);
         }
     }
@@ -50,7 +60,7 @@ public class UserController {
             userService.signUp(signUpForm.getName().trim(), signUpForm.getPassword());
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new MessageResponse("회원가입이 완료되었습니다."));
-        } catch (RuntimeException exception) {
+        } catch (UserRequestException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, exception.getMessage(), exception);
         }
     }
