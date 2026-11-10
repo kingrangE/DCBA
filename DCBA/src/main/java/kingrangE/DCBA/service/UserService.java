@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.nio.charset.StandardCharsets;
 
 @Service
@@ -37,7 +38,14 @@ public class UserService {
         String encoded_password = BCrypt.hashpw(password, BCrypt.gensalt());
         // 암호화된 비밀번호로 로그인
         User user = new User(name, encoded_password);
-        userRepo.save(user);
+        try {
+            userRepo.save(user);
+        } catch (DataIntegrityViolationException exception) {
+            if (userRepo.findByName(name).isPresent()) {
+                throw new UserRequestException("해당 닉네임을 사용하는 유저가 존재합니다.");
+            }
+            throw exception;
+        }
     }
 
     /**

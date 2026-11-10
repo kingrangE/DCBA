@@ -7,6 +7,26 @@ import static org.mockito.Mockito.*;
 
 class UserInputTests {
     @Test
+    void concurrentNameConflictBecomesUserError() {
+        UserRepository repository = mock(UserRepository.class);
+        when(repository.findByName("reader")).thenReturn(java.util.Optional.empty(),
+                java.util.Optional.of(new kingrangE.DCBA.domain.User("reader", "hash")));
+        when(repository.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"));
+        assertThatThrownBy(() -> new UserService(repository).signUp("reader", "password"))
+                .isInstanceOf(UserRequestException.class)
+                .hasMessage("해당 닉네임을 사용하는 유저가 존재합니다.");
+    }
+
+    @Test
+    void unrelatedDatabaseConstraintFailureStillPropagates() {
+        UserRepository repository = mock(UserRepository.class);
+        var failure = new org.springframework.dao.DataIntegrityViolationException("unexpected constraint");
+        when(repository.save(any())).thenThrow(failure);
+        assertThatThrownBy(() -> new UserService(repository).signUp("reader", "password"))
+                .isSameAs(failure);
+    }
+
+    @Test
     void rejectsInvalidSignupBeforeDatabaseOrHashing() {
         UserRepository repository = mock(UserRepository.class);
         UserService service = new UserService(repository);
