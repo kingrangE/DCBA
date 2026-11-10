@@ -5,12 +5,11 @@ import kingrangE.DCBA.domain.Level;
 import kingrangE.DCBA.domain.Subject;
 import lombok.NonNull;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import javax.swing.text.html.Option;
 import java.util.List;
-import java.util.Optional;
 
 // DCBA의 서비스에서는 문제를 개별적으로 확인할 일이 V1에서는 없다. -> Page 단위 관리를 위해 Page 이용
 public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
@@ -50,41 +49,16 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
      */
     Page<Exercise> findBySubjectAndLevel(Subject subject, Level level, Pageable pageable);
 
-    /**
-     * 벤한 문제 제외 전체 조회
-     * @param ids 벤한 문제 id
-     * @param pageable 페이지 정보
-     * @return 필터링된 Exercise들의 Pages
-     */
-    Page<Exercise> findByIdNotIn(List<Long> ids, Pageable pageable);
-
-    /**
-     * 벤한 문제 제외 과목 필터링 조회
-     * @param subject 과목 (Enum)
-     * @param ids 벤한 문제 id
-     * @param pageable 페이지 정보
-     * @return 필터링된 Exercise Pages
-     */
-    Page<Exercise> findBySubjectAndIdNotIn(Subject subject, List<Long> ids, Pageable pageable);
-
-    /**
-     * 벤한 문제 제외 레벨 필터링 조회
-     * @param level 레벨 (Enum)
-     * @param ids 벤한 문제 id
-     * @param pageable 페이지 정보
-     * @return 필터링된 Exercise Pages
-     */
-    Page<Exercise> findByLevelAndIdNotIn(Level level, List<Long> ids, Pageable pageable);
-
-    /**
-     * 벤한 문제 제외 레벨,과목 필터링 조회
-     * @param subject 과목 (Enum)
-     * @param level 레벨 (Enum)
-     * @param ids 벤한 문제 id
-     * @param pageable 페이지 정보
-     * @return 필터링된 Exercise Pages
-     */
-    Page<Exercise> findBySubjectAndLevelAndIdNotIn(Subject subject, Level level, List<Long> ids, Pageable pageable);
+    @org.springframework.data.jpa.repository.Query("""
+            select e from Exercise e
+            where (:subject is null or e.subject = :subject)
+              and (:level is null or e.level = :level)
+              and (:before is null or e.id < :before)
+              and (:after is null or e.id > :after)
+              and not exists (select b.id from BannedExercise b
+                              where b.user.id = :userId and b.exercise = e)
+            """)
+    Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, Long before, Long after, Pageable pageable);
 
     /**
      * 과목 기반 필터링 조회 (List 반환)

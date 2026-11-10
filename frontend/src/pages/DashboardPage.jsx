@@ -16,8 +16,8 @@ const tabs = [
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [options, setOptions] = useState(emptyOptions)
-  const [filters, setFilters] = useState({ view: 'all', subject: '', level: '', page: 0 })
-  const [result, setResult] = useState({ content: [], page: 0, totalPages: 0, totalElements: 0 })
+  const [filters, setFilters] = useState({ view: 'all', subject: '', level: '', before: null, after: null })
+  const [result, setResult] = useState({ content: [], hasPrevious: false, hasNext: false })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
@@ -42,7 +42,7 @@ export default function DashboardPage() {
 
   useEffect(() => { loadExercises() }, [loadExercises])
 
-  const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value, page: 0 }))
+  const updateFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value, before: null, after: null }))
 
   const toggleSave = async (exercise) => {
     setBusyId(exercise.id)
@@ -85,10 +85,10 @@ export default function DashboardPage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">QUESTION LIBRARY</p>
-              <h2>문제 보관함 <span>{result.totalElements}</span></h2>
+              <h2>문제 보관함</h2>
             </div>
             <div className="filters">
-              {filters.view === 'all' && <>
+              <>
                 <select aria-label="분야 필터" value={filters.subject} onChange={(e) => updateFilter('subject', e.target.value)}>
                   <option value="">모든 분야</option>
                   {options.subjects.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
@@ -97,7 +97,7 @@ export default function DashboardPage() {
                   <option value="">모든 난이도</option>
                   {options.levels.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>
-              </>}
+              </>
             </div>
           </div>
           <div className="tabs" role="tablist">
@@ -113,7 +113,7 @@ export default function DashboardPage() {
           ) : (
             <div className="empty-state"><strong>표시할 문제가 없습니다.</strong><span>필터를 바꾸거나 새 문제 생성을 요청해 보세요.</span></div>
           )}
-          <Pagination page={result.page} totalPages={result.totalPages} onChange={(page) => setFilters((current) => ({ ...current, page }))} />
+          <Pagination result={result} onChange={(cursor) => setFilters((current) => ({ ...current, ...cursor }))} />
         </section>
       </main>
     </Layout>

@@ -3,10 +3,32 @@ package kingrangE.DCBA.repository;
 import kingrangE.DCBA.domain.BannedExercise;
 import kingrangE.DCBA.domain.User;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BannedExerciseRepository extends JpaRepository<BannedExercise, Long> {
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("delete from BannedExercise p where p.user.id = :userId and p.exercise.id = :exerciseId")
+    int deletePreference(Long userId, Long exerciseId);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select p.exercise.id from BannedExercise p
+            where p.user.id = :userId and p.exercise.id in :exerciseIds
+            """)
+    java.util.List<Long> findExerciseIds(Long userId, java.util.List<Long> exerciseIds);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select e from BannedExercise preference join preference.exercise e
+            where preference.user.id = :userId
+              and (:subject is null or e.subject = :subject)
+              and (:level is null or e.level = :level)
+              and (:before is null or e.id < :before)
+              and (:after is null or e.id > :after)
+            """)
+    Slice<kingrangE.DCBA.domain.Exercise> findExercises(Long userId,
+            kingrangE.DCBA.domain.Subject subject, kingrangE.DCBA.domain.Level level, Long before, Long after, Pageable pageable);
+
     /**
      * User가 밴한 전체 문제 Page 찾기
      * @param user 유저 객체
