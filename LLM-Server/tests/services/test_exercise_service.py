@@ -25,7 +25,7 @@ def test_parse_content():
     assert parsed_dict["answer"] == "4456"
 
 
-def test_parse_content_with_spaces():
+def test_parse_content_with_surrounding_spaces():
     # 공백이 다수 존재하는 경우
     content = "  Q:  123   \n   A:  4456   "
     service = exercise_service
@@ -50,7 +50,7 @@ def test_parse_content_with_spaces():
     assert parsed_dict["question"] == "123"
     assert parsed_dict["answer"] == "4456"
 
-def test_parse_content_with_weird_two_line():
+def test_parse_content_without_answer_marker():
     """라인이 2개로 구분되어 있으나, Q,A가 아닌 경우"""
     # =========== given =========== 
     bad_content = " Q: 1123 A: 456 \n 123"
@@ -127,7 +127,7 @@ def test_generate_exercise_success(mocker):
     # =========== then =========== 
     assert result == "Q: 1123 \nA:456"
 
-def test_generate_exercise_success_within_max_tries(mocker):
+def test_generate_exercise_after_parse_retries(mocker):
     """문제 생성을 maximum try이내로 잘 한 경우"""
     # =========== given =========== 
     mock_completion = mocker.Mock()
@@ -166,7 +166,7 @@ def test_generate_exercise_success_within_max_tries(mocker):
     # =========== then =========== 
     assert result == "Q: 1123 \nA:456"
 
-def test_generate_exercise_success_within_max_tries(mocker):
+def test_generate_exercise_after_duplicate_retries(mocker):
     """중복 검사 3번째에 통과되는 경우"""
     # =========== given =========== 
     mock_dedup = mocker.patch("app.services.deduplication_service.deduplication_service") 
@@ -273,3 +273,26 @@ def test_connection_failure_has_bounded_backoff(mocker):
     assert generate.call_count == 10
     assert sleep.call_count == 9
     assert max(call.args[0] for call in sleep.call_args_list) <= 30
+
+
+@pytest.mark.parametrize("content,question,answer", [
+    ('Q: 문자열 "Q:"의 의미는?\nA: "A:"를 그대로 유지합니다.', '문자열 "Q:"의 의미는?', '"A:"를 그대로 유지합니다.'),
+    ('Q: 첫째 줄\n둘째 줄\n\n A: 답변 첫째 줄\n\n답변 둘째 줄', '첫째 줄\n둘째 줄', '답변 첫째 줄\n\n답변 둘째 줄'),
+    ('Q: 질문\r\n  A: 답변\r\n다음 줄', '질문', '답변\r\n다음 줄'),
+])
+def test_parser_preserves_body_markers_quotes_and_line_breaks(content, question, answer):
+    assert exercise_service.parse_content(content) == {"question": question, "answer": answer}
+
+
+def test_multiline_generation_is_checked_and_saved_without_regeneration(mocker):
+    content = 'Q: Question Q: body\nA: Answer A: body\nSecond line'
+    generate = mocker.patch.object(exercise_service.client.chat.completions, "create")
+    generate.return_value.choices[0].message.content = content
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    repository.find_task.return_value = None
+    dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
+    dedup.is_duplicate.return_value = False
+    exercise_service.generate_and_save("ALGORITHM", "EASY")
+    assert generate.call_count == 1
+    dedup.is_duplicate.assert_called_once_with("ALGORITHM", "EASY", content)
+    assert repository.save_exercise.call_args.args == ("ALGORITHM", "EASY", "Question Q: body", "Answer A: body\nSecond line")

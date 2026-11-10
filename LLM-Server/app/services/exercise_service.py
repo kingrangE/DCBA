@@ -1,5 +1,6 @@
 import os
 import time
+import re
 from openai import OpenAI, APIConnectionError, APIStatusError
 from dotenv import load_dotenv
 from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
@@ -35,25 +36,12 @@ class ExerciseService:
     
     # 파싱 전용 함수 
     def parse_content(self, content: str) -> dict:
-        question = ""
-        answer = ""
-        lines = content.strip().split("\n")
-
-        # Q \n A 형식으로 들어오지 않았다면 return 빈 값
-        if len(lines) != 2 : 
-            return {"question": question, "answer": answer}
-        
-        # 제대로 들어왔으면 Q,A 파싱 (둘 중 하나라도 없으면 빈값 리턴(Error 처리 할 수 있게 ))
-        for line in lines :
-            processed_line = line.strip()
-            if processed_line.startswith("Q:"):
-                question = processed_line.replace("Q:", "").strip().strip("\"")
-            elif processed_line.startswith("A:"):
-                answer = processed_line.replace("A:", "").strip().strip("\"")
-        if not question or not answer : 
-            # 둘 중 하나라도 빈 값이면 빈 값 리턴
+        match = re.fullmatch(r"Q:[ \t]*(.*?)\r?\n[ \t]*A:[ \t]*(.*)", content.strip(), re.DOTALL)
+        if not match:
             return {"question": "", "answer": ""}
-        # 둘 다 있으면 정상 리턴
+        question, answer = (part.strip() for part in match.groups())
+        if not question or not answer:
+            return {"question": "", "answer": ""}
         return {"question": question, "answer": answer}
 
     # 문제 생성
@@ -131,7 +119,8 @@ class ExerciseService:
                     time.sleep(min(2 ** attempt, 30))
                 continue
 
-            if deduplication_service.is_duplicate(subject, level, content):
+            canonical_content = f"Q: {parsed_data['question']}\nA: {parsed_data['answer']}"
+            if deduplication_service.is_duplicate(subject, level, canonical_content):
                 print(f"[Retry] Duplicate content detected (Attempt {attempt+1}/{max_retries})")
                 time.sleep(1)
                 continue
