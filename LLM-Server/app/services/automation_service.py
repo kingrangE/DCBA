@@ -3,35 +3,116 @@ import json
 import redis
 import asyncio
 import random
+import uuid
+import time
+from prometheus_client import Counter
+from openai import APIStatusError
+
+TASK_RESULTS = Counter("dcba_generation_tasks_total", "Generation task outcomes", ["result"])
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.exercise_service import exercise_service
+from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
 
 class RedisQueue:
     def __init__(self, host="localhost", port=6379, db=0):
-        self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True)
-        self.queue_key = "exercise:generation_queue"
+        self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True,
+                                        socket_connect_timeout=5, socket_timeout=10)
+        self.queue_key = "exercise:generation_stream"
+        self.legacy_key = "exercise:generation_queue"
+        self.attempts_key = "exercise:generation_attempts"
+        self.failed_key = "exercise:generation_failed"
+        self.group = "exercise-generators"
+        self.consumer = str(uuid.uuid4())
+        self.retry_idle_ms = 600_000
+        self.claim_cursor = "0-0"
 
     def enqueue(self, task: dict):
-        # Producer 역할, task가 들어오면 queue에 삽입 (LLM이 이전 요청을 모두 처리하지 못했는데, 요청이 오는경우 여기서 처리)
-        try:
-            self.redis_client.rpush(self.queue_key, json.dumps(task))
-            print(f"[Producer] Enqueued task: {task['subject']} - {task['level']}")
-        except Exception as e:
-            print(f"[Producer Error] Failed to enqueue: {e}")
+        request = ExerciseRequest(**task)
+        payload = {**request.model_dump(mode="json"), "task_id": str(uuid.uuid4())}
+        result = self.redis_client.eval("""
+            if redis.call('XLEN', KEYS[1]) + redis.call('LLEN', KEYS[2]) >= 1000 then return false end
+            return redis.call('XADD', KEYS[1], '*', 'payload', ARGV[1])
+        """, 2, self.queue_key, self.legacy_key, json.dumps(payload))
+        if not result:
+            raise RuntimeError("Generation queue is full")
 
-    def dequeue(self, timeout=0):
-        # consumer 역할, 완료되면 queue에서 하나뺌
+    def dequeue(self, timeout=5):
         try:
-            result = self.redis_client.blpop(self.queue_key, timeout=timeout)
-            if result:
-                return json.loads(result[1])
-        except Exception as e:
-            print(f"[Consumer Error] Failed to dequeue: {e}")
-        return None
+            self.redis_client.xgroup_create(self.queue_key, self.group, id="0-0", mkstream=True)
+        except Exception as error:
+            if not str(error).startswith("BUSYGROUP"):
+                raise
+        # Move old deployments' queued work without a gap between removal and insertion.
+        self.redis_client.eval("""
+            if redis.call('XLEN', KEYS[1]) >= 1000 then return false end
+            local payload = redis.call('LINDEX', KEYS[2], 0)
+            if not payload then return false end
+            local id = redis.call('XADD', KEYS[1], '*', 'payload', payload)
+            redis.call('LPOP', KEYS[2])
+            return id
+        """, 2, self.queue_key, self.legacy_key)
+        claimed = self.redis_client.xautoclaim(
+            self.queue_key, self.group, self.consumer, self.retry_idle_ms,
+            start_id=self.claim_cursor, count=1,
+        )
+        self.claim_cursor = claimed[0]
+        messages = claimed[1]
+        if not messages:
+            result = self.redis_client.xreadgroup(self.group, self.consumer,
+                        {self.queue_key: ">"}, count=1, block=max(1, timeout * 1000))
+            messages = result[0][1] if result else []
+        if not messages:
+            return None
+        message_id, fields = messages[0]
+        message = {
+            "_message_id": message_id,
+            "_attempt": self.redis_client.hincrby(self.attempts_key, message_id, 1),
+            "_payload": fields.get("payload", ""),
+        }
+        if message["_attempt"] > 5:
+            self.reject(message, "Retry limit reached after interrupted processing")
+            return None
+        try:
+            payload = json.loads(message["_payload"])
+            request = ExerciseRequest(**payload)
+            task_id = payload.get("task_id") or "legacy:" + message_id
+            if not isinstance(task_id, str) or len(task_id) > 128:
+                raise ValueError("Invalid task identity")
+            return {**request.model_dump(mode="json"), "task_id": task_id, **message}
+        except (ValueError, TypeError):
+            self.reject(message, "Invalid task payload")
+            return None
+
+    def acknowledge(self, task):
+        with self.redis_client.pipeline() as transaction:
+            transaction.xack(self.queue_key, self.group, task["_message_id"])
+            transaction.xdel(self.queue_key, task["_message_id"])
+            transaction.hdel(self.attempts_key, task["_message_id"])
+            transaction.execute()
+
+    def reject(self, task, reason):
+        # Preserve the original payload before removing pending work; Lua stops before removal if storage fails.
+        self.redis_client.eval("""
+            redis.call('XADD', KEYS[2], '*', 'original_id', ARGV[1], 'payload', ARGV[2], 'reason', ARGV[3])
+            redis.call('XACK', KEYS[1], ARGV[4], ARGV[1])
+            redis.call('XDEL', KEYS[1], ARGV[1])
+            redis.call('HDEL', KEYS[3], ARGV[1])
+            return 1
+        """, 3, self.queue_key, self.failed_key, self.attempts_key,
+            task["_message_id"], task["_payload"], reason, self.group)
+        TASK_RESULTS.labels("dead_letter").inc()
+
+    def failed(self, task, error):
+        permanent_api_error = (isinstance(error, APIStatusError)
+                               and error.status_code < 500 and error.status_code not in (408, 409, 429))
+        if isinstance(error, ValueError) or permanent_api_error or task["_attempt"] >= 5:
+            self.reject(task, type(error).__name__)
+
+    def failed_size(self):
+        return self.redis_client.xlen(self.failed_key)
 
     def size(self):
-        # 현재 저장된 양 확인
-        return self.redis_client.llen(self.queue_key)
+        return self.redis_client.xlen(self.queue_key) + self.redis_client.llen(self.legacy_key)
 
 
 class AutomationService:
@@ -46,21 +127,14 @@ class AutomationService:
 
         # 현재 scheduler 실행 여부 상태
         self.is_running = False
+        self.last_success_at = None
+        self.consecutive_failures = 0
+        self.producer_failed = False
+        self.queue_depth = -1
+        self.quarantined_tasks = -1
         
-        self.subject_map = {
-            "COMPUTER_ARCHITECTURE": "컴퓨터 구조",
-            "OPERATING_SYSTEM": "운영체제",
-            "COMPUTER_NETWORK": "컴퓨터 네트워크",
-            "DATA_STRUCTURE": "자료구조",
-            "ALGORITHM": "알고리즘",
-            "DATABASE": "데이터베이스"
-        }
-        
-        self.level_map = {
-            "EASY": "난이도 1 (기초)",
-            "MEDIUM": "난이도 2 (기본)",
-            "HARD": "난이도 3 (심화)"
-        }
+        self.subject_map = SUBJECT_LABELS
+        self.level_map = LEVEL_LABELS
 
     def start_producer(self):
         # 아직 안돌아가고 있으면 scheduler에 잡 넣고 시작
@@ -70,7 +144,7 @@ class AutomationService:
             print("[Start] Producer Scheduler started.")
 
     def _produce_job(self):
-        """The job that runs every 30s."""
+        """The job that runs every 60s."""
         
         # 랜덤 선택
         selected_subject_key = random.choice(list(self.subject_map.keys()))
@@ -80,10 +154,15 @@ class AutomationService:
         task = {
             "subject": selected_subject_key, # DB 저장용 (Java Enum)
             "level": selected_level_key,     # DB 저장용 (Java Enum)
-            "subject_display": self.subject_map[selected_subject_key], # LLM 프롬프트용
-            "level_display": self.level_map[selected_level_key]       # LLM 프롬프트용
         }
-        self.queue.enqueue(task)
+        try:
+            self.queue.enqueue(task)
+            self.queue_depth = self.queue.size()
+            self.producer_failed = False
+        except Exception:
+            self.producer_failed = True
+            TASK_RESULTS.labels("enqueue_failure").inc()
+            raise
 
     async def start_consumer(self):
         # consumer
@@ -102,42 +181,28 @@ class AutomationService:
                     print(f"[Consumer] Processing: {task['subject']} ({task['level']})")
                     # 문제 생성 시작
                     try:
-                        from app.repositories.exercise_repository import exercise_repository
-                        
-                        # 문제 생성 
-                        content = await loop.run_in_executor(
-                            None, 
-                            exercise_service.generate_exercise, 
-                            task['subject_display'], 
-                            task['level_display']
+                        saved_exercise = await loop.run_in_executor(
+                            None, exercise_service.generate_and_save, task['subject'], task['level'], task['task_id']
                         )
-                        
-                        # 파싱
-                        parsed_data = exercise_service.parse_content(content)
-                        question = parsed_data["question"]
-                        answer = parsed_data["answer"]
-                        
-                        # 결과 잘 있으면 저장 
-                        if question and answer:
-                            saved_exercise = await loop.run_in_executor(
-                                None, 
-                                exercise_repository.save_exercise, 
-                                task['subject'], 
-                                task['level'], 
-                                question, 
-                                answer
-                            )
-                            print(f"[Consumer] Saved : {saved_exercise.question} (ID : {saved_exercise.id})")
-                            
-                        else: # 결과 잘 없으면 로그찍고 저장없이 다음
-                            print(f"[Consumer] Failed to parse content: {content[:50]}...")
+                        await loop.run_in_executor(None, self.queue.acknowledge, task)
+                        self.last_success_at = time.time()
+                        self.consecutive_failures = 0
+                        TASK_RESULTS.labels("success").inc()
+                        self.queue_depth = await loop.run_in_executor(None, self.queue.size)
+                        print(f"[Consumer] Saved exercise {saved_exercise.id}")
 
                     except Exception as e:
+                        await loop.run_in_executor(None, self.queue.failed, task, e)
+                        self.consecutive_failures += 1
+                        TASK_RESULTS.labels("failure").inc()
                         print(f"[Consumer] Failed generation: {e}")
                 
                 await asyncio.sleep(0.1) 
                 
             except Exception as e:
+                self.consecutive_failures += 1
+                self.queue_depth = -1
+                TASK_RESULTS.labels("queue_failure").inc()
                 print(f"[Error] {e}")
                 await asyncio.sleep(1)
 
