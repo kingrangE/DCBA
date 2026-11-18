@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=requirements.txt,target=requirements.txt \
     uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
-    uv pip install --torch-backend cpu -r requirements.txt
+    uv pip install -r requirements.txt
 
 # 실행
 FROM python:3.13-slim
@@ -39,7 +39,7 @@ COPY instructions ./instructions
 COPY migrations ./migrations
 
 RUN adduser --disabled-password --gecos "" appuser && \
-    mkdir -p /home/appuser/.cache/huggingface /app/chroma_db && \
+    mkdir -p /app/chroma_db && \
     chown -R appuser:appuser /app /home/appuser
 USER appuser
 

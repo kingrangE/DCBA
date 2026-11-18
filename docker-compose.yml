@@ -47,18 +47,14 @@ services:
       - MARIADB_USER=${MARIADB_USER:-dcba}
       - MARIADB_PASSWORD=${MARIADB_PASSWORD:-dcba_password}
       - MARIADB_DATABASE=${MARIADB_DATABASE:-dcba}
-      - KANANA_MODEL_NAME=${KANANA_MODEL_NAME:-kakaocorp/kanana-2-3b-instruct}
-      - KANANA_DEVICE_MAP=${KANANA_DEVICE_MAP:-auto}
-      - KANANA_MAX_NEW_TOKENS=${KANANA_MAX_NEW_TOKENS:-512}
-      - KANANA_TEMPERATURE=${KANANA_TEMPERATURE:-0.2}
-      - KANANA_TOP_P=${KANANA_TOP_P:-0.9}
-      - HF_HOME=/home/appuser/.cache/huggingface
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NVIDIA_MODEL=${NVIDIA_MODEL:-}
+      - NVIDIA_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - DEDUPLICATION_ENABLED=${DEDUPLICATION_ENABLED:-false}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - CHROMA_PERSIST_DIRECTORY=/app/chroma_db
     volumes:
-      - huggingface_cache:/home/appuser/.cache/huggingface
       - chroma_data:/app/chroma_db
     depends_on:
       schema-migrate:
@@ -186,7 +182,6 @@ services:
 volumes:
   redis_data:
   mariadb_data:
-  huggingface_cache:
   chroma_data:
   prometheus_data:
   grafana_data:

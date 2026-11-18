@@ -17,6 +17,8 @@ from fastapi.testclient import TestClient
 def client():
     with pytest.MonkeyPatch.context() as m:
         m.setenv("LLM_API_KEY", "test-generation-key")
+        m.setenv("NVIDIA_API_KEY", "test-nvidia-key")
+        m.setenv("NVIDIA_MODEL", "test/model")
         # 테스트 전, producer와 consumer 기능을 대체 (with에서만 가짜가 적용)
         m.setattr("app.services.automation_service.automation_service.start_producer", MagicMock())
         m.setattr("app.services.automation_service.automation_service.start_consumer", AsyncMock()) # 비동기 함수에 사용할 Mock

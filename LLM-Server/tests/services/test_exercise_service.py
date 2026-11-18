@@ -19,10 +19,12 @@ def test_disabled_dedup_does_not_access_embedding_service(mocker):
 
 def test_invalid_output_has_bounded_retry(mocker):
     generator=mocker.patch.object(exercise_service.client, "generate", return_value="invalid")
-    with pytest.raises(RuntimeError): exercise_service.generate_exercise("ALGORITHM", "EASY")
+    with pytest.raises(ValueError, match="valid, unique content"):
+        exercise_service.generate_exercise("ALGORITHM", "EASY")
     assert generator.call_count == 10
 
 def test_model_failure_is_not_retried_within_request(mocker):
-    generator=mocker.patch.object(exercise_service.client, "generate", side_effect=RuntimeError("missing weights"))
-    with pytest.raises(RuntimeError, match="missing weights"): exercise_service.generate_exercise("ALGORITHM", "EASY")
+    generator=mocker.patch.object(exercise_service.client, "generate", side_effect=RuntimeError("provider unavailable"))
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        exercise_service.generate_exercise("ALGORITHM", "EASY")
     generator.assert_called_once()

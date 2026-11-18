@@ -5,9 +5,7 @@ pydantic
 redis
 apscheduler
 pymysql
-torch
-transformers>=4.57.0,<5
-accelerate
+openai
 
 # AI & Vector DB
 langchain

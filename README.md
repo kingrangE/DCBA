@@ -27,7 +27,7 @@
 |---|---|
 | Web | React |
 | API | Spring Boot |
-| LLM | FastAPI + `kakaocorp/kanana-2-3b-instruct` |
+| LLM | FastAPI + NVIDIA NIM Chat Completions API |
 | Data | MariaDB + Redis |
 | 실행 | Docker Compose |
 
@@ -36,20 +36,17 @@
 | 필수 항목 | 기준 |
 |---|---|
 | Docker | Docker Desktop 또는 Docker Engine + Compose |
-| 메모리 | Kanana 실행 시 Docker 메모리 12GB 이상 권장 |
-| 디스크 | 최초 모델 다운로드용 여유 공간 7GB 이상 |
+| 문제 생성 | NVIDIA API 키, 해당 계정에서 사용 가능한 채팅 모델 ID, HTTPS 연결 |
 
 ## 2. 전체 서비스 실행
 
+처음 실행할 때 `.env.example`을 `.env`로 복사하고 `NVIDIA_API_KEY`와 `NVIDIA_MODEL`을 입력합니다. 기존 `.env`가 있다면 해당 항목만 추가합니다. `NVIDIA_BASE_URL` 기본값은 NVIDIA 개발용 엔드포인트입니다. 운영에서는 사용 계약과 요청 한도가 확인된 엔드포인트를 설정하세요. API 키는 `.env` 또는 서버의 비밀 저장소에서 워커에 주입합니다. [NVIDIA API 시작 가이드](https://docs.api.nvidia.com/nim/re/docs/api-quickstart) · [NVIDIA API 체험 약관](https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf)
+
 ```bash
-docker compose --profile llm up -d --build
+docker compose -p dcba --profile llm up -d --build
 ```
 
-| 최초 실행 | 내용 |
-|---|---|
-| 모델 다운로드 | Kanana 가중치 약 6.5GB 다운로드 |
-| 모델 캐시 | `huggingface_cache` Docker 볼륨에 보관 |
-| 문제 생성 | CPU 환경에서는 첫 생성에 시간이 오래 걸릴 수 있음 |
+기존 배포를 업데이트할 때는 기존 Compose 프로젝트 이름과 데이터 볼륨을 사용합니다. 생성 워커는 1분마다 자동 생성 작업을 추가하며, 30일 동안 계속 실행하면 사용자 요청과 재시도 외에 정기 작업이 43,200건 추가됩니다.
 
 ## 3. 접속 주소
 
@@ -63,27 +60,26 @@ docker compose --profile llm up -d --build
 ## 4. 정상 실행 확인
 
 ```bash
-docker compose --profile llm ps
-docker logs -f llm-server
+docker compose -p dcba --profile llm ps
+docker compose -p dcba --profile llm logs -f llm-server
 ```
 
 | 로그 | 상태 |
 |---|---|
-| `[Kanana] Model loaded: kakaocorp/kanana-2-3b-instruct` | 모델 준비 완료 |
 | `[Consumer] Processing: ...` | 문제 생성 중 |
-| `[Consumer] Saved : ... (ID : ...)` | DB 저장 완료 |
+| `[Consumer] Saved exercise ...` | DB 저장 완료 |
 
 ## 5. 주요 명령
 
 | 작업 | 명령 |
 |---|---|
-| 기본 서비스만 실행 | `docker compose up -d --build` |
-| LLM 포함 실행 | `docker compose --profile llm up -d --build` |
-| 모니터링 포함 실행 | `docker compose --profile llm --profile monitoring up -d --build` |
-| 전체 상태 확인 | `docker compose --profile llm ps` |
-| LLM 로그 확인 | `docker logs -f llm-server` |
-| 생성 대기 작업 수 확인 | `docker exec redis-cache redis-cli LLEN exercise:generation_queue` |
-| 전체 중지 | `docker compose down` |
+| 기본 서비스만 실행 | `docker compose -p dcba up -d --build` |
+| LLM 포함 실행 | `docker compose -p dcba --profile llm up -d --build` |
+| 모니터링 포함 실행 | `docker compose -p dcba --profile llm --profile monitoring up -d --build` |
+| 전체 상태 확인 | `docker compose -p dcba --profile llm ps` |
+| LLM 로그 확인 | `docker compose -p dcba --profile llm logs -f llm-server` |
+| 생성 대기 및 처리 중 작업 수 확인 | `docker compose -p dcba exec redis redis-cli XLEN exercise:generation_stream` |
+| 전체 중지 | `docker compose -p dcba --profile llm --profile monitoring down` |
 
 ## 6. 선택 설정
 
@@ -98,7 +94,9 @@ cp .env.example .env
 
 | 변수 | 기본값 | 용도 |
 |---|---|---|
-| `KANANA_MODEL_NAME` | `kakaocorp/kanana-2-3b-instruct` | 생성 모델 |
+| `NVIDIA_API_KEY` | 없음 | 생성 API 인증 키 |
+| `NVIDIA_MODEL` | 없음 | 엔드포인트에서 사용 가능한 모델 ID |
+| `NVIDIA_BASE_URL` | `https://integrate.api.nvidia.com/v1` | Chat Completions API의 HTTPS 기본 주소 |
 | `DEDUPLICATION_ENABLED` | `false` | 중복 검사 활성화 여부 |
 | `OPENAI_API_KEY` | 없음 | 중복 검사 활성화 시 필요 |
 | `FRONTEND_PORT` | `80` | Web 외부 포트 |
@@ -112,13 +110,13 @@ cp .env.example .env
 
 ### 안정성 개선 통합 시 배포
 
-React·REST API·Slack·Kanana 및 선택적 중복 검사는 유지됩니다. 문제 목록은 전체 건수와 번호 페이지 대신 이전·다음 이동을 사용합니다. 배포 전에 기존 MariaDB와 Redis 데이터를 백업하세요. 공통 스키마 마이그레이션이 성공한 뒤 Java와 LLM 서버가 시작되며 Java 운영 설정은 스키마를 검증만 합니다. 중복 저장 기록, 고아 참조, 필수 값 누락이 발견되면 데이터를 삭제하지 않고 마이그레이션을 중단하므로 운영자가 기존 자료를 확인해야 합니다. Slack 정보는 유지됩니다.
+문제 목록은 전체 건수와 번호 페이지 대신 이전·다음 이동을 사용합니다. 배포 전에 기존 MariaDB와 Redis 데이터를 백업하세요. 공통 스키마 마이그레이션이 성공한 뒤 Java와 LLM 서버가 시작되며 Java 운영 설정은 스키마를 검증만 합니다. 중복 저장 기록, 고아 참조, 필수 값 누락이 발견되면 데이터를 삭제하지 않고 마이그레이션을 중단하므로 운영자가 기존 자료를 확인해야 합니다. Slack 정보는 유지됩니다.
 
-Redis는 내부 네트워크에서만 접근하며 AOF를 매 쓰기마다 동기화합니다. 디스크 지연이 큐 처리 지연에 반영됩니다. MariaDB와 Prometheus 관리 포트는 로컬에만 열고 Java 지표는 내부 9091 포트로 분리합니다. LLM의 직접 생성 API는 내부 접근과 별도 `LLM_API_KEY`가 필요하며 키가 없으면 비활성화됩니다. React의 로그인 사용자 생성 요청은 기존 Java 큐 API로 계속 동작합니다. 임베딩 중복 검사를 사용할 때만 `DEDUPLICATION_ENABLED=true`와 유효한 OpenAI 키가 필요합니다. 모델 캐시와 중복 검사 인덱스는 각각 영구 볼륨에 보관합니다.
+Redis는 내부 네트워크에서만 접근하며 AOF를 매 쓰기마다 동기화합니다. 디스크 지연이 큐 처리 지연에 반영됩니다. MariaDB와 Prometheus 관리 포트는 로컬에만 열고 Java 지표는 내부 9091 포트로 분리합니다. LLM의 직접 생성 API는 내부 접근과 별도 `LLM_API_KEY`가 필요하며 키가 없으면 비활성화됩니다. React의 로그인 사용자 생성 요청은 기존 Java 큐 API로 계속 동작합니다. 임베딩 중복 검사를 사용할 때만 `DEDUPLICATION_ENABLED=true`와 유효한 OpenAI 키가 필요합니다. 중복 검사 인덱스는 기존 Chroma 볼륨에 보관합니다.
 
-LLM의 `/health`는 프로세스 생존, `/ready`는 실제 생성 성공·큐·DB 상태를 확인합니다. Kanana 최초 다운로드와 CPU 추론 중에는 첫 생성이 완료될 때까지 준비되지 않은 상태가 정상입니다. 마지막 성공이 1시간보다 오래되면 준비 상태를 해제하므로 실제 장비의 추론 시간을 고려해 운영하세요. 준비 상태는 프로세스 재시작 조건으로 사용하지 않습니다. 실패 작업은 Redis의 `exercise:generation_failed`에 원문과 함께 남고 자동 삭제되지 않습니다. 원인 수정 후 확인하여 재등록하고, 보관량과 디스크를 관리해야 합니다.
+LLM의 `/health`는 프로세스 생존, `/ready`는 실제 생성 성공·큐·DB 상태를 확인합니다. 처음 생성이 성공하기 전과 마지막 성공 후 1시간이 지나면 준비 상태가 해제됩니다. 준비 상태는 프로세스 재시작 조건으로 사용하지 않습니다. NVIDIA API의 일시적 오류는 Redis 큐에서 재처리합니다. 재시도 한도를 넘기거나 인증·모델 설정 오류가 발생한 작업은 `exercise:generation_failed`에 남습니다. 원인을 수정한 뒤 실패 작업을 검토해 재등록하세요.
 
 기존 목록 큐의 작업은 원자적으로 Stream으로 이전합니다. DB 저장과 작업 완료 기록은 같은 트랜잭션으로 반영되어 재처리 시 중복 저장을 방지합니다. 중복 검사 인덱스는 DB의 확정된 문제를 기준으로 복구합니다. 로컬 벡터 저장소는 단일 생성 서버를 전제로 하며 여러 생성 서버를 운영하려면 공용 벡터 서버가 필요합니다. 인증 요청 제한은 프록시가 전달한 임의 주소를 신뢰하지 않으므로 기본 nginx 배포에서는 같은 프록시를 경유한 요청이 제한 예산을 공유합니다. 사용자별 제한이 필요하면 신뢰할 수 있는 진입점에서 적용해야 합니다.
 
 
-CI는 Java·Python·React 검증을 유지하며 문서만 바뀐 경우 기존 경로 제외 규칙을 유지합니다. Java는 테스트 실행을 생략하지 않고 컴파일 캐시를 사용하며 검증한 JAR을 배포 이미지에 그대로 넣습니다. Python은 운영·테스트 의존성을 나누고 uv 캐시를 사용하되 CPU용 추론 패키지와 Kanana 지원은 유지합니다. 배포는 lint와 테스트 성공 후 main push에서만 실행되며 main의 진행 중 배포는 새 커밋 때문에 취소하지 않습니다. 검토용 누적 PR에서도 최종 CI 변경을 검증할 수 있게 `review/**` 기준 브랜치를 허용합니다. GitHub 실행 시간·원격 캐시 적중률과 이미지 배포 결과는 실제 실행 기록으로 확인해야 합니다.
+CI는 Java·Python·React를 검증하며 문서 변경에는 기존 경로 제외 규칙을 적용합니다. Java는 컴파일 캐시를 사용하며 검증한 JAR을 배포 이미지에 그대로 넣습니다. Python은 운영·테스트 의존성을 나누고 uv 캐시를 사용하며, 테스트에서는 NVIDIA 응답을 모의합니다. 배포 이미지 발행은 lint와 테스트 성공 후 main push에서만 실행되며 새 커밋이 들어와도 진행 중인 main 배포는 계속됩니다. 검토용 누적 PR에서도 CI를 실행할 수 있도록 `review/**` 기준 브랜치를 허용합니다.
