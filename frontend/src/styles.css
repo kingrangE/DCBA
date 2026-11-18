@@ -53,6 +53,8 @@ h2 { font-size: 1.25rem; letter-spacing: -.025em; }
 }
 .button--primary { color: white; background: var(--accent); }
 .button--primary:hover:not(:disabled) { background: var(--accent-hover); }
+.button--danger { color: var(--error); border-color: var(--error); background: var(--surface); }
+.button--danger:hover:not(:disabled) { background: var(--error-soft); }
 .button--secondary, .pagination button { color: var(--accent); border-color: var(--control-border); background: var(--surface); }
 .button--secondary:hover:not(:disabled), .pagination button:hover:not(:disabled) { background: var(--accent-soft); }
 .button--secondary.is-active, .button--secondary[aria-pressed='true'] { font-weight: 750; background: var(--accent-soft); }

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import kingrangE.DCBA.domain.User;
 import kingrangE.DCBA.dto.LoginForm;
 import kingrangE.DCBA.dto.api.UserResponse;
+import kingrangE.DCBA.service.GenerationAdminService;
 import kingrangE.DCBA.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new UserController(userService);
+        controller = new UserController(userService, new GenerationAdminService(null, 0));
     }
 
     @Test

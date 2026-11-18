@@ -57,6 +57,19 @@ def test_automatic_generation_does_not_enqueue_while_work_is_pending():
     assert queue.redis_client.eval.call_args.args[-1] == "1"
 
 
+def test_pause_key_is_checked_in_the_automatic_enqueue_script():
+    queue = RedisQueue()
+    queue.redis_client.eval.return_value = -1
+    task = {"subject": "ALGORITHM", "level": "EASY"}
+    assert queue.enqueue(task, only_when_idle=True) is False
+    script, key_count, _, _, pause_key, _, automatic = queue.redis_client.eval.call_args.args
+    assert key_count == 3 and pause_key == "exercise:auto_generation_paused" and automatic == "1"
+    assert script.index("EXISTS") < script.index("XADD")
+    queue.redis_client.eval.return_value = "1-0"
+    assert queue.enqueue(task) is True
+    assert queue.redis_client.eval.call_args.args[-1] == "0"
+
+
 def test_automatic_generation_uses_configured_interval(monkeypatch, mocker):
     monkeypatch.setenv("AUTO_GENERATION_ENABLED", "true")
     monkeypatch.setenv("AUTO_GENERATION_INTERVAL_SECONDS", "600")
@@ -77,8 +90,8 @@ def test_on_demand_mode_does_not_schedule_automatic_generation(mocker):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("fails", [False, True])
-async def test_consumer_acknowledges_only_committed_tasks(mocker, fails):
+@pytest.mark.parametrize("outcome", ["saved", "deleted", "failed"])
+async def test_consumer_acknowledges_only_committed_tasks(mocker, outcome):
     task = {"subject": "DATABASE", "level": "HARD", "task_id": "task-1", "_message_id": "1-0", "_attempt": 1, "_payload": "{}"}
     def dequeue(*args):
         automation_service.is_running = False
@@ -86,13 +99,13 @@ async def test_consumer_acknowledges_only_committed_tasks(mocker, fails):
     mocker.patch.object(automation_service.queue, "dequeue", side_effect=dequeue)
     acknowledge = mocker.patch.object(automation_service.queue, "acknowledge")
     service = mocker.patch("app.services.automation_service.exercise_service")
-    if fails:
+    if outcome == "failed":
         service.generate_and_save.side_effect = RuntimeError("database unavailable")
     else:
-        service.generate_and_save.return_value = MagicMock(id=123)
+        service.generate_and_save.return_value = None if outcome == "deleted" else MagicMock(id=123)
     await automation_service.start_consumer()
     service.generate_and_save.assert_called_once_with("DATABASE", "HARD", "task-1")
-    if fails:
+    if outcome == "failed":
         acknowledge.assert_not_called()
     else:
         acknowledge.assert_called_once_with(task)

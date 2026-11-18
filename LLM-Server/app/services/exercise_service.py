@@ -2,7 +2,7 @@ import json
 import os
 from dotenv import load_dotenv
 from app.services.nvidia_generator import NvidiaGenerator
-from app.models.exercise import ExerciseRequest, GeneratedExercise, SUBJECT_LABELS, LEVEL_LABELS
+from app.models.exercise import Exercise, ExerciseRequest, GeneratedExercise, SUBJECT_LABELS, LEVEL_LABELS
 
 load_dotenv()
 
@@ -53,9 +53,10 @@ class ExerciseService:
             deduplication = deduplication_service
         with exercise_repository.generation_lock() as connection:
             if task_id is not None:
-                saved = exercise_repository.find_task(task_id, connection)
-                if saved is not None:
-                    return saved
+                completed = exercise_repository.find_task(task_id, connection)
+                if completed is not None:
+                    # A retry of a completed task must not recreate a problem deleted by an administrator.
+                    return Exercise(**completed) if completed["id"] is not None else None
             if deduplication is not None:
                 deduplication.synchronize(exercise_repository, connection)
             question, answer, embedding = self.generate_exercise(request.subject.value, request.level.value)

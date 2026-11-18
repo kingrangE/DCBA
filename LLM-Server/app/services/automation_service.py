@@ -14,6 +14,8 @@ from app.services.exercise_service import exercise_service
 from app.models.exercise import ExerciseRequest, Level, SUBJECT_LABELS
 
 class RedisQueue:
+    AUTO_GENERATION_PAUSE_KEY = "exercise:auto_generation_paused"
+
     def __init__(self, host="localhost", port=6379, db=0):
         self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True,
                                         socket_connect_timeout=5, socket_timeout=10)
@@ -30,16 +32,21 @@ class RedisQueue:
         request = ExerciseRequest(**task)
         payload = {**request.model_dump(mode="json"), "task_id": str(uuid.uuid4())}
         result = self.redis_client.eval("""
+            if ARGV[2] == '1' and redis.call('EXISTS', KEYS[3]) == 1 then return -1 end
             local depth = redis.call('XLEN', KEYS[1]) + redis.call('LLEN', KEYS[2])
             if ARGV[2] == '1' and depth > 0 then return -1 end
             if depth >= 1000 then return false end
             return redis.call('XADD', KEYS[1], '*', 'payload', ARGV[1])
-        """, 2, self.queue_key, self.legacy_key, json.dumps(payload), "1" if only_when_idle else "0")
+        """, 3, self.queue_key, self.legacy_key, self.AUTO_GENERATION_PAUSE_KEY,
+            json.dumps(payload), "1" if only_when_idle else "0")
         if result == -1:
             return False
         if not result:
             raise RuntimeError("Generation queue is full")
         return True
+
+    def is_auto_generation_paused(self) -> bool:
+        return bool(self.redis_client.exists(self.AUTO_GENERATION_PAUSE_KEY))
 
     def dequeue(self, timeout=5):
         try:
@@ -190,11 +197,12 @@ class AutomationService:
                             None, exercise_service.generate_and_save, task['subject'], task['level'], task['task_id']
                         )
                         await loop.run_in_executor(None, self.queue.acknowledge, task)
-                        self.last_success_at = time.time()
                         self.consecutive_failures = 0
-                        TASK_RESULTS.labels("success").inc()
+                        if saved_exercise is not None:
+                            self.last_success_at = time.time()
+                            TASK_RESULTS.labels("success").inc()
+                            print(f"[Consumer] Saved exercise {saved_exercise.id}")
                         self.queue_depth = await loop.run_in_executor(None, self.queue.size)
-                        print(f"[Consumer] Saved exercise {saved_exercise.id}")
 
                     except Exception as e:
                         await loop.run_in_executor(None, self.queue.failed, task, e)

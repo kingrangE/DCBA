@@ -15,6 +15,10 @@ public interface SelectedExerciseRepository extends JpaRepository<SelectedExerci
     @org.springframework.data.jpa.repository.Query("delete from SelectedExercise p where p.user.id = :userId and p.exercise.id = :exerciseId")
     int deletePreference(Long userId, Long exerciseId);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("delete from SelectedExercise p where p.exercise.id = :exerciseId")
+    void deleteForExercise(Long exerciseId);
+
     @org.springframework.data.jpa.repository.Query("""
             select p.exercise.id from SelectedExercise p
             where p.user.id = :userId and p.exercise.id in :exerciseIds

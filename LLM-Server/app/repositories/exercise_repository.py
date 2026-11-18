@@ -52,11 +52,19 @@ class ExerciseRepository:
     def find_task(self, task_id, connection):
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT e.* FROM exercise e JOIN generation_task t ON t.exercise_id = e.id
+                SELECT e.* FROM generation_task t LEFT JOIN exercise e ON t.exercise_id = e.id
                 WHERE t.task_id = %s
             """, (task_id,))
-            row = cursor.fetchone()
-            return Exercise(**row) if row else None
+            return cursor.fetchone()
+
+    def find_deleted_ids(self, connection):
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT exercise_id FROM deleted_exercise ORDER BY exercise_id LIMIT 100")
+            return [row["exercise_id"] for row in cursor.fetchall()]
+
+    def clear_deleted_ids(self, ids, connection):
+        with connection.cursor() as cursor:
+            cursor.executemany("DELETE FROM deleted_exercise WHERE exercise_id = %s", [(exercise_id,) for exercise_id in ids])
 
     def save_exercise(self, subject: str, level: str, question: str, answer: str,
                       task_id=None, connection=None) -> Exercise:
