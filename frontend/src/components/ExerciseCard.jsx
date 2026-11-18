@@ -13,7 +13,7 @@ function ExerciseMarkdown({ children }) {
   )
 }
 
-export default function ExerciseCard({ exercise, pending, onChangePreference }) {
+export default function ExerciseCard({ exercise, pending, onChangePreference, onDelete }) {
   const answerId = useId()
   const [showAnswer, setShowAnswer] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -33,6 +33,7 @@ export default function ExerciseCard({ exercise, pending, onChangePreference }) 
       <div className="card-meta">
         <span>{exercise.subjectName}</span>
         <span>난이도 {exercise.levelNumber}</span>
+        {onDelete && <span>#{exercise.id}</span>}
       </div>
       <div className="exercise-markdown question-copy">
         {exercise.question.includes('\n')
@@ -43,22 +44,30 @@ export default function ExerciseCard({ exercise, pending, onChangePreference }) 
         <button className="button button--primary" type="button" aria-expanded={showAnswer} aria-controls={answerId} onClick={() => setShowAnswer((value) => !value)}>
           {showAnswer ? '해설 접기' : '해설 보기'}
         </button>
-        <button
-          className={`button button--secondary ${exercise.saved ? 'is-active' : ''}`}
-          type="button"
-          aria-disabled={Boolean(pending)}
-          onClick={(event) => changePreference('saved', event)}
-        >
-          {pending === 'saved' ? '처리 중…' : exercise.saved ? '저장 취소' : '저장'}
-        </button>
-        <button
-          className={`button button--secondary ${exercise.banned ? 'is-active' : ''}`}
-          type="button"
-          aria-disabled={Boolean(pending)}
-          onClick={(event) => changePreference('banned', event)}
-        >
-          {pending === 'banned' ? '처리 중…' : exercise.banned ? '차단 해제' : '차단'}
-        </button>
+        {onDelete ? (
+          <button className="button button--danger" type="button" disabled={Boolean(pending)} onClick={() => onDelete(exercise)}>
+            문제 삭제
+          </button>
+        ) : (
+          <>
+            <button
+              className={`button button--secondary ${exercise.saved ? 'is-active' : ''}`}
+              type="button"
+              aria-disabled={Boolean(pending)}
+              onClick={(event) => changePreference('saved', event)}
+            >
+              {pending === 'saved' ? '처리 중…' : exercise.saved ? '저장 취소' : '저장'}
+            </button>
+            <button
+              className={`button button--secondary ${exercise.banned ? 'is-active' : ''}`}
+              type="button"
+              aria-disabled={Boolean(pending)}
+              onClick={(event) => changePreference('banned', event)}
+            >
+              {pending === 'banned' ? '처리 중…' : exercise.banned ? '차단 해제' : '차단'}
+            </button>
+          </>
+        )}
       </div>
       <div className="answer-panel" id={answerId} hidden={!showAnswer}>
         <h4>해설</h4>

@@ -47,14 +47,16 @@ def database_available():
 
 @app.get("/ready")
 async def readiness():
-    depth, database, quarantined = await asyncio.gather(
+    depth, database, quarantined, paused = await asyncio.gather(
         asyncio.wait_for(asyncio.to_thread(automation_service.queue.size), timeout=3),
         asyncio.wait_for(asyncio.to_thread(database_available), timeout=3),
         asyncio.wait_for(asyncio.to_thread(automation_service.queue.failed_size), timeout=3),
+        asyncio.wait_for(asyncio.to_thread(automation_service.queue.is_auto_generation_paused), timeout=3),
         return_exceptions=True,
     )
     redis_available = (isinstance(depth, int) and not isinstance(depth, bool)
-                       and isinstance(quarantined, int) and not isinstance(quarantined, bool))
+                       and isinstance(quarantined, int) and not isinstance(quarantined, bool)
+                       and isinstance(paused, bool))
     automation_service.queue_depth = depth if redis_available else -1
     automation_service.quarantined_tasks = quarantined if isinstance(quarantined, int) and not isinstance(quarantined, bool) else -1
     consumer = getattr(app.state, "consumer_task", None)
@@ -62,14 +64,15 @@ async def readiness():
     last_success = automation_service.last_success_at
     success_window = max(3600, automation_service.generation_interval_seconds * 2)
     recent_success = last_success is not None and time.time() - last_success < success_window
-    available_for_requests = recent_success or not automation_service.auto_generation_enabled
+    available_for_requests = recent_success or not automation_service.auto_generation_enabled or paused is True
     ready = (consumer_running and available_for_requests and redis_available and database is True
              and depth <= 20 and automation_service.consecutive_failures == 0
-             and not automation_service.producer_failed)
+             and (paused is True or not automation_service.producer_failed))
     GENERATION_READY.set(int(ready))
     return JSONResponse(status_code=200 if ready else 503, content={
         "status": "ready" if ready else "degraded",
         "auto_generation_enabled": automation_service.auto_generation_enabled,
+        "auto_generation_paused": paused if isinstance(paused, bool) else None,
         "auto_generation_interval_seconds": automation_service.generation_interval_seconds,
         "consumer_running": consumer_running,
         "database_available": database is True,

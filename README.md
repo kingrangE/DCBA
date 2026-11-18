@@ -127,4 +127,8 @@ CI는 Java·Python·React를 검증하며 문서 변경에는 경로 제외 규�
 
 EC2에는 SSM Agent와 역할, Git, curl, Docker Engine과 Compose 2.24.4 이상이 필요합니다. `/opt/dcba/.env`를 서버에 만들고 파일 권한을 `0600`으로 설정합니다. `MARIADB_PASSWORD`와 `MARIADB_ROOT_PASSWORD`에는 서로 다른 임의 값을 사용합니다. 문제 생성을 쓸 때는 `COMPOSE_PROFILES=llm`과 NVIDIA 환경 변수도 서버에 설정합니다. EC2에서 정기 생성을 사용하려면 `AUTO_GENERATION_ENABLED=true`와 생성 간격(초)인 `AUTO_GENERATION_INTERVAL_SECONDS`를 설정합니다. 워커의 내부 `/ready`에서 적용된 값을 확인할 수 있습니다.
 
+관리자로 지정할 기존 계정의 숫자 ID를 `DCBA_ADMIN_USER_ID`에 설정하면 해당 계정에 관리자 메뉴가 표시됩니다. 관리자 화면에서 자동 생성을 중단하면 Redis에 상태가 저장되므로 워커를 재시작해도 중단 상태가 유지됩니다. 수동 생성과 이미 큐에 들어간 작업은 계속 처리됩니다. 워커의 내부 `/ready`에서 환경 설정은 `auto_generation_enabled`, 관리자 중단 여부는 `auto_generation_paused`로 확인합니다.
+
+관리자 화면의 문제 풀에서 개별 문제를 삭제할 수 있습니다. 삭제한 문제는 모든 사용자의 저장·차단 목록에서도 제거됩니다. 중복 검사 인덱스는 중복 검사가 활성화된 워커가 다음에 생성 작업을 처리할 때 정리됩니다.
+
 GitHub 저장소 Variables의 `DCBA_EC2_INSTANCE_ID`와 `DCBA_EC2_ROLE_ARN`에 시험 서버와 배포 역할을 지정합니다. AWS 배포 역할은 이 저장소의 `main`만 OIDC로 신뢰하고, 해당 인스턴스와 `AWS-RunShellScript` 문서에 `ssm:SendCommand`를 허용합니다. 결과 확인에는 `ssm:GetCommandInvocation`이 필요합니다. 웹은 EC2 내부 `127.0.0.1:8080`에 열리며, 보안 그룹 변경 없이 Session Manager 포트 포워딩으로 확인할 수 있습니다.

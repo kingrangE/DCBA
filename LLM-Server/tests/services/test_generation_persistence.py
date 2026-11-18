@@ -29,12 +29,13 @@ def test_index_failure_prevents_generation_and_save(mocker):
     repository.save_exercise.assert_not_called()
 
 
-def test_completed_task_returns_saved_problem_without_regeneration(mocker):
+@pytest.mark.parametrize("deleted", [False, True])
+def test_completed_task_does_not_regenerate_even_after_deletion(mocker, deleted):
     repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
     saved = Exercise(id=1, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
-    repository.find_task.return_value = saved
+    repository.find_task.return_value = {"id": None} if deleted else saved.model_dump(exclude_none=True)
     generate = mocker.patch.object(exercise_service, "generate_exercise")
-    assert exercise_service.generate_and_save("ALGORITHM", "EASY", "task-1") == saved
+    assert exercise_service.generate_and_save("ALGORITHM", "EASY", "task-1") == (None if deleted else saved)
     generate.assert_not_called()
     repository.save_exercise.assert_not_called()
 
@@ -45,6 +46,7 @@ def test_index_rebuild_resumes_after_committed_batch(tmp_path, monkeypatch, mock
     embeddings.embed_documents.return_value = [[1.0, 0.0]]
     embeddings.embed_query.return_value = [1.0, 0.0]
     repository = MagicMock()
+    repository.find_deleted_ids.return_value = []
     repository.find_after.side_effect = [[{"id": 7, "subject": "ALGORITHM", "level": "EASY", "question": "Question", "answer": "Answer"}], []]
     store = DeduplicationService()
     store.synchronize(repository, None)
@@ -79,6 +81,7 @@ def test_accepted_embedding_is_recorded_once_and_not_embedded_again(tmp_path, mo
     mocker.patch("app.services.deduplication_service.deduplication_service", store)
     repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
     repository.find_after.return_value = []
+    repository.find_deleted_ids.return_value = []
     saved = Exercise(id=11, subject="ALGORITHM", level="EASY", question="Question", answer=STORED_ANSWER)
     repository.save_exercise.return_value = saved
     completion = mocker.patch.object(exercise_service.client, "generate")
@@ -110,6 +113,7 @@ def test_checkpoint_failure_recovers_committed_problem_from_database(tmp_path, m
     mocker.patch("app.services.deduplication_service.deduplication_service", store)
     repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
     repository.find_after.return_value = []
+    repository.find_deleted_ids.return_value = []
     saved = Exercise(id=12, subject="ALGORITHM", level="EASY", question="Question", answer=STORED_ANSWER)
     repository.save_exercise.return_value = saved
     mocker.patch.object(exercise_service, "generate_exercise", return_value=("Question", STORED_ANSWER, [1.0, 0.0]))
@@ -123,6 +127,28 @@ def test_checkpoint_failure_recovers_committed_problem_from_database(tmp_path, m
     store.synchronize(repository, None)
     assert store.collection.metadata["last_exercise_id"] == 12
     assert store.collection.count() == 1
+
+
+def test_deleted_problem_is_removed_from_index_before_cleanup_is_acknowledged(tmp_path, monkeypatch, mocker):
+    monkeypatch.setenv("CHROMA_PERSIST_DIRECTORY", str(tmp_path))
+    mocker.patch("app.services.deduplication_service.OpenAIEmbeddings")
+    store = DeduplicationService()
+    saved = Exercise(id=9, subject="ALGORITHM", level="EASY", question="Example", answer="Example")
+    store.record(saved, [1.0, 0.0])
+    repository = MagicMock()
+    repository.find_after.return_value = []
+    repository.find_deleted_ids.side_effect = [[9, 10], []]
+    store.synchronize(repository, None)
+    assert store.collection.count() == 0
+    repository.clear_deleted_ids.assert_called_once_with([9, 10], None)
+
+    repository.find_deleted_ids.side_effect = None
+    repository.find_deleted_ids.return_value = [9]
+    repository.clear_deleted_ids.reset_mock()
+    with patch.object(type(store.collection), "delete", side_effect=RuntimeError("index unavailable")):
+        with pytest.raises(RuntimeError, match="index unavailable"):
+            store.synchronize(repository, None)
+    repository.clear_deleted_ids.assert_not_called()
 
 @pytest.fixture(autouse=True)
 def enable_deduplication(monkeypatch):

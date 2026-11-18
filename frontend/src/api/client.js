@@ -38,6 +38,15 @@ export const api = {
   signup: (credentials) => request('/api/auth/signup', { method: 'POST', body: JSON.stringify(credentials) }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   me: () => request('/api/auth/me'),
+  automaticGenerationPause: () => request('/api/admin/automatic-generation/pause'),
+  pauseAutomaticGeneration: () => request('/api/admin/automatic-generation/pause', { method: 'PUT' }),
+  exercisePool: ({ before, after }) => {
+    const params = new URLSearchParams()
+    if (before) params.set('before', String(before))
+    if (after) params.set('after', String(after))
+    return request(`/api/admin/exercises?${params}`)
+  },
+  deleteExercise: (id) => request(`/api/admin/exercises/${id}`, { method: 'DELETE' }),
   updateSlack: (slackId) => request('/api/users/me/slack', {
     method: 'PATCH',
     body: JSON.stringify({ slackId }),

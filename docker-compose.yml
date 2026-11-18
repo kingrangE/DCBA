@@ -79,6 +79,7 @@ services:
       - "${DCBA_SERVER_PORT:-8080}:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
+      - DCBA_ADMIN_USER_ID=${DCBA_ADMIN_USER_ID:-0}
       - MARIADB_HOST=mariadb
       - MARIADB_PORT=3306
       - MARIADB_USER=${MARIADB_USER:-dcba}

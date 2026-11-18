@@ -72,6 +72,10 @@ def migrate():
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE user ADD COLUMN IF NOT EXISTS slack_id VARCHAR(255)")
                 cursor.execute("INSERT INTO schema_migration (version) VALUES (3)")
+            cursor.execute("SELECT version FROM schema_migration WHERE version = 4")
+            if not cursor.fetchone():
+                cursor.execute("CREATE TABLE IF NOT EXISTS deleted_exercise (exercise_id BIGINT PRIMARY KEY) ENGINE=InnoDB")
+                cursor.execute("INSERT INTO schema_migration (version) VALUES (4)")
     finally:
         connection.close()
 

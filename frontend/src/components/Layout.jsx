@@ -31,6 +31,7 @@ export default function Layout({ children }) {
           <nav className="main-nav" aria-label="주요 메뉴">
             <NavLink to="/dashboard">문제 풀기</NavLink>
             <NavLink to="/mypage">계정 설정</NavLink>
+            {user.admin === true && <NavLink to="/admin">관리자</NavLink>}
           </nav>
           <div className="account-menu">
             <span>{user.name} 님</span>

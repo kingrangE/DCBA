@@ -5,11 +5,12 @@ from app.main import app, monitor_generation, GENERATION_READY
 from app.services.automation_service import automation_service
 
 
-@pytest.mark.parametrize("condition", ["healthy", "on_demand", "database", "redis", "stopped", "stale", "warming", "backlog", "generation", "producer", "failed_storage"])
+@pytest.mark.parametrize("condition", ["healthy", "on_demand", "paused", "database", "redis", "stopped", "stale", "warming", "backlog", "generation", "producer", "failed_storage", "pause_storage"])
 def test_readiness_reports_generation_and_dependency_failures(client, mocker, condition):
     mocker.patch("app.main.database_available", return_value=True)
     size = mocker.patch.object(automation_service.queue, "size", return_value=0)
     mocker.patch.object(automation_service.queue, "failed_size", return_value=0)
+    pause_state = mocker.patch.object(automation_service.queue, "is_auto_generation_paused", return_value=False)
     mocker.patch.object(automation_service, "is_running", True)
     mocker.patch.object(automation_service, "last_success_at", time.time())
     mocker.patch.object(automation_service, "consecutive_failures", 0)
@@ -30,6 +31,9 @@ def test_readiness_reports_generation_and_dependency_failures(client, mocker, co
     elif condition == "on_demand":
         automation_service.auto_generation_enabled = False
         automation_service.last_success_at = None
+    elif condition == "paused":
+        pause_state.return_value = True
+        automation_service.last_success_at = None
     elif condition == "backlog":
         size.return_value = 21
     elif condition == "generation":
@@ -38,9 +42,12 @@ def test_readiness_reports_generation_and_dependency_failures(client, mocker, co
         automation_service.producer_failed = True
     elif condition == "failed_storage":
         mocker.patch.object(automation_service.queue, "failed_size", side_effect=RuntimeError("private storage detail"))
+    elif condition == "pause_storage":
+        pause_state.side_effect = RuntimeError("private storage detail")
     response = client.get("/ready")
-    assert response.status_code == (200 if condition in {"healthy", "on_demand"} else 503)
+    assert response.status_code == (200 if condition in {"healthy", "on_demand", "paused"} else 503)
     assert response.json()["auto_generation_enabled"] == (condition != "on_demand")
+    assert response.json()["auto_generation_paused"] == (None if condition == "pause_storage" else condition == "paused")
     assert response.json()["auto_generation_interval_seconds"] == 60
     assert "private" not in response.text
     assert client.get("/health").status_code == 200

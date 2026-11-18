@@ -10,6 +10,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 
 // DCBA의 서비스에서는 문제를 개별적으로 확인할 일이 V1에서는 없다. -> Page 단위 관리를 위해 Page 이용
 public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
@@ -59,6 +64,21 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
                               where b.user.id = :userId and b.exercise = e)
             """)
     Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, Long before, Long after, Pageable pageable);
+
+    @Query("select e from Exercise e where (:before is null or e.id < :before) and (:after is null or e.id > :after)")
+    Slice<Exercise> findPool(Long before, Long after, Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select e from Exercise e where e.id = :id")
+    Optional<Exercise> findForPreference(Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from Exercise e where e.id = :id")
+    Optional<Exercise> findForDeletion(Long id);
+
+    @Modifying
+    @Query(value = "INSERT INTO deleted_exercise (exercise_id) VALUES (:id)", nativeQuery = true)
+    void recordDeletion(Long id);
 
     /**
      * 과목 기반 필터링 조회 (List 반환)

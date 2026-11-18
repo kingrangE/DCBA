@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.ArrayList;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +24,33 @@ class ConcurrentExerciseTests {
     @Autowired ExerciseRepository exercises;
     @Autowired SelectedExerciseRepository selected;
     @Autowired BannedExerciseRepository banned;
+    @Autowired JdbcTemplate jdbc;
+
+    @Test
+    void deletingFromPoolRemovesOnlyTargetPreferencesAndRecordsIndexCleanupOnce() {
+        jdbc.execute("CREATE TABLE IF NOT EXISTS deleted_exercise (exercise_id BIGINT PRIMARY KEY)");
+        User reader = users.saveAndFlush(new User("poolReader", "test"));
+        Exercise target = exercises.saveAndFlush(Exercise.builder().subject(Subject.ALGORITHM)
+                .level(Level.EASY).question("Remove this").answer("Answer").build());
+        Exercise other = exercises.saveAndFlush(Exercise.builder().subject(Subject.ALGORITHM)
+                .level(Level.EASY).question("Keep this").answer("Answer").build());
+        for (Exercise exercise : java.util.List.of(target, other)) {
+            service.saveExercise(reader.getId(), exercise.getId());
+            service.banExercise(reader.getId(), exercise.getId());
+        }
+
+        assertThat(service.getExercisePool(null, null)).extracting(Exercise::getId)
+                .contains(target.getId(), other.getId());
+        service.deleteExerciseFromPool(target.getId());
+        service.deleteExerciseFromPool(target.getId());
+        assertThat(exercises.findById(target.getId())).isEmpty();
+        assertThat(service.getSelectedExercises(reader.getId(), null, null, null, null))
+                .extracting(Exercise::getId).containsExactly(other.getId());
+        assertThat(service.getBannedExercises(reader.getId(), null, null, null, null))
+                .extracting(Exercise::getId).containsExactly(other.getId());
+        assertThat(jdbc.queryForList("SELECT exercise_id FROM deleted_exercise", Long.class))
+                .containsExactly(target.getId());
+    }
 
     @Test
     void concurrentRequestsKeepOnePreferenceAndCanCancel() throws Exception {

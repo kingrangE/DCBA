@@ -40,6 +40,20 @@ public class ExerciseService {
         return exerciseRepository.findVisibleExercises(userId, subject, level, before, after, cursorPage(before, after));
     }
 
+    public Slice<Exercise> getExercisePool(Long before, Long after) {
+        return exerciseRepository.findPool(before, after, cursorPage(before, after));
+    }
+
+    @Transactional
+    public void deleteExerciseFromPool(Long exerciseId) {
+        exerciseRepository.findForDeletion(exerciseId).ifPresent(exercise -> {
+            selectedExerciseRepository.deleteForExercise(exerciseId);
+            bannedExerciseRepository.deleteForExercise(exerciseId);
+            exerciseRepository.recordDeletion(exerciseId);
+            exerciseRepository.delete(exercise);
+        });
+    }
+
     /**
      * User SelectedRepo에 문제 저장
      * @param userId 유저 Id
@@ -52,7 +66,7 @@ public class ExerciseService {
                 -> new jakarta.persistence.EntityNotFoundException("User not found"));
 
         // Exercise 정보 가져옴 (없으면 Error)
-        Exercise exercise = exerciseRepository.findById(exerciseId)
+        Exercise exercise = exerciseRepository.findForPreference(exerciseId)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Exercise not found"));
 
         // 선택된 운동을 관리하는 Repo에 이미 저장되어 있는지 확인 (있으면 중복 저장 X)
@@ -92,7 +106,7 @@ public class ExerciseService {
     public void banExercise(Long userId, Long exerciseId) {
         User user = userRepository.findByIdForUpdate(userId).orElseThrow(()
                 -> new jakarta.persistence.EntityNotFoundException("User not found"));
-        Exercise exercise = exerciseRepository.findById(exerciseId)
+        Exercise exercise = exerciseRepository.findForPreference(exerciseId)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Exercise not found"));
 
         if (bannedExerciseRepository.findByUserAndExercise(user, exercise).isPresent()) {

@@ -33,6 +33,9 @@ class DeduplicationService:
             )
             after_id = rows[-1]["id"]
             self.collection.modify(metadata={"last_exercise_id": after_id})
+        while deleted_ids := repository.find_deleted_ids(connection):
+            self.collection.delete(ids=[str(exercise_id) for exercise_id in deleted_ids])
+            repository.clear_deleted_ids(deleted_ids, connection)
 
     def check_duplicate(self, subject: str, level: str, text: str) -> tuple[bool, list[float]]:
         request = ExerciseRequest(subject=subject, level=level)

@@ -12,6 +12,7 @@ import kingrangE.DCBA.dto.api.MessageResponse;
 import kingrangE.DCBA.dto.api.SlackUpdateRequest;
 import kingrangE.DCBA.dto.api.UserResponse;
 import kingrangE.DCBA.exception.UnauthorizedException;
+import kingrangE.DCBA.service.GenerationAdminService;
 import kingrangE.DCBA.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -32,6 +33,7 @@ public class UserController {
     private static final String LOGIN_USER = "loginUser";
 
     private final UserService userService;
+    private final GenerationAdminService generationAdmin;
 
     @GetMapping("/auth/csrf")
     public Map<String, String> csrf(CsrfToken token) {
@@ -46,7 +48,7 @@ public class UserController {
             User user = userService.login(loginForm.getName().trim(), loginForm.getPassword());
             request.changeSessionId();
             session.setAttribute(LOGIN_USER, user);
-            return UserResponse.from(user);
+            return userResponse(user);
         } catch (UserRequestException exception) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, exception.getMessage(), exception);
         }
@@ -74,7 +76,7 @@ public class UserController {
     @GetMapping("/auth/me")
     public UserResponse currentUser(HttpSession session) {
         User sessionUser = requireUser(session);
-        return UserResponse.from(userService.getUser(sessionUser.getId()));
+        return userResponse(userService.getUser(sessionUser.getId()));
     }
 
     @PatchMapping("/users/me/slack")
@@ -88,7 +90,11 @@ public class UserController {
         userService.updateSlackId(sessionUser.getId(), slackId);
         User updatedUser = userService.getUser(sessionUser.getId());
         session.setAttribute(LOGIN_USER, updatedUser);
-        return UserResponse.from(updatedUser);
+        return userResponse(updatedUser);
+    }
+
+    private UserResponse userResponse(User user) {
+        return UserResponse.from(user, generationAdmin.isAdmin(user));
     }
 
     private User requireUser(HttpSession session) {

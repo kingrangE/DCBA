@@ -8,9 +8,10 @@ public record UserResponse(
         Long id,
         String name,
         String slackId,
-        LocalDateTime createdAt) {
+        LocalDateTime createdAt,
+        boolean admin) {
 
-    public static UserResponse from(User user) {
-        return new UserResponse(user.getId(), user.getName(), user.getSlackId(), user.getCreatedAt());
+    public static UserResponse from(User user, boolean admin) {
+        return new UserResponse(user.getId(), user.getName(), user.getSlackId(), user.getCreatedAt(), admin);
     }
 }
