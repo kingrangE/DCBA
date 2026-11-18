@@ -24,7 +24,7 @@ export default function ExerciseCard({ exercise, pending, onChangePreference }) 
       </div>
       <h3>{exercise.question}</h3>
       <div className="card-actions">
-        <button className="button button--dark" type="button" aria-expanded={showAnswer} aria-controls={answerId} onClick={() => setShowAnswer((value) => !value)}>
+        <button className="button button--primary" type="button" aria-expanded={showAnswer} aria-controls={answerId} onClick={() => setShowAnswer((value) => !value)}>
           {showAnswer ? '해설 접기' : '해설 보기'}
         </button>
         <button
