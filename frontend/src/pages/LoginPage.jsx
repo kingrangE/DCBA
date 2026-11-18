@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthShell from '../components/AuthShell'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ name: '', password: '' })
+  const { state } = useLocation()
+  const [form, setForm] = useState({ name: state?.registeredName ?? '', password: '' })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -16,9 +17,10 @@ export default function LoginPage() {
     setError('')
     try {
       await login(form)
-      navigate('/dashboard')
+      navigate('/dashboard', { replace: true })
     } catch (requestError) {
-      setError(requestError.message)
+      if (requestError.status === 401) setError('닉네임과 비밀번호를 확인해 주세요.')
+      else setError(requestError.status ? requestError.message : '로그인 요청에 실패했어요. 연결을 확인한 뒤 다시 시도해 주세요.')
     } finally {
       setSubmitting(false)
     }
@@ -26,16 +28,15 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      eyebrow="WELCOME BACK"
-      title="다시 시작해 볼까요?"
-      description="오늘의 CS 문제를 만나려면 로그인하세요."
+      title="로그인"
       footer={<>아직 계정이 없나요? <Link to="/signup">회원가입</Link></>}
     >
+      {state?.registeredName && <p className="form-status form-status--success" role="status">회원가입이 완료됐어요. 비밀번호를 입력해 로그인하세요.</p>}
       <form className="stack-form" onSubmit={submit}>
-        <label>이름<input autoComplete="username" maxLength="10" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="이름을 입력하세요" /></label>
-        <label>비밀번호<input type="password" autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="비밀번호를 입력하세요" /></label>
+        <label>닉네임<input name="name" required readOnly={submitting} autoComplete="username" autoCapitalize="none" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+        <label>비밀번호<input name="password" required readOnly={submitting} type="password" autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
         {error && <p className="form-status form-status--error" role="alert">{error}</p>}
-        <button className="button button--primary button--wide" disabled={submitting} type="submit">{submitting ? '로그인 중...' : '로그인 →'}</button>
+        <button className="button button--primary button--wide" disabled={submitting} type="submit">{submitting ? '로그인 중…' : '로그인'}</button>
       </form>
     </AuthShell>
   )

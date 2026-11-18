@@ -13,10 +13,11 @@ export default function MyPage() {
     setSubmitting(true)
     setStatus(null)
     try {
-      await updateSlack(slackId)
-      setStatus({ type: 'success', text: 'Slack ID를 저장했습니다.' })
+      const updatedUser = await updateSlack(slackId)
+      setSlackId(updatedUser.slackId || '')
+      setStatus({ type: 'success', text: 'Slack 멤버 ID를 저장했어요.' })
     } catch (error) {
-      setStatus({ type: 'error', text: error.message })
+      setStatus({ type: 'error', text: error.status ? error.message : '저장 여부를 확인할 수 없어요. 연결을 확인한 뒤 다시 저장해 주세요.' })
     } finally {
       setSubmitting(false)
     }
@@ -24,23 +25,27 @@ export default function MyPage() {
 
   return (
     <Layout>
-      <main className="profile-page">
+      <main className="profile-page" id="main-content" tabIndex={-1}>
         <section className="profile-intro">
-          <p className="eyebrow">MY PROFILE</p>
-          <h1>{user.name}님의<br />학습 설정.</h1>
+          <h1>계정 설정</h1>
           <dl>
-            <div><dt>가입일</dt><dd>{user.createdAt ? new Date(user.createdAt).toLocaleDateString('ko-KR') : '-'}</dd></div>
-            <div><dt>Slack 연동</dt><dd>{user.slackId ? '연결됨' : '연결 전'}</dd></div>
+            <div><dt>닉네임</dt><dd>{user.name}</dd></div>
+            <div><dt>가입일</dt><dd>{user.createdAt ? new Date(user.createdAt).toLocaleDateString('ko-KR') : '정보 없음'}</dd></div>
           </dl>
         </section>
         <section className="profile-card">
-          <p className="eyebrow">NOTIFICATION</p>
-          <h2>Slack 알림 설정</h2>
-          <p className="muted">문제 알림을 받을 Slack Member ID를 등록하세요.</p>
+          <h2>Slack 설정</h2>
+          <p className="muted">{user.slackId ? '멤버 ID가 등록되어 있어요.' : '등록된 멤버 ID가 없어요.'}</p>
           <form className="stack-form" onSubmit={submit}>
-            <label>Slack Member ID<input value={slackId} onChange={(e) => setSlackId(e.target.value)} placeholder="예: U012ABCDEF" /></label>
-            {status && <p className={`form-status form-status--${status.type}`}>{status.text}</p>}
-            <button className="button button--primary" disabled={submitting} type="submit">{submitting ? '저장 중...' : '설정 저장 →'}</button>
+            <div className="form-field">
+              <label>Slack 멤버 ID<input name="slackId" required readOnly={submitting} autoCapitalize="none" spellCheck={false} aria-describedby="slack-help" value={slackId} onChange={(event) => {
+                setSlackId(event.target.value)
+                setStatus(null)
+              }} placeholder="예: U012ABCDEF" /></label>
+              <small id="slack-help" className="field-help">Slack 프로필의 더 보기 메뉴에서 ‘멤버 ID 복사’를 선택하세요.</small>
+            </div>
+            {status && <p className={`form-status form-status--${status.type}`} role={status.type === 'error' ? 'alert' : 'status'}>{status.text}</p>}
+            <button className="button button--primary" disabled={submitting} type="submit">{submitting ? '저장 중…' : '멤버 ID 저장'}</button>
           </form>
         </section>
       </main>
