@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from datetime import datetime
 from enum import StrEnum
+from typing import Annotated
 
 class Subject(StrEnum):
     COMPUTER_ARCHITECTURE = "COMPUTER_ARCHITECTURE"
@@ -31,6 +32,24 @@ class ExerciseBase(BaseModel):
 
 class ExerciseRequest(ExerciseBase):
     pass
+
+NonBlankText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class RelatedConcept(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    term: NonBlankText
+    explanation: NonBlankText
+
+
+class GeneratedExercise(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    question: NonBlankText
+    answer: NonBlankText
+    concepts: list[RelatedConcept] = Field(min_length=1, max_length=4)
+
 
 class Exercise(ExerciseBase):
     id: int

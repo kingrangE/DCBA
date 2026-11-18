@@ -31,12 +31,12 @@ def setup_generator(monkeypatch, mocker):
     return setup
 
 
-@pytest.mark.parametrize("endpoint,model,tokens", [
-    (None, "test/model", 512),
-    ("https://nim.example/v1", "test/model", 512),
-    (None, "nvidia/nemotron-3-ultra-550b-a55b", 1024),
+@pytest.mark.parametrize("endpoint,model", [
+    (None, "test/model"),
+    ("https://nim.example/v1", "test/model"),
+    (None, "nvidia/nemotron-3-ultra-550b-a55b"),
 ])
-def test_generator_sends_authenticated_chat_completion(monkeypatch, setup_generator, endpoint, model, tokens):
+def test_generator_sends_authenticated_chat_completion(monkeypatch, setup_generator, endpoint, model):
     monkeypatch.setenv("NVIDIA_MODEL", model)
     if endpoint:
         monkeypatch.setenv("NVIDIA_BASE_URL", endpoint)
@@ -46,7 +46,7 @@ def test_generator_sends_authenticated_chat_completion(monkeypatch, setup_genera
         assert request.headers["Authorization"] == "Bearer test-nvidia-key"
         payload = json.loads(request.content)
         assert payload["model"] == model
-        assert payload["max_tokens"] == tokens
+        assert payload["max_tokens"] == 1536
         if model == "nvidia/nemotron-3-ultra-550b-a55b":
             assert payload["chat_template_kwargs"] == {"enable_thinking": False}
         else:

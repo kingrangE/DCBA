@@ -27,7 +27,7 @@ class NvidiaGenerator:
         response = self._client.chat.completions.create(
             model=self.model,
             messages=messages,
-            max_tokens=1024 if is_nemotron_ultra else 512,
+            max_tokens=1536,
             temperature=0.2,
             top_p=0.9,
             # Nemotron Ultra's default reasoning can exhaust the budget before emitting an answer.

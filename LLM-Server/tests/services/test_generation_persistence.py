@@ -4,10 +4,13 @@ from app.models.exercise import Exercise
 from app.services.exercise_service import exercise_service
 from app.services.deduplication_service import DeduplicationService
 
+MODEL_OUTPUT = '{"question":"Question","answer":"Answer","concepts":[{"term":"Term","explanation":"Explanation"}]}'
+STORED_ANSWER = "Answer\n\n##### 이 문제를 풀기 위해 알아야 할 개념\n\n- **Term** — Explanation"
+
 
 def test_duplicate_check_failure_stops_without_repeated_paid_generation(mocker):
     completion = mocker.patch.object(exercise_service.client, "generate")
-    completion.return_value = "Q: Question\nA: Answer"
+    completion.return_value = MODEL_OUTPUT
     dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
     dedup.check_duplicate.side_effect = RuntimeError("embedding unavailable")
     with pytest.raises(RuntimeError, match="embedding unavailable"):
@@ -76,13 +79,13 @@ def test_accepted_embedding_is_recorded_once_and_not_embedded_again(tmp_path, mo
     mocker.patch("app.services.deduplication_service.deduplication_service", store)
     repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
     repository.find_after.return_value = []
-    saved = Exercise(id=11, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
+    saved = Exercise(id=11, subject="ALGORITHM", level="EASY", question="Question", answer=STORED_ANSWER)
     repository.save_exercise.return_value = saved
     completion = mocker.patch.object(exercise_service.client, "generate")
-    completion.return_value = "Q: Question\nA: Answer"
+    completion.return_value = MODEL_OUTPUT
     assert exercise_service.generate_and_save("ALGORITHM", "EASY") == saved
     store.synchronize(repository, None)
-    embeddings.embed_query.assert_called_once_with("Q: Question\nA: Answer")
+    embeddings.embed_query.assert_called_once_with(f"Q: Question\nA: {STORED_ANSWER}")
     embeddings.embed_documents.assert_not_called()
     assert store.collection.metadata["last_exercise_id"] == 11
     assert list(store.collection.get(ids=["11"], include=["embeddings"])["embeddings"][0]) == [1.0, 0.0]
@@ -92,7 +95,7 @@ def test_database_failure_never_records_candidate_embedding(mocker):
     repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
     repository.save_exercise.side_effect = RuntimeError("database failed")
     dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
-    mocker.patch.object(exercise_service, "generate_exercise", return_value=("Q: Question\nA: Answer", [1.0, 0.0]))
+    mocker.patch.object(exercise_service, "generate_exercise", return_value=("Question", STORED_ANSWER, [1.0, 0.0]))
     with pytest.raises(RuntimeError, match="database failed"):
         exercise_service.generate_and_save("ALGORITHM", "EASY")
     dedup.record.assert_not_called()
@@ -107,9 +110,9 @@ def test_checkpoint_failure_recovers_committed_problem_from_database(tmp_path, m
     mocker.patch("app.services.deduplication_service.deduplication_service", store)
     repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
     repository.find_after.return_value = []
-    saved = Exercise(id=12, subject="ALGORITHM", level="EASY", question="Question", answer="Answer")
+    saved = Exercise(id=12, subject="ALGORITHM", level="EASY", question="Question", answer=STORED_ANSWER)
     repository.save_exercise.return_value = saved
-    mocker.patch.object(exercise_service, "generate_exercise", return_value=("Q: Question\nA: Answer", [1.0, 0.0]))
+    mocker.patch.object(exercise_service, "generate_exercise", return_value=("Question", STORED_ANSWER, [1.0, 0.0]))
     # synchronize reopens the collection, so fail the checkpoint at the collection class boundary.
     with patch.object(type(store.collection), "modify", side_effect=RuntimeError("checkpoint failed")):
         with pytest.raises(RuntimeError, match="checkpoint failed"):

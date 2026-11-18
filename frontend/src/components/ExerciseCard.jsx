@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import Markdown from 'react-markdown'
 
 export default function ExerciseCard({ exercise, pending, onChangePreference }) {
   const answerId = useId()
@@ -45,7 +46,17 @@ export default function ExerciseCard({ exercise, pending, onChangePreference }) 
       </div>
       <div className="answer-panel" id={answerId} hidden={!showAnswer}>
         <h4>해설</h4>
-        <p className="answer-copy">{exercise.answer}</p>
+        {showAnswer && (
+          <div className="answer-copy">
+            <Markdown
+              skipHtml
+              unwrapDisallowed
+              allowedElements={['h5', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code']}
+            >
+              {exercise.answer}
+            </Markdown>
+          </div>
+        )}
       </div>
       {actionError && <p className="form-status form-status--error" role="alert">{actionError}</p>}
     </article>
