@@ -14,6 +14,8 @@ def test_readiness_reports_generation_and_dependency_failures(client, mocker, co
     mocker.patch.object(automation_service, "last_success_at", time.time())
     mocker.patch.object(automation_service, "consecutive_failures", 0)
     mocker.patch.object(automation_service, "producer_failed", False)
+    mocker.patch.object(automation_service, "auto_generation_enabled", True)
+    mocker.patch.object(automation_service, "generation_interval_seconds", 60)
     consumer = MagicMock()
     consumer.done.return_value = condition == "stopped"
     app.state.consumer_task = consumer
@@ -26,7 +28,7 @@ def test_readiness_reports_generation_and_dependency_failures(client, mocker, co
     elif condition == "warming":
         automation_service.last_success_at = None
     elif condition == "on_demand":
-        mocker.patch.object(automation_service, "auto_generation_enabled", False)
+        automation_service.auto_generation_enabled = False
         automation_service.last_success_at = None
     elif condition == "backlog":
         size.return_value = 21
@@ -38,6 +40,8 @@ def test_readiness_reports_generation_and_dependency_failures(client, mocker, co
         mocker.patch.object(automation_service.queue, "failed_size", side_effect=RuntimeError("private storage detail"))
     response = client.get("/ready")
     assert response.status_code == (200 if condition in {"healthy", "on_demand"} else 503)
+    assert response.json()["auto_generation_enabled"] == (condition != "on_demand")
+    assert response.json()["auto_generation_interval_seconds"] == 60
     assert "private" not in response.text
     assert client.get("/health").status_code == 200
 

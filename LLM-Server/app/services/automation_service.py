@@ -26,15 +26,20 @@ class RedisQueue:
         self.retry_idle_ms = 600_000
         self.claim_cursor = "0-0"
 
-    def enqueue(self, task: dict):
+    def enqueue(self, task: dict, *, only_when_idle: bool = False) -> bool:
         request = ExerciseRequest(**task)
         payload = {**request.model_dump(mode="json"), "task_id": str(uuid.uuid4())}
         result = self.redis_client.eval("""
-            if redis.call('XLEN', KEYS[1]) + redis.call('LLEN', KEYS[2]) >= 1000 then return false end
+            local depth = redis.call('XLEN', KEYS[1]) + redis.call('LLEN', KEYS[2])
+            if ARGV[2] == '1' and depth > 0 then return -1 end
+            if depth >= 1000 then return false end
             return redis.call('XADD', KEYS[1], '*', 'payload', ARGV[1])
-        """, 2, self.queue_key, self.legacy_key, json.dumps(payload))
+        """, 2, self.queue_key, self.legacy_key, json.dumps(payload), "1" if only_when_idle else "0")
+        if result == -1:
+            return False
         if not result:
             raise RuntimeError("Generation queue is full")
+        return True
 
     def dequeue(self, timeout=5):
         try:
@@ -116,9 +121,11 @@ class RedisQueue:
 
 
 class AutomationService:
-    # 자동으로 30초마다 추가하는 시스템
     def __init__(self):
         self.auto_generation_enabled = os.getenv("AUTO_GENERATION_ENABLED", "true").lower() == "true"
+        self.generation_interval_seconds = int(os.getenv("AUTO_GENERATION_INTERVAL_SECONDS", "60"))
+        if self.generation_interval_seconds <= 0:
+            raise ValueError("AUTO_GENERATION_INTERVAL_SECONDS must be positive")
         # Redis 관련 정보
         redis_host = os.getenv("REDIS_HOST", "localhost")
         redis_port = int(os.getenv("REDIS_PORT", 6379))
@@ -140,13 +147,11 @@ class AutomationService:
     def start_producer(self):
         # 아직 안돌아가고 있으면 scheduler에 잡 넣고 시작
         if self.auto_generation_enabled and not self.scheduler.running:
-            self.scheduler.add_job(self._produce_job, 'interval', seconds=60)
+            self.scheduler.add_job(self._produce_job, 'interval', seconds=self.generation_interval_seconds)
             self.scheduler.start()
-            print("[Start] Producer Scheduler started.")
+            print(f"[Start] Automatic generation interval: {self.generation_interval_seconds}s")
 
     def _produce_job(self):
-        """The job that runs every 60s."""
-        
         # 랜덤 선택
         selected_subject_key = random.choice(list(self.subject_map.keys()))
         selected_level_key = random.choice(list(self.level_map.keys()))
@@ -157,7 +162,7 @@ class AutomationService:
             "level": selected_level_key,     # DB 저장용 (Java Enum)
         }
         try:
-            self.queue.enqueue(task)
+            self.queue.enqueue(task, only_when_idle=True)
             self.queue_depth = self.queue.size()
             self.producer_failed = False
         except Exception:

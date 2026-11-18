@@ -46,7 +46,7 @@
 docker compose -p dcba --profile llm up -d --build
 ```
 
-기존 배포를 업데이트할 때는 기존 Compose 프로젝트 이름과 데이터 볼륨을 사용합니다. 생성 워커는 1분마다 자동 생성 작업을 추가하며, 30일 동안 계속 실행하면 사용자 요청과 재시도 외에 정기 작업이 43,200건 추가됩니다.
+기존 배포를 업데이트할 때는 기존 Compose 프로젝트 이름과 데이터 볼륨을 사용합니다. 자동 생성의 기본 간격은 60초입니다. 사용자 요청이나 처리 중인 작업이 있으면 그 회차의 자동 생성을 건너뜁니다.
 
 ## 3. 접속 주소
 
@@ -125,6 +125,6 @@ CI는 Java·Python·React를 검증하며 문서 변경에는 경로 제외 규�
 
 기능 브랜치의 PR에서 테스트를 통과해 `main`에 들어간 커밋은 GitHub Actions가 AMD64·ARM64 이미지를 빌드하고, 커밋 SHA에 맞는 애플리케이션·마이그레이션 이미지를 EC2에 배포합니다. 필요하면 Actions의 **DCBA EC2 Release**에서 `main`을 선택해 수동 실행할 수 있습니다.
 
-EC2에는 SSM Agent와 역할, Git, curl, Docker Engine과 Compose 2.24.4 이상이 필요합니다. `/opt/dcba/.env`를 서버에 만들고 파일 권한을 `0600`으로 설정합니다. `MARIADB_PASSWORD`와 `MARIADB_ROOT_PASSWORD`에는 서로 다른 임의 값을 사용합니다. 문제 생성을 쓸 때는 `COMPOSE_PROFILES=llm`과 NVIDIA 환경 변수도 서버에 설정합니다. EC2에서는 기본적으로 요청 기반으로 생성하며, `AUTO_GENERATION_ENABLED=true`를 설정하면 정기 생성도 실행합니다.
+EC2에는 SSM Agent와 역할, Git, curl, Docker Engine과 Compose 2.24.4 이상이 필요합니다. `/opt/dcba/.env`를 서버에 만들고 파일 권한을 `0600`으로 설정합니다. `MARIADB_PASSWORD`와 `MARIADB_ROOT_PASSWORD`에는 서로 다른 임의 값을 사용합니다. 문제 생성을 쓸 때는 `COMPOSE_PROFILES=llm`과 NVIDIA 환경 변수도 서버에 설정합니다. EC2에서 정기 생성을 사용하려면 `AUTO_GENERATION_ENABLED=true`와 생성 간격(초)인 `AUTO_GENERATION_INTERVAL_SECONDS`를 설정합니다. 워커의 내부 `/ready`에서 적용된 값을 확인할 수 있습니다.
 
 GitHub 저장소 Variables의 `DCBA_EC2_INSTANCE_ID`와 `DCBA_EC2_ROLE_ARN`에 시험 서버와 배포 역할을 지정합니다. AWS 배포 역할은 이 저장소의 `main`만 OIDC로 신뢰하고, 해당 인스턴스와 `AWS-RunShellScript` 문서에 `ssm:SendCommand`를 허용합니다. 결과 확인에는 `ssm:GetCommandInvocation`이 필요합니다. 웹은 EC2 내부 `127.0.0.1:8080`에 열리며, 보안 그룹 변경 없이 Session Manager 포트 포워딩으로 확인할 수 있습니다.
