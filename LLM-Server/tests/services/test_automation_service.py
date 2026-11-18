@@ -1,6 +1,7 @@
 import json
 import pytest
 from unittest.mock import MagicMock
+from app.models.exercise import Level
 from app.services.automation_service import AutomationService, automation_service, RedisQueue
 
 
@@ -40,10 +41,12 @@ def test_dequeue_reads_new_work_and_preserves_legacy_identity():
 
 
 def test_produce_job(mocker):
-    mocker.patch("random.choice", side_effect=["ALGORITHM", "EASY"])
+    mocker.patch("random.choice", return_value="ALGORITHM")
+    choose_level = mocker.patch("random.choices", return_value=[Level.MEDIUM])
     enqueue = mocker.patch.object(automation_service.queue, "enqueue")
     automation_service._produce_job()
-    enqueue.assert_called_once_with({"subject": "ALGORITHM", "level": "EASY"}, only_when_idle=True)
+    choose_level.assert_called_once_with((Level.EASY, Level.MEDIUM, Level.HARD), weights=(1, 4, 2))
+    enqueue.assert_called_once_with({"subject": "ALGORITHM", "level": "MEDIUM"}, only_when_idle=True)
 
 
 def test_automatic_generation_does_not_enqueue_while_work_is_pending():

@@ -11,7 +11,7 @@ from openai import APIError, APIStatusError
 TASK_RESULTS = Counter("dcba_generation_tasks_total", "Generation task outcomes", ["result"])
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.exercise_service import exercise_service
-from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
+from app.models.exercise import ExerciseRequest, Level, SUBJECT_LABELS
 
 class RedisQueue:
     def __init__(self, host="localhost", port=6379, db=0):
@@ -142,7 +142,6 @@ class AutomationService:
         self.quarantined_tasks = -1
         
         self.subject_map = SUBJECT_LABELS
-        self.level_map = LEVEL_LABELS
 
     def start_producer(self):
         # 아직 안돌아가고 있으면 scheduler에 잡 넣고 시작
@@ -154,12 +153,12 @@ class AutomationService:
     def _produce_job(self):
         # 랜덤 선택
         selected_subject_key = random.choice(list(self.subject_map.keys()))
-        selected_level_key = random.choice(list(self.level_map.keys()))
+        selected_level = random.choices((Level.EASY, Level.MEDIUM, Level.HARD), weights=(1, 4, 2))[0]
         
         # 잡 넣기 - 저장 및 Java 통신용으로는 Key(영어)를 사용, Prompt용으로는 Value(한글) 사용
         task = {
             "subject": selected_subject_key, # DB 저장용 (Java Enum)
-            "level": selected_level_key,     # DB 저장용 (Java Enum)
+            "level": selected_level.value,   # DB 저장용 (Java Enum)
         }
         try:
             self.queue.enqueue(task, only_when_idle=True)
