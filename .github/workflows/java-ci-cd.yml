@@ -1,8 +1,9 @@
 name: Java CI/CD
 
 on:
+  workflow_call:
   push:
-    branches: ["main", "JavaApp"]
+    branches: ["JavaApp"]
     paths:
       - "DCBA/**"
       - ".github/workflows/java-ci-cd.yml"
@@ -14,7 +15,7 @@ on:
       - ".github/workflows/java-ci-cd.yml"
       - "!DCBA/**/*.md"
 concurrency:
-  group: ${{github.workflow}}-${{github.ref }}
+  group: java-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 permissions:
   contents: read
@@ -68,7 +69,7 @@ jobs:
           SPRING_JPA_HIBERNATE_DDL_AUTO: create
         run: ./gradlew test --rerun bootJar --build-cache
       - name: Keep the tested application
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: java-app
@@ -79,7 +80,7 @@ jobs:
 
   java-cd:
     needs: [lint, java-ci]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # main에 push일 때만 CD 수행
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -111,11 +112,13 @@ jobs:
           context: ./.ci-java
           file: ./DCBA/Dockerfile
           target: ci
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=java
           cache-to: type=gha,mode=max,scope=java
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:${{ env.VERSION }}
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:${{ env.MINOR }}
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-java-app:${{ env.MAJOR }}

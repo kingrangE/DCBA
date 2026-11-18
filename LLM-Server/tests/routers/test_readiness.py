@@ -5,7 +5,7 @@ from app.main import app, monitor_generation, GENERATION_READY
 from app.services.automation_service import automation_service
 
 
-@pytest.mark.parametrize("condition", ["healthy", "database", "redis", "stopped", "stale", "warming", "backlog", "generation", "producer", "failed_storage"])
+@pytest.mark.parametrize("condition", ["healthy", "on_demand", "database", "redis", "stopped", "stale", "warming", "backlog", "generation", "producer", "failed_storage"])
 def test_readiness_reports_generation_and_dependency_failures(client, mocker, condition):
     mocker.patch("app.main.database_available", return_value=True)
     size = mocker.patch.object(automation_service.queue, "size", return_value=0)
@@ -25,6 +25,9 @@ def test_readiness_reports_generation_and_dependency_failures(client, mocker, co
         automation_service.last_success_at = time.time() - 3601
     elif condition == "warming":
         automation_service.last_success_at = None
+    elif condition == "on_demand":
+        mocker.patch.object(automation_service, "auto_generation_enabled", False)
+        automation_service.last_success_at = None
     elif condition == "backlog":
         size.return_value = 21
     elif condition == "generation":
@@ -34,7 +37,7 @@ def test_readiness_reports_generation_and_dependency_failures(client, mocker, co
     elif condition == "failed_storage":
         mocker.patch.object(automation_service.queue, "failed_size", side_effect=RuntimeError("private storage detail"))
     response = client.get("/ready")
-    assert response.status_code == (200 if condition == "healthy" else 503)
+    assert response.status_code == (200 if condition in {"healthy", "on_demand"} else 503)
     assert "private" not in response.text
     assert client.get("/health").status_code == 200
 

@@ -61,7 +61,8 @@ async def readiness():
     consumer_running = consumer is not None and not consumer.done() and automation_service.is_running
     last_success = automation_service.last_success_at
     recent_success = last_success is not None and time.time() - last_success < 3600
-    ready = (consumer_running and recent_success and redis_available and database is True
+    available_for_requests = recent_success or not automation_service.auto_generation_enabled
+    ready = (consumer_running and available_for_requests and redis_available and database is True
              and depth <= 20 and automation_service.consecutive_failures == 0
              and not automation_service.producer_failed)
     GENERATION_READY.set(int(ready))
