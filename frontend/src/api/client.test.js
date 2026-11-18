@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, request } from './client'
+import { ApiError, api, request } from './client'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -36,4 +36,15 @@ it('fetches a fresh CSRF token before each mutation', async () => {
   await request('/api/auth/logout', { method: 'POST' })
   expect(fetch).toHaveBeenNthCalledWith(1, '/api/auth/csrf', { credentials: 'include' })
   expect(fetch).toHaveBeenNthCalledWith(2, '/api/auth/logout', expect.objectContaining({ headers: { 'X-CSRF-TOKEN': 'fresh-token' } }))
+})
+
+it.each([
+  [{ 'X-DCBA-Generation-Enabled': 'false' }, false],
+  [{}, true],
+])('uses the site generation setting in the exercise options', async (headers, generationEnabled) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+    JSON.stringify({ subjects: [], levels: [] }), { headers },
+  )))
+
+  await expect(api.options()).resolves.toEqual({ subjects: [], levels: [], generationEnabled })
 })

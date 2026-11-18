@@ -8,6 +8,15 @@ export default function GenerationPanel({ options, optionsLoading, optionsError,
   const [submitting, setSubmitting] = useState(false)
   const requestInFlight = useRef(false)
 
+  if (options.generationEnabled === false) {
+    return (
+      <section className="generation-panel" id="generate" aria-labelledby="generation-heading">
+        <h2 id="generation-heading">문제 생성</h2>
+        <p className="muted">공개 웹에서는 새 문제 생성을 제한하고 있어요. 문제 목록에서 기존 문제를 풀고 저장할 수 있어요.</p>
+      </section>
+    )
+  }
+
   const submit = async (event) => {
     event.preventDefault()
     if (requestInFlight.current) return

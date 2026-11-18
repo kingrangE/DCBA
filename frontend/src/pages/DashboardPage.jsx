@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const listError = loading ? '' : current.error
   const isFiltered = Boolean(filters.subject || filters.level)
   const isFirstPage = !filters.before && !filters.after
+  const showGenerationLink = !optionsLoading && !optionsError && options.generationEnabled !== false
 
   useEffect(() => {
     let active = true
@@ -142,7 +143,7 @@ export default function DashboardPage() {
             <h1>CS 문제 풀기</h1>
             <p className="hero-copy">분야와 난이도를 골라 학습하고, 다시 볼 문제를 저장하세요.</p>
           </div>
-          <a className="button button--secondary" href="#generate">문제 생성 요청</a>
+          {showGenerationLink && <a className="button button--secondary" href="#generate">문제 생성 요청</a>}
         </header>
 
         <section className="exercise-section" aria-labelledby="exercise-heading">
@@ -233,7 +234,7 @@ export default function DashboardPage() {
                 ) : filters.view === 'all' ? (
                   <>
                     <strong>풀 수 있는 문제가 없어요.</strong>
-                    <a className="button button--secondary" href="#generate">문제 생성 요청</a>
+                    {showGenerationLink && <a className="button button--secondary" href="#generate">문제 생성 요청</a>}
                   </>
                 ) : (
                   <>
