@@ -3,6 +3,7 @@ import kingrangE.DCBA.config.SecurityConfig;
 import kingrangE.DCBA.domain.User;
 import kingrangE.DCBA.service.ExerciseService;
 import kingrangE.DCBA.service.GenerationAdminService;
+import kingrangE.DCBA.service.ReviewService;
 import kingrangE.DCBA.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,12 +20,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-@WebMvcTest(controllers = {UserController.class, AdminController.class}, properties = "DCBA_ADMIN_USER_ID=17")
+@WebMvcTest(controllers = {UserController.class, AdminController.class, ReviewController.class}, properties = "DCBA_ADMIN_USER_ID=17")
 @Import({SecurityConfig.class, GenerationAdminService.class})
 class RestSecurityTests {
  @Autowired MockMvc mvc;
  @MockitoBean UserService users;
  @MockitoBean ExerciseService exercises;
+ @MockitoBean ReviewService reviews;
  @MockitoBean StringRedisTemplate redis;
  @Test void loginRotatesSessionAndLogoutInvalidatesIt() throws Exception {
   var session = new MockHttpSession();
@@ -115,5 +117,44 @@ class RestSecurityTests {
   mvc.perform(delete(path + "/45").session(admin).header(adminToken.getHeaderName(), adminToken.getToken()))
           .andExpect(status().isNoContent());
   verify(exercises).deleteExerciseFromPool(45L);
+ }
+
+ @Test void reviewUsesSessionCsrfStrictInputAndNoStore() throws Exception {
+  var sample = "/api/exercises/review-sample";
+  var mark = "/api/exercises/42/review-again";
+  var feedback = "/api/exercises/42/review-feedback";
+  mvc.perform(get(sample)).andExpect(status().isUnauthorized()).andExpect(header().string("Cache-Control", "no-store"));
+  var session = new MockHttpSession();
+  session.setAttribute("loginUser", new User(18L, "reader", "hash", null, null));
+  var token = csrf(session);
+  when(reviews.sample(18L, "random", null, null)).thenReturn(new ReviewService.Sample(java.util.List.of()));
+  mvc.perform(get(sample).session(session)).andExpect(status().isOk())
+          .andExpect(header().string("Cache-Control", "no-store")).andExpect(jsonPath("$.items").isEmpty());
+  mvc.perform(put(mark).session(session).contentType("application/json").content("{\"enabled\":true}"))
+          .andExpect(status().isForbidden());
+  mvc.perform(post(feedback).session(session).contentType("application/json").content("{\"answer\":\"test\"}"))
+          .andExpect(status().isForbidden());
+  for (String body : new String[]{"{}", "{\"enabled\":null}", "{\"enabled\":1}"}) {
+      mvc.perform(put(mark).session(session).header(token.getHeaderName(), token.getToken()).contentType("application/json").content(body))
+              .andExpect(status().isBadRequest());
+  }
+  for (String body : new String[]{"{}", "{\"answer\":\" \"}", "{\"answer\":45}", "{\"answer\":\"" + "🚀".repeat(1001) + "\"}"}) {
+      mvc.perform(post(feedback).session(session).header(token.getHeaderName(), token.getToken()).contentType("application/json").content(body))
+              .andExpect(status().isBadRequest()).andExpect(header().string("Cache-Control", "no-store"));
+  }
+  mvc.perform(post(feedback).session(session).header(token.getHeaderName(), token.getToken()).contentType("application/json")
+          .content(" ".repeat(16384) + "{}")).andExpect(status().is(413));
+  verify(reviews, never()).feedback(anyLong(), anyLong(), anyString());
+  verify(reviews, never()).mark(anyLong(), anyLong(), anyBoolean());
+
+  mvc.perform(put(mark).session(session).header(token.getHeaderName(), token.getToken()).contentType("application/json")
+          .content("{\"enabled\":true}")).andExpect(status().isNoContent());
+  verify(reviews).mark(18L, 42L, true);
+  var result = new kingrangE.DCBA.service.ReviewProtocol.Feedback(java.util.List.of(), "다음 단계");
+  when(reviews.feedback(18L, 42L, "test")).thenReturn(result);
+  mvc.perform(post(feedback).session(session).header(token.getHeaderName(), token.getToken())
+          .contentType("application/json").content("{\"answer\":\" test \"}"))
+          .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+          .andExpect(jsonPath("$.nextStep").value("다음 단계"));
  }
 }

@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import Markdown from 'react-markdown'
 
-function ExerciseMarkdown({ children }) {
+export function ExerciseMarkdown({ children }) {
   return (
     <Markdown
       skipHtml
@@ -10,6 +10,14 @@ function ExerciseMarkdown({ children }) {
     >
       {children}
     </Markdown>
+  )
+}
+
+export function ExerciseQuestion({ question }) {
+  return (
+    <div className="exercise-markdown question-copy">
+      {question.includes('\n') ? <ExerciseMarkdown>{question}</ExerciseMarkdown> : <h3>{question}</h3>}
+    </div>
   )
 }
 
@@ -35,11 +43,7 @@ export default function ExerciseCard({ exercise, pending, onChangePreference, on
         <span>난이도 {exercise.levelNumber}</span>
         {onDelete && <span>#{exercise.id}</span>}
       </div>
-      <div className="exercise-markdown question-copy">
-        {exercise.question.includes('\n')
-          ? <ExerciseMarkdown>{exercise.question}</ExerciseMarkdown>
-          : <h3>{exercise.question}</h3>}
-      </div>
+      <ExerciseQuestion question={exercise.question} />
       <div className="card-actions">
         <button className="button button--primary" type="button" aria-expanded={showAnswer} aria-controls={answerId} onClick={() => setShowAnswer((value) => !value)}>
           {showAnswer ? '해설 접기' : '해설 보기'}

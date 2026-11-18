@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from prometheus_client import Gauge
 import time
-from app.routers import exercise
+from app.routers import exercise, review
 from app.services.automation_service import automation_service
 from app.services.exercise_service import exercise_service
 from contextlib import asynccontextmanager, suppress
@@ -101,6 +101,7 @@ Gauge("dcba_generation_consecutive_failures", "Consecutive consumer failures").s
 Gauge("dcba_generation_producer_failed", "Whether the last enqueue failed").set_function(lambda: int(automation_service.producer_failed))
 
 app.include_router(exercise.router)
+app.include_router(review.router)
 
 if __name__ == "__main__":
     import uvicorn

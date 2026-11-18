@@ -1,8 +1,9 @@
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, retryAfter = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    if (retryAfter !== null) this.retryAfter = retryAfter
   }
 }
 
@@ -26,7 +27,8 @@ export async function request(path, options = {}, readResponse = (response) => r
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
-    throw new ApiError(body.message || '요청을 처리하지 못했습니다.', response.status)
+    const retryAfter = response.status === 429 ? response.headers.get('Retry-After') : null
+    throw new ApiError(body.message || '요청을 처리하지 못했습니다.', response.status, retryAfter)
   }
 
   if (response.status === 204) return null
@@ -47,6 +49,18 @@ export const api = {
     return request(`/api/admin/exercises?${params}`)
   },
   deleteExercise: (id) => request(`/api/admin/exercises/${id}`, { method: 'DELETE' }),
+  reviewSample: ({ mode, subject, level }) => {
+    const params = new URLSearchParams({ mode })
+    if (subject) params.set('subject', subject)
+    if (level) params.set('level', level)
+    return request(`/api/exercises/review-sample?${params}`)
+  },
+  markReview: (id, enabled) => request(`/api/exercises/${id}/review-again`, {
+    method: 'PUT', body: JSON.stringify({ enabled }),
+  }),
+  reviewFeedback: (id, answer) => request(`/api/exercises/${id}/review-feedback`, {
+    method: 'POST', body: JSON.stringify({ answer }),
+  }),
   updateSlack: (slackId) => request('/api/users/me/slack', {
     method: 'PATCH',
     body: JSON.stringify({ slackId }),

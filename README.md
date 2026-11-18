@@ -132,3 +132,16 @@ EC2에는 SSM Agent와 역할, Git, curl, Docker Engine과 Compose 2.24.4 이상
 관리자 화면의 문제 풀에서 개별 문제를 삭제할 수 있습니다. 삭제한 문제는 모든 사용자의 저장·차단 목록에서도 제거됩니다. 중복 검사 인덱스는 중복 검사가 활성화된 워커가 다음에 생성 작업을 처리할 때 정리됩니다.
 
 GitHub 저장소 Variables의 `DCBA_EC2_INSTANCE_ID`와 `DCBA_EC2_ROLE_ARN`에 시험 서버와 배포 역할을 지정합니다. AWS 배포 역할은 이 저장소의 `main`만 OIDC로 신뢰하고, 해당 인스턴스와 `AWS-RunShellScript` 문서에 `ssm:SendCommand`를 허용합니다. 결과 확인에는 `ssm:GetCommandInvocation`이 필요합니다. 웹은 EC2 내부 `127.0.0.1:8080`에 열리며, 보안 그룹 변경 없이 Session Manager 포트 포워딩으로 확인할 수 있습니다.
+
+### 저장한 문제 복습과 AI 피드백
+
+대시보드의 **저장한 문제** 탭에서 현재 분야·난이도로 최대 세 문제를 연습할 수 있습니다. **다시 풀기** 표시는 저장 관계에 유지됩니다. 연습 회차와 입력한 답은 브라우저에서만 관리하며, AI 피드백을 요청한 경우 답변을 평가 모델로 전달합니다.
+
+AI 피드백은 기본으로 꺼져 있습니다. 활성화하려면 서버의 `REVIEW_FEEDBACK_ENABLED=true`와 공유 내부 키 `LLM_API_KEY`를 Java와 LLM 컨테이너에 적용하고, 기존 NVIDIA 생성 설정이 있는 LLM 워커를 실행해야 합니다. `REVIEW_LLM_BASE_URL` 기본값은 `http://llm-server:8000`입니다. 랜덤 복습과 다시 풀기 표시는 LLM 워커 없이도 사용할 수 있습니다.
+
+운영 문제의 기준은 실제 질문·해설을 검수하고 확인한 문제 ID에만 등록합니다. 마이그레이션은 개발 표본을 운영 DB에 삽입하지 않습니다. 개발 기준 9문제와 표본 답변의 기대 판정은 `LLM-Server/tests/fixtures/review_feedback.json`에 있습니다. AI를 켜기 전 검수자가 표본의 기대 판정을 확인한 뒤 다음 검수를 실행해 기준별 일치율 85% 이상과 핵심 오류 오판 부재를 확인합니다.
+
+```bash
+cd LLM-Server
+RUN_REVIEW_MODEL_VALIDATION=true python -m pytest tests/routers/test_review.py -k live_review
+```

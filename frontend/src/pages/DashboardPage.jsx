@@ -4,6 +4,7 @@ import ExerciseCard from '../components/ExerciseCard'
 import GenerationPanel from '../components/GenerationPanel'
 import Layout from '../components/Layout'
 import Pagination from '../components/Pagination'
+import ReviewSession from '../components/ReviewSession'
 import { useAuth } from '../context/AuthContext'
 
 const emptyOptions = { subjects: [], levels: [] }
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   const { expireSession } = useAuth()
   const listHeading = useRef(null)
   const requestId = useRef(0)
+  const reviewRequestId = useRef(0)
   const [options, setOptions] = useState(emptyOptions)
   const [optionsError, setOptionsError] = useState('')
   const [optionsLoading, setOptionsLoading] = useState(true)
@@ -43,6 +45,10 @@ export default function DashboardPage() {
   const [listAttempt, setListAttempt] = useState(0)
   const [actionStatus, setActionStatus] = useState('')
   const [pendingPreferences, setPendingPreferences] = useState({})
+  const [reviewItems, setReviewItems] = useState(null)
+  const [startingReview, setStartingReview] = useState(null)
+  const [emptyReview, setEmptyReview] = useState(null)
+  const [reviewError, setReviewError] = useState('')
   const current = list?.filters === filters ? list : null
   const result = current?.result
   const loading = !current || current.attempt !== listAttempt
@@ -97,8 +103,37 @@ export default function DashboardPage() {
   }
 
   const changeFilters = (values) => {
+    reviewRequestId.current += 1
+    setStartingReview(null)
+    setEmptyReview(null)
+    setReviewError('')
     setActionStatus('')
     setFilters((previous) => ({ ...previous, ...firstPage, ...values }))
+  }
+
+  const startReview = async (mode) => {
+    if (startingReview) return
+    const id = ++reviewRequestId.current
+    setStartingReview(mode)
+    setEmptyReview(null)
+    setReviewError('')
+    try {
+      const { items } = await api.reviewSample({ mode, subject: filters.subject, level: filters.level })
+      if (id !== reviewRequestId.current) return
+      if (items.length) setReviewItems(items)
+      else setEmptyReview(mode)
+    } catch (error) {
+      if (id !== reviewRequestId.current) return
+      if (error.status === 401) expireSession()
+      else setReviewError('연습 문제를 불러오지 못했어요. 다시 시도해 주세요.')
+    } finally {
+      if (id === reviewRequestId.current) setStartingReview(null)
+    }
+  }
+
+  const returnFromReview = () => {
+    setReviewItems(null)
+    requestAnimationFrame(() => listHeading.current?.focus())
   }
 
   const movePage = (cursor) => {
@@ -133,6 +168,10 @@ export default function DashboardPage() {
     })
     setActionStatus(enabled ? preference.added : preference.removed)
     refreshList()
+  }
+
+  if (reviewItems) {
+    return <Layout><ReviewSession initialItems={reviewItems} onReturn={returnFromReview} /></Layout>
   }
 
   return (
@@ -191,6 +230,35 @@ export default function DashboardPage() {
               changeFilters({ subject: '', level: '' })
             }}>필터 초기화</button>}
           </div>
+          {filters.view === 'selected' && (
+            <div className="review-start">
+              <div className="card-actions">
+                <button className="button button--primary" type="button" disabled={Boolean(startingReview)}
+                  onClick={() => startReview('random')}>랜덤으로 3문제 풀기</button>
+                <button className="button button--secondary" type="button" disabled={Boolean(startingReview)}
+                  onClick={() => startReview('marked')}>다시 풀 문제 연습</button>
+              </div>
+              <p className="field-help">새로고침하거나 페이지를 떠나면 이번 연습과 답변이 사라질 수 있어요.</p>
+              {startingReview && <p role="status">연습 문제를 고르는 중이에요.</p>}
+              {reviewError && <p className="notice notice--error" role="alert">{reviewError}</p>}
+              {emptyReview && (
+                <div className="empty-state">
+                  <p role="status">{emptyReview === 'marked' ? '현재 조건에서 다시 풀기로 표시한 문제가 없어요. 위의 랜덤 연습을 시작할 수 있어요.'
+                    : '현재 조건에서 연습할 수 있는 저장 문제가 없어요.'}</p>
+                  <div className="card-actions">
+                    {isFiltered && <button className="button button--secondary" type="button" onClick={() => {
+                      listHeading.current?.focus()
+                      changeFilters({ subject: '', level: '' })
+                    }}>필터 초기화</button>}
+                    <button className="button button--secondary" type="button" onClick={() => {
+                      listHeading.current?.focus()
+                      changeFilters({ view: 'all' })
+                    }}>전체 문제 보기</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {optionsError && (
             <div className="notice notice--error">
               <p role="alert">{optionsError}</p>

@@ -24,7 +24,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ApiError> handleResponseStatus(ResponseStatusException exception) {
         String message = exception.getReason() == null ? "요청을 처리하지 못했습니다." : exception.getReason();
-        return ResponseEntity.status(exception.getStatusCode())
+        return ResponseEntity.status(exception.getStatusCode()).headers(exception.getHeaders())
                 .body(ApiError.of(message, exception.getStatusCode().value()));
     }
 
