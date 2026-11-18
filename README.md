@@ -139,7 +139,7 @@ GitHub 저장소 Variables의 `DCBA_EC2_INSTANCE_ID`와 `DCBA_EC2_ROLE_ARN`에 �
 
 AI 피드백은 기본으로 꺼져 있습니다. 활성화하려면 서버의 `REVIEW_FEEDBACK_ENABLED=true`와 공유 내부 키 `LLM_API_KEY`를 Java와 LLM 컨테이너에 적용하고, 기존 NVIDIA 생성 설정이 있는 LLM 워커를 실행해야 합니다. `REVIEW_LLM_BASE_URL` 기본값은 `http://llm-server:8000`입니다. 랜덤 복습과 다시 풀기 표시는 LLM 워커 없이도 사용할 수 있습니다.
 
-운영 문제의 기준은 실제 질문·해설을 검수하고 확인한 문제 ID에만 등록합니다. 마이그레이션은 개발 표본을 운영 DB에 삽입하지 않습니다. 개발 기준 9문제와 사람이 분류한 표본 답변은 `LLM-Server/tests/fixtures/review_feedback.json`에 있습니다. AI를 켜기 전 해당 표본으로 다음 검수를 실행해 기준별 일치율 85% 이상과 핵심 오류 오판 부재를 확인합니다.
+운영 문제의 기준은 실제 질문·해설을 검수하고 확인한 문제 ID에만 등록합니다. 마이그레이션은 개발 표본을 운영 DB에 삽입하지 않습니다. 개발 기준 9문제와 표본 답변의 기대 판정은 `LLM-Server/tests/fixtures/review_feedback.json`에 있습니다. AI를 켜기 전 검수자가 표본의 기대 판정을 확인한 뒤 다음 검수를 실행해 기준별 일치율 85% 이상과 핵심 오류 오판 부재를 확인합니다.
 
 ```bash
 cd LLM-Server
