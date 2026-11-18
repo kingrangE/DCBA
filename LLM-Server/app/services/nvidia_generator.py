@@ -23,12 +23,15 @@ class NvidiaGenerator:
         self._client.close()
 
     def generate(self, messages: list[dict[str, str]]) -> str:
+        is_nemotron_ultra = self.model == "nvidia/nemotron-3-ultra-550b-a55b"
         response = self._client.chat.completions.create(
             model=self.model,
             messages=messages,
-            max_tokens=512,
+            max_tokens=1024 if is_nemotron_ultra else 512,
             temperature=0.2,
             top_p=0.9,
+            # Nemotron Ultra's default reasoning can exhaust the budget before emitting an answer.
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}} if is_nemotron_ultra else None,
         )
         if not isinstance(response, ChatCompletion) or not getattr(response, "choices", None):
             return ""
