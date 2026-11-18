@@ -116,13 +116,17 @@ input[aria-invalid='true'] { border-color: var(--error); }
 .exercise-card { display: grid; gap: .875rem; min-width: 0; padding: clamp(.875rem, 2.5vw, 1.25rem); border: 1px solid var(--line); border-radius: var(--radius); }
 .card-meta { display: flex; flex-wrap: wrap; gap: .375rem .625rem; color: var(--muted); font-size: .875rem; font-weight: 650; }
 .card-meta span:first-child { color: var(--accent); }
-.exercise-card h3, .answer-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+.exercise-card h3, .answer-copy p { white-space: pre-wrap; }
+.exercise-card h3, .answer-copy { overflow-wrap: anywhere; }
 .exercise-card h3 { font-size: 1.125rem; line-height: 1.55; }
 .card-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .card-actions .button { padding-inline: .75rem; font-size: .875rem; }
 .answer-panel { padding: .875rem; border-radius: var(--radius); background: var(--paper); }
 .answer-panel[hidden] { display: none; }
-.answer-copy { margin-top: .375rem; color: var(--muted); }
+.answer-copy { display: grid; gap: .5rem; margin-top: .375rem; color: var(--muted); }
+.answer-copy h5 { margin: .375rem 0 0; color: var(--ink); font-size: 1rem; }
+.answer-copy ul, .answer-copy ol { margin: 0; padding-inline-start: 1.5rem; }
+.answer-copy li + li { margin-top: .25rem; }
 .empty-state { display: grid; justify-items: start; gap: .5rem; padding: 1.25rem; border-radius: var(--radius); color: var(--muted); background: var(--paper); }
 .empty-state strong { color: var(--ink); }
 .pagination { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin-top: 1rem; }

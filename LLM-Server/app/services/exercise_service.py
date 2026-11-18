@@ -1,10 +1,20 @@
+import json
 import os
-import re
 from dotenv import load_dotenv
 from app.services.nvidia_generator import NvidiaGenerator
-from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
+from app.models.exercise import ExerciseRequest, GeneratedExercise, SUBJECT_LABELS, LEVEL_LABELS
 
 load_dotenv()
+
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate JSON key")
+        result[key] = value
+    return result
+
 
 # 운동 관련 서비스
 class ExerciseService:
@@ -27,16 +37,12 @@ class ExerciseService:
             return ""
 
     
-    # 파싱 전용 함수 
-    def parse_content(self, content: str) -> dict:
-        if not content:
-            return {"question": "", "answer": ""}
-
-        match = re.fullmatch(r"Q:[ \t]*(.*?)\r?\n[ \t]*A:[ \t]*(.*)", content.strip(), re.DOTALL)
-        if not match:
-            return {"question": "", "answer": ""}
-        question, answer = (part.strip() for part in match.groups())
-        return {"question": question, "answer": answer} if question and answer else {"question": "", "answer": ""}
+    def parse_content(self, content: str) -> GeneratedExercise | None:
+        try:
+            value = json.loads(content, object_pairs_hook=unique_object)
+            return GeneratedExercise.model_validate(value)
+        except (ValueError, RecursionError):
+            return None
 
     def generate_and_save(self, subject: str, level: str, task_id=None):
         from app.repositories.exercise_repository import exercise_repository
@@ -52,10 +58,9 @@ class ExerciseService:
                     return saved
             if deduplication is not None:
                 deduplication.synchronize(exercise_repository, connection)
-            content, embedding = self.generate_exercise(request.subject.value, request.level.value)
-            parsed = self.parse_content(content)
+            question, answer, embedding = self.generate_exercise(request.subject.value, request.level.value)
             saved = exercise_repository.save_exercise(
-                request.subject.value, request.level.value, parsed["question"], parsed["answer"],
+                request.subject.value, request.level.value, question, answer,
                 task_id=task_id, connection=connection,
             )
             if deduplication is not None:
@@ -80,17 +85,19 @@ class ExerciseService:
                 {"role": "user", "content": formatted_prompt},
             ])
             parsed = self.parse_content(content)
-            if not parsed["question"] or not parsed["answer"]:
+            if parsed is None:
                 continue
+            concepts = "\n".join(f"- **{item.term}** — {item.explanation}" for item in parsed.concepts)
+            answer = f"{parsed.answer}\n\n##### 이 문제를 풀기 위해 알아야 할 개념\n\n{concepts}"
             embedding = None
             if deduplication is not None:
                 duplicate, embedding = deduplication.check_duplicate(
                     request.subject.value, request.level.value,
-                    f"Q: {parsed['question']}\nA: {parsed['answer']}",
+                    f"Q: {parsed.question}\nA: {answer}",
                 )
                 if duplicate:
                     continue
-            return content, embedding
+            return parsed.question, answer, embedding
         raise ValueError("Failed to generate valid, unique content after multiple attempts")
 
 
