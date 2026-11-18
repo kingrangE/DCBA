@@ -1,7 +1,7 @@
 import json
 import pytest
 from unittest.mock import MagicMock
-from app.services.automation_service import automation_service, RedisQueue
+from app.services.automation_service import AutomationService, automation_service, RedisQueue
 
 
 def test_enqueue_is_bounded_and_gives_each_task_an_identity():
@@ -9,7 +9,7 @@ def test_enqueue_is_bounded_and_gives_each_task_an_identity():
     queue.redis_client.hincrby.return_value = 1
     queue.redis_client.eval.return_value = "1-0"
     queue.enqueue({"subject": "ALGORITHM", "level": "EASY"})
-    payload = json.loads(queue.redis_client.eval.call_args.args[-1])
+    payload = json.loads(queue.redis_client.eval.call_args.args[-2])
     assert payload["subject"] == "ALGORITHM" and payload["task_id"]
     queue.redis_client.eval.return_value = None
     with pytest.raises(RuntimeError, match="full"):
@@ -43,7 +43,26 @@ def test_produce_job(mocker):
     mocker.patch("random.choice", side_effect=["ALGORITHM", "EASY"])
     enqueue = mocker.patch.object(automation_service.queue, "enqueue")
     automation_service._produce_job()
-    enqueue.assert_called_once_with({"subject": "ALGORITHM", "level": "EASY"})
+    enqueue.assert_called_once_with({"subject": "ALGORITHM", "level": "EASY"}, only_when_idle=True)
+
+
+def test_automatic_generation_does_not_enqueue_while_work_is_pending():
+    queue = RedisQueue()
+    queue.redis_client.eval.return_value = -1
+    accepted = queue.enqueue({"subject": "ALGORITHM", "level": "EASY"}, only_when_idle=True)
+    assert accepted is False
+    assert queue.redis_client.eval.call_args.args[-1] == "1"
+
+
+def test_automatic_generation_uses_configured_interval(monkeypatch, mocker):
+    monkeypatch.setenv("AUTO_GENERATION_ENABLED", "true")
+    monkeypatch.setenv("AUTO_GENERATION_INTERVAL_SECONDS", "600")
+    service = AutomationService()
+    scheduler = mocker.patch.object(service, "scheduler")
+    scheduler.running = False
+    service.start_producer()
+    scheduler.add_job.assert_called_once_with(service._produce_job, "interval", seconds=600)
+    scheduler.start.assert_called_once()
 
 
 def test_on_demand_mode_does_not_schedule_automatic_generation(mocker):

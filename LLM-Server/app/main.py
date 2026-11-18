@@ -60,7 +60,8 @@ async def readiness():
     consumer = getattr(app.state, "consumer_task", None)
     consumer_running = consumer is not None and not consumer.done() and automation_service.is_running
     last_success = automation_service.last_success_at
-    recent_success = last_success is not None and time.time() - last_success < 3600
+    success_window = max(3600, automation_service.generation_interval_seconds * 2)
+    recent_success = last_success is not None and time.time() - last_success < success_window
     available_for_requests = recent_success or not automation_service.auto_generation_enabled
     ready = (consumer_running and available_for_requests and redis_available and database is True
              and depth <= 20 and automation_service.consecutive_failures == 0
@@ -68,6 +69,8 @@ async def readiness():
     GENERATION_READY.set(int(ready))
     return JSONResponse(status_code=200 if ready else 503, content={
         "status": "ready" if ready else "degraded",
+        "auto_generation_enabled": automation_service.auto_generation_enabled,
+        "auto_generation_interval_seconds": automation_service.generation_interval_seconds,
         "consumer_running": consumer_running,
         "database_available": database is True,
         "redis_available": redis_available,
