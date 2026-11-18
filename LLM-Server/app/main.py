@@ -4,13 +4,14 @@ from prometheus_client import Gauge
 import time
 from app.routers import exercise
 from app.services.automation_service import automation_service
+from app.services.exercise_service import exercise_service
 from contextlib import asynccontextmanager, suppress
 from prometheus_fastapi_instrumentator import Instrumentator
 import asyncio
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 시작 시 실행
+    exercise_service.client.configure()
     automation_service.start_producer()
     consumer = asyncio.create_task(automation_service.start_consumer())
     app.state.consumer_task = consumer
@@ -26,6 +27,8 @@ async def lifespan(app: FastAPI):
             await asyncio.wait_for(consumer, timeout=10)
         except asyncio.TimeoutError:
             pass
+        finally:
+            exercise_service.client.close()
 
 app = FastAPI(lifespan=lifespan)
 Instrumentator().instrument(app).expose(app)

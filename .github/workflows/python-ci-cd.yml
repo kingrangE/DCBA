@@ -52,11 +52,10 @@ jobs:
           enable-cache: true
           cache-dependency-glob: 'LLM-Server/requirements*.txt'
       - name: Install Packages
-        run: uv pip install --system --torch-backend cpu -r requirements-test.txt
+        run: uv pip install --system -r requirements-test.txt
       - name: Execute Test
-        env: #환경 변수 에러 방지용 빈 값 (사용하지 않을 것이기에 값이 필요 없음)
-          OPENAI_API_KEY: "key"
-          KANANA_MODEL_NAME: "kakaocorp/kanana-2-3b-instruct"
+        env:
+          OPENAI_API_KEY: "test-embedding-key"
           DEDUPLICATION_ENABLED: "false"
           CHROMA_PERSIST_DIRECTORY: ${{ runner.temp }}/chroma-ci
         run: python -m pytest tests

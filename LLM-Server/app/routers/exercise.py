@@ -3,6 +3,7 @@ import secrets
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from openai import APIError
 from app.models.exercise import ExerciseRequest
 from app.services.exercise_service import exercise_service
 
@@ -26,6 +27,8 @@ router = APIRouter(
 def generate_exercise(request: ExerciseRequest):
     try:
         return exercise_service.generate_and_save(request.subject.value, request.level.value)
-    except Exception:
-        logger.exception("Exercise generation failed: subject=%s level=%s", request.subject.value, request.level.value)
+    except Exception as error:
+        message = "Exercise generation failed: subject=%s level=%s error=%s"
+        logger.error(message, request.subject.value, request.level.value, type(error).__name__,
+                     exc_info=not isinstance(error, APIError))
         raise HTTPException(status_code=503, detail="Generation is temporarily unavailable") from None

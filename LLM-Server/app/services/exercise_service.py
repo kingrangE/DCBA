@@ -1,7 +1,7 @@
 import os
 import re
 from dotenv import load_dotenv
-from app.services.kanana_generator import KananaGenerator
+from app.services.nvidia_generator import NvidiaGenerator
 from app.models.exercise import ExerciseRequest, SUBJECT_LABELS, LEVEL_LABELS
 
 load_dotenv()
@@ -9,11 +9,7 @@ load_dotenv()
 # 운동 관련 서비스
 class ExerciseService:
     def __init__(self):
-        # Kanana 모델은 첫 생성 요청에서 지연 로딩한다.
-        self.model_name = os.getenv(
-            "KANANA_MODEL_NAME", "kakaocorp/kanana-2-3b-instruct"
-        )
-        self.client = KananaGenerator(model_name=self.model_name)
+        self.client = NvidiaGenerator()
         self.deduplication_enabled = os.getenv(
             "DEDUPLICATION_ENABLED", "false"
         ).lower() in {"1", "true", "yes", "on"}
@@ -78,7 +74,7 @@ class ExerciseService:
             from app.services.deduplication_service import deduplication_service
             deduplication = deduplication_service
         for attempt in range(10):
-            # Model loading, configuration and index failures need operator action, not repeated generation.
+            # Retry unusable content here. The queue handles API and storage failures.
             content = self.client.generate(messages=[
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": formatted_prompt},
@@ -95,7 +91,7 @@ class ExerciseService:
                 if duplicate:
                     continue
             return content, embedding
-        raise RuntimeError("Failed to generate unique content after multiple retries.")
+        raise ValueError("Failed to generate valid, unique content after multiple attempts")
 
 
 exercise_service = ExerciseService()

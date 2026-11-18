@@ -3,6 +3,8 @@ from app.models.exercise import Exercise
 import pytest
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
+import httpx
+from openai import APIStatusError
 
 def test_generation_failure_logs_cause_without_exposing_it_to_client(client, mocker, caplog):
     failure = RuntimeError("private storage detail")
@@ -16,6 +18,19 @@ def test_generation_failure_logs_cause_without_exposing_it_to_client(client, moc
     assert "subject=ALGORITHM level=EASY" in record.getMessage()
     assert "private storage detail" not in response.text
     assert "test-generation-key" not in caplog.text
+
+
+def test_generation_failure_excludes_provider_response_from_logs(client, mocker, caplog):
+    request = httpx.Request("POST", "https://nim.example/v1/chat/completions")
+    response = httpx.Response(401, request=request)
+    failure = APIStatusError("private provider response", response=response, body=None)
+    mocker.patch("app.routers.exercise.exercise_service.generate_and_save", side_effect=failure)
+
+    result = client.post("/exercise/generate", json={"subject": "ALGORITHM", "level": "EASY"})
+
+    assert result.status_code == 503
+    assert "APIStatusError" in caplog.text
+    assert "private provider response" not in caplog.text
 
 def test_health_responds_while_generation_waits(client, mocker):
     started, release = Event(), Event()

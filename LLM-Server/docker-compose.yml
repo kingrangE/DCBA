@@ -25,7 +25,6 @@ services:
 volumes:
   redis_data:
   mariadb_data:
-  huggingface_cache:
   chroma_data:
 networks:
   dcba-network:

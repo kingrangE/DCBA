@@ -6,7 +6,7 @@ import random
 import uuid
 import time
 from prometheus_client import Counter
-from openai import APIStatusError
+from openai import APIError, APIStatusError
 
 TASK_RESULTS = Counter("dcba_generation_tasks_total", "Generation task outcomes", ["result"])
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -195,7 +195,8 @@ class AutomationService:
                         await loop.run_in_executor(None, self.queue.failed, task, e)
                         self.consecutive_failures += 1
                         TASK_RESULTS.labels("failure").inc()
-                        print(f"[Consumer] Failed generation: {e}")
+                        detail = type(e).__name__ if isinstance(e, APIError) else str(e)
+                        print(f"[Consumer] Failed generation: {detail}")
                 
                 await asyncio.sleep(0.1) 
                 
