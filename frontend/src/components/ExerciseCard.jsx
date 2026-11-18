@@ -1,42 +1,53 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
-export default function ExerciseCard({ exercise, onSave, onBan, busy }) {
+export default function ExerciseCard({ exercise, pending, onChangePreference }) {
+  const answerId = useId()
   const [showAnswer, setShowAnswer] = useState(false)
+  const [actionError, setActionError] = useState('')
+
+  const changePreference = async (key, event) => {
+    if (pending) return
+    setActionError('')
+    try {
+      await onChangePreference(exercise, key, event.currentTarget)
+    } catch {
+      setActionError(key === 'saved' ? '저장 상태를 바꾸지 못했어요. 다시 시도해 주세요.' : '차단 상태를 바꾸지 못했어요. 다시 시도해 주세요.')
+    }
+  }
 
   return (
     <article className={`exercise-card ${showAnswer ? 'exercise-card--answer' : ''}`}>
       <div className="card-meta">
         <span>{exercise.subjectName}</span>
-        <span>LEVEL {exercise.levelNumber}</span>
+        <span>난이도 {exercise.levelNumber}</span>
       </div>
-      <span className="card-number">Q{String(exercise.id).padStart(3, '0')}</span>
-      <h3>{showAnswer ? '해설' : exercise.question}</h3>
-      {showAnswer && <p className="answer-copy">{exercise.answer}</p>}
+      <h3>{exercise.question}</h3>
       <div className="card-actions">
-        <button className="button button--dark" type="button" onClick={() => setShowAnswer((value) => !value)}>
-          {showAnswer ? '문제로 돌아가기' : '정답 확인'}
+        <button className="button button--dark" type="button" aria-expanded={showAnswer} aria-controls={answerId} onClick={() => setShowAnswer((value) => !value)}>
+          {showAnswer ? '해설 접기' : '해설 보기'}
         </button>
         <button
-          className={`icon-button ${exercise.saved ? 'is-active' : ''}`}
+          className={`button button--secondary ${exercise.saved ? 'is-active' : ''}`}
           type="button"
-          disabled={busy}
-          onClick={() => onSave(exercise)}
-          aria-label={exercise.saved ? '저장 취소' : '문제 저장'}
-          title={exercise.saved ? '저장 취소' : '문제 저장'}
+          aria-disabled={Boolean(pending)}
+          onClick={(event) => changePreference('saved', event)}
         >
-          {exercise.saved ? '★' : '☆'}
+          {pending === 'saved' ? '처리 중…' : exercise.saved ? '저장 취소' : '저장'}
         </button>
         <button
-          className={`icon-button icon-button--ban ${exercise.banned ? 'is-active' : ''}`}
+          className={`button button--secondary ${exercise.banned ? 'is-active' : ''}`}
           type="button"
-          disabled={busy}
-          onClick={() => onBan(exercise)}
-          aria-label={exercise.banned ? '차단 취소' : '문제 차단'}
-          title={exercise.banned ? '차단 취소' : '문제 차단'}
+          aria-disabled={Boolean(pending)}
+          onClick={(event) => changePreference('banned', event)}
         >
-          {exercise.banned ? '↺' : '×'}
+          {pending === 'banned' ? '처리 중…' : exercise.banned ? '차단 해제' : '차단'}
         </button>
       </div>
+      <div className="answer-panel" id={answerId} hidden={!showAnswer}>
+        <h4>해설</h4>
+        <p className="answer-copy">{exercise.answer}</p>
+      </div>
+      {actionError && <p className="form-status form-status--error" role="alert">{actionError}</p>}
     </article>
   )
 }
