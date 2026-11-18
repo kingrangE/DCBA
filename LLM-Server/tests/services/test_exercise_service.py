@@ -5,15 +5,16 @@ import pytest
 from app.services.exercise_service import exercise_service
 
 
+QUESTION = "새 버전을 배포한 뒤 주문 API가 느려졌습니다.\n\n- **관측값** — 타임아웃이 늘었습니다.\n\n### 어디부터 조사하겠습니까?"
 ANSWER = '##### 핵심 원리\n\n- **워커**가 "작업"을 실행합니다.\n- 경로는 \\로 시작합니다.'
 CONCEPT = {"term": "워커", "explanation": "작업을 실행하는 스레드입니다."}
-OUTPUT = json.dumps({"question": "질문", "answer": ANSWER, "concepts": [CONCEPT]})
+OUTPUT = json.dumps({"question": QUESTION, "answer": ANSWER, "concepts": [CONCEPT]})
 FORMATTED_ANSWER = f"{ANSWER}\n\n##### 이 문제를 풀기 위해 알아야 할 개념\n\n- **워커** — 작업을 실행하는 스레드입니다."
 
 
 def test_parser_preserves_markdown_and_escaped_characters():
     parsed = exercise_service.parse_content(OUTPUT)
-    assert parsed.question == "질문"
+    assert parsed.question == QUESTION
     assert parsed.answer == ANSWER
     assert parsed.concepts[0].model_dump() == CONCEPT
 
@@ -50,14 +51,14 @@ def test_invalid_json_is_retried_before_saving_valid_markdown(mocker):
     exercise_service.generate_and_save("OPERATING_SYSTEM", "EASY")
     assert generator.call_count == 2
     repository.save_exercise.assert_called_once()
-    assert repository.save_exercise.call_args.args == ("OPERATING_SYSTEM", "EASY", "질문", FORMATTED_ANSWER)
+    assert repository.save_exercise.call_args.args == ("OPERATING_SYSTEM", "EASY", QUESTION, FORMATTED_ANSWER)
 
 
 def test_disabled_dedup_does_not_access_embedding_service(mocker):
     mocker.patch.object(exercise_service, "deduplication_enabled", False)
     generator = mocker.patch.object(exercise_service.client, "generate", return_value=OUTPUT)
     dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
-    assert exercise_service.generate_exercise("ALGORITHM", "EASY") == ("질문", FORMATTED_ANSWER, None)
+    assert exercise_service.generate_exercise("ALGORITHM", "EASY") == (QUESTION, FORMATTED_ANSWER, None)
     generator.assert_called_once()
     dedup.check_duplicate.assert_not_called()
 

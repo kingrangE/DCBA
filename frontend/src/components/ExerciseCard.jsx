@@ -1,6 +1,18 @@
 import { useId, useState } from 'react'
 import Markdown from 'react-markdown'
 
+function ExerciseMarkdown({ children }) {
+  return (
+    <Markdown
+      skipHtml
+      unwrapDisallowed
+      allowedElements={['h3', 'h5', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code']}
+    >
+      {children}
+    </Markdown>
+  )
+}
+
 export default function ExerciseCard({ exercise, pending, onChangePreference }) {
   const answerId = useId()
   const [showAnswer, setShowAnswer] = useState(false)
@@ -22,7 +34,11 @@ export default function ExerciseCard({ exercise, pending, onChangePreference }) 
         <span>{exercise.subjectName}</span>
         <span>난이도 {exercise.levelNumber}</span>
       </div>
-      <h3>{exercise.question}</h3>
+      <div className="exercise-markdown question-copy">
+        {exercise.question.includes('\n')
+          ? <ExerciseMarkdown>{exercise.question}</ExerciseMarkdown>
+          : <h3>{exercise.question}</h3>}
+      </div>
       <div className="card-actions">
         <button className="button button--primary" type="button" aria-expanded={showAnswer} aria-controls={answerId} onClick={() => setShowAnswer((value) => !value)}>
           {showAnswer ? '해설 접기' : '해설 보기'}
@@ -47,14 +63,8 @@ export default function ExerciseCard({ exercise, pending, onChangePreference }) 
       <div className="answer-panel" id={answerId} hidden={!showAnswer}>
         <h4>해설</h4>
         {showAnswer && (
-          <div className="answer-copy">
-            <Markdown
-              skipHtml
-              unwrapDisallowed
-              allowedElements={['h5', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code']}
-            >
-              {exercise.answer}
-            </Markdown>
+          <div className="exercise-markdown answer-copy">
+            <ExerciseMarkdown>{exercise.answer}</ExerciseMarkdown>
           </div>
         )}
       </div>
