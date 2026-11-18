@@ -6,7 +6,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function request(path, options = {}) {
+export async function request(path, options = {}, readResponse = (response) => response.json()) {
   const headers = { ...options.headers }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
 
@@ -30,7 +30,7 @@ export async function request(path, options = {}) {
   }
 
   if (response.status === 204) return null
-  return response.json()
+  return readResponse(response)
 }
 
 export const api = {
@@ -42,7 +42,10 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify({ slackId }),
   }),
-  options: () => request('/api/exercises/options'),
+  options: () => request('/api/exercises/options', {}, async (response) => ({
+    ...await response.json(),
+    generationEnabled: response.headers.get('X-DCBA-Generation-Enabled') !== 'false',
+  })),
   exercises: ({ view, subject, level, before, after }) => {
     const params = new URLSearchParams({ view })
     if (before) params.set('before', String(before))
