@@ -1,0 +1,16 @@
+services:
+  frontend:
+    image: kingrange/dcba-frontend:${DCBA_RELEASE:?Set DCBA_RELEASE to a commit SHA}
+    ports: !override
+      - "127.0.0.1:8080:80"
+  dcba-app:
+    image: kingrange/dcba-java-app:${DCBA_RELEASE:?Set DCBA_RELEASE to a commit SHA}
+    ports: !reset []
+  schema-migrate:
+    image: kingrange/dcba-llm-server:migration-${DCBA_RELEASE:?Set DCBA_RELEASE to a commit SHA}
+  llm-server:
+    image: kingrange/dcba-llm-server:${DCBA_RELEASE:?Set DCBA_RELEASE to a commit SHA}
+    environment:
+      AUTO_GENERATION_ENABLED: ${AUTO_GENERATION_ENABLED:-false}
+  mariadb:
+    ports: !reset []
