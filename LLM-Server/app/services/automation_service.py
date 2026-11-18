@@ -118,6 +118,7 @@ class RedisQueue:
 class AutomationService:
     # 자동으로 30초마다 추가하는 시스템
     def __init__(self):
+        self.auto_generation_enabled = os.getenv("AUTO_GENERATION_ENABLED", "true").lower() == "true"
         # Redis 관련 정보
         redis_host = os.getenv("REDIS_HOST", "localhost")
         redis_port = int(os.getenv("REDIS_PORT", 6379))
@@ -138,7 +139,7 @@ class AutomationService:
 
     def start_producer(self):
         # 아직 안돌아가고 있으면 scheduler에 잡 넣고 시작
-        if not self.scheduler.running:
+        if self.auto_generation_enabled and not self.scheduler.running:
             self.scheduler.add_job(self._produce_job, 'interval', seconds=60)
             self.scheduler.start()
             print("[Start] Producer Scheduler started.")

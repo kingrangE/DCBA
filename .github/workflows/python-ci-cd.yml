@@ -1,8 +1,9 @@
 name: Python CI/CD
 
 on:
+  workflow_call:
   push:
-    branches: ["main", "LLM-Server"]
+    branches: ["LLM-Server"]
     paths:
       - "LLM-Server/**"
       - ".github/workflows/python-ci-cd.yml"
@@ -15,7 +16,7 @@ on:
       - "!LLM-Server/**/*.md"
 
 concurrency:
-  group: ${{github.workflow}}-${{github.ref}}
+  group: python-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -62,11 +63,14 @@ jobs:
 
   python-cd:
     needs: [lint, python-ci]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # main에 push일 때만 CD 수행
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to Docker Hub
@@ -88,11 +92,21 @@ jobs:
         with:
           context: ./LLM-Server
           file: ./LLM-Server/Dockerfile
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=python
           cache-to: type=gha,mode=max,scope=python
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:${{ env.VERSION }}
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:${{ env.MINOR }}
             ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:${{ env.MAJOR }}
+      - name: Publish schema migration image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./LLM-Server
+          target: migration
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/dcba-llm-server:migration-${{ github.sha }}

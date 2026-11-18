@@ -46,6 +46,14 @@ def test_produce_job(mocker):
     enqueue.assert_called_once_with({"subject": "ALGORITHM", "level": "EASY"})
 
 
+def test_on_demand_mode_does_not_schedule_automatic_generation(mocker):
+    mocker.patch.object(automation_service, "auto_generation_enabled", False)
+    scheduler = mocker.patch.object(automation_service, "scheduler")
+    automation_service.start_producer()
+    scheduler.add_job.assert_not_called()
+    scheduler.start.assert_not_called()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("fails", [False, True])
 async def test_consumer_acknowledges_only_committed_tasks(mocker, fails):

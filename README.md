@@ -119,4 +119,12 @@ LLM의 `/health`는 프로세스 생존, `/ready`는 실제 생성 성공·큐·
 기존 목록 큐의 작업은 원자적으로 Stream으로 이전합니다. DB 저장과 작업 완료 기록은 같은 트랜잭션으로 반영되어 재처리 시 중복 저장을 방지합니다. 중복 검사 인덱스는 DB의 확정된 문제를 기준으로 복구합니다. 로컬 벡터 저장소는 단일 생성 서버를 전제로 하며 여러 생성 서버를 운영하려면 공용 벡터 서버가 필요합니다. 인증 요청 제한은 프록시가 전달한 임의 주소를 신뢰하지 않으므로 기본 nginx 배포에서는 같은 프록시를 경유한 요청이 제한 예산을 공유합니다. 사용자별 제한이 필요하면 신뢰할 수 있는 진입점에서 적용해야 합니다.
 
 
-CI는 Java·Python·React를 검증하며 문서 변경에는 기존 경로 제외 규칙을 적용합니다. Java는 컴파일 캐시를 사용하며 검증한 JAR을 배포 이미지에 그대로 넣습니다. Python은 운영·테스트 의존성을 나누고 uv 캐시를 사용하며, 테스트에서는 NVIDIA 응답을 모의합니다. 배포 이미지 발행은 lint와 테스트 성공 후 main push에서만 실행되며 새 커밋이 들어와도 진행 중인 main 배포는 계속됩니다. 검토용 누적 PR에서도 CI를 실행할 수 있도록 `review/**` 기준 브랜치를 허용합니다.
+CI는 Java·Python·React를 검증하며 문서 변경에는 경로 제외 규칙을 적용합니다. Java는 컴파일 캐시를 사용하며 검증한 JAR을 배포 이미지에 그대로 넣습니다. Python은 운영·테스트 의존성을 나누고 uv 캐시를 사용하며, 테스트에서는 NVIDIA 응답을 모의합니다. 배포 이미지는 `main` 커밋의 lint와 테스트가 성공한 뒤 발행합니다. 검토용 누적 PR에서도 CI를 실행할 수 있도록 `review/**` 기준 브랜치를 허용합니다.
+
+### EC2 시험 환경 자동 배포
+
+기능 브랜치의 PR에서 테스트를 통과해 `main`에 들어간 커밋은 GitHub Actions가 AMD64·ARM64 이미지를 빌드하고, 커밋 SHA에 맞는 애플리케이션·마이그레이션 이미지를 EC2에 배포합니다. 필요하면 Actions의 **DCBA EC2 Release**에서 `main`을 선택해 수동 실행할 수 있습니다.
+
+EC2에는 SSM Agent와 역할, Git, curl, Docker Engine과 Compose 2.24.4 이상이 필요합니다. `/opt/dcba/.env`를 서버에 만들고 파일 권한을 `0600`으로 설정합니다. `MARIADB_PASSWORD`와 `MARIADB_ROOT_PASSWORD`에는 서로 다른 임의 값을 사용합니다. 문제 생성을 쓸 때는 `COMPOSE_PROFILES=llm`과 NVIDIA 환경 변수도 서버에 설정합니다. EC2에서는 기본적으로 요청 기반으로 생성하며, `AUTO_GENERATION_ENABLED=true`를 설정하면 정기 생성도 실행합니다.
+
+GitHub 저장소 Variables의 `DCBA_EC2_INSTANCE_ID`와 `DCBA_EC2_ROLE_ARN`에 시험 서버와 배포 역할을 지정합니다. AWS 배포 역할은 이 저장소의 `main`만 OIDC로 신뢰하고, 해당 인스턴스와 `AWS-RunShellScript` 문서에 `ssm:SendCommand`를 허용합니다. 결과 확인에는 `ssm:GetCommandInvocation`이 필요합니다. 웹은 EC2 내부 `127.0.0.1:8080`에 열리며, 보안 그룹 변경 없이 Session Manager 포트 포워딩으로 확인할 수 있습니다.
