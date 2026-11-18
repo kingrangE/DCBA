@@ -133,6 +133,15 @@ input[aria-invalid='true'] { border-color: var(--error); }
 .answer-panel { padding: .875rem; border-radius: var(--radius); background: var(--paper); }
 .answer-panel[hidden] { display: none; }
 .answer-copy { margin-top: .375rem; color: var(--muted); }
+.review-start { display: grid; gap: .625rem; margin: 0 0 1rem; }
+.review-content { display: grid; gap: 1rem; margin-top: 1rem; }
+.review-content form { gap: .5rem; }
+.review-content textarea { width: 100%; min-width: 0; border: 1px solid var(--control-border); border-radius: var(--radius); padding: .75rem; font: inherit; color: var(--ink); resize: vertical; }
+.review-feedback-action, .review-feedback { display: grid; gap: .75rem; justify-items: start; }
+.review-feedback-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.review-feedback ul { margin: .375rem 0 0; padding-inline-start: 1.25rem; }
+.review-feedback li + li { margin-top: .375rem; }
+.review-navigation { justify-content: space-between; }
 .empty-state { display: grid; justify-items: start; gap: .5rem; padding: 1.25rem; border-radius: var(--radius); color: var(--muted); background: var(--paper); }
 .empty-state strong { color: var(--ink); }
 .pagination { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; margin-top: 1rem; }

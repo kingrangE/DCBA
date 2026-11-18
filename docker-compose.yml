@@ -55,6 +55,7 @@ services:
       - DEDUPLICATION_ENABLED=${DEDUPLICATION_ENABLED:-false}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
+      - REVIEW_FEEDBACK_ENABLED=${REVIEW_FEEDBACK_ENABLED:-false}
       - CHROMA_PERSIST_DIRECTORY=/app/chroma_db
     volumes:
       - chroma_data:/app/chroma_db
@@ -80,6 +81,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - DCBA_ADMIN_USER_ID=${DCBA_ADMIN_USER_ID:-0}
+      - REVIEW_FEEDBACK_ENABLED=${REVIEW_FEEDBACK_ENABLED:-false}
+      - REVIEW_LLM_BASE_URL=${REVIEW_LLM_BASE_URL:-http://llm-server:8000}
+      - LLM_API_KEY=${LLM_API_KEY:-}
       - MARIADB_HOST=mariadb
       - MARIADB_PORT=3306
       - MARIADB_USER=${MARIADB_USER:-dcba}

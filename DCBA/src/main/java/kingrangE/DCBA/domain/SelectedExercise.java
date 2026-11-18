@@ -21,6 +21,10 @@ public class SelectedExercise {
     @JoinColumn(name = "exercise_id")
     private Exercise exercise;
 
+    @org.hibernate.annotations.ColumnDefault("false")
+    @Column(nullable = false)
+    private boolean reviewAgain;
+
     @Nullable // 처음엔 모범 답변을 보여줘야 하므로 NUll가능
     @Column(columnDefinition = "TEXT") // 글자수 많게 가능하도록
     private String custom_answer; // Null이면 원본 답안 보여주고, 유저가 수정했으면 수정 답안 보여주는 용도

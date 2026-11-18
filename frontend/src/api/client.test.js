@@ -48,3 +48,22 @@ it.each([
 
   await expect(api.options()).resolves.toEqual({ subjects: [], levels: [], generationEnabled })
 })
+
+it('sends review mutations with CSRF and surfaces Retry-After for feedback limits', async () => {
+  const csrf = () => new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'review-token' }))
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(csrf())
+    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    .mockResolvedValueOnce(csrf())
+    .mockResolvedValueOnce(new Response(JSON.stringify({ message: '한도에 도달했어요.' }), {
+      status: 429, headers: { 'Retry-After': '120' },
+    })))
+  await expect(api.markReview(42, true)).resolves.toBeNull()
+  await expect(api.reviewFeedback(42, '답변')).rejects.toMatchObject({ status: 429, retryAfter: '120' })
+  expect(fetch).toHaveBeenNthCalledWith(2, '/api/exercises/42/review-again', expect.objectContaining({
+    method: 'PUT', body: '{"enabled":true}', headers: expect.objectContaining({ 'X-CSRF-TOKEN': 'review-token' }),
+  }))
+  expect(fetch).toHaveBeenNthCalledWith(4, '/api/exercises/42/review-feedback', expect.objectContaining({
+    method: 'POST', body: '{"answer":"답변"}', headers: expect.objectContaining({ 'X-CSRF-TOKEN': 'review-token' }),
+  }))
+})

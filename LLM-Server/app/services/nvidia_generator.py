@@ -22,9 +22,10 @@ class NvidiaGenerator:
     def close(self) -> None:
         self._client.close()
 
-    def generate(self, messages: list[dict[str, str]]) -> str:
+    def generate(self, messages: list[dict[str, str]], *, timeout: float | None = None) -> str:
         is_nemotron_ultra = self.model == "nvidia/nemotron-3-ultra-550b-a55b"
-        response = self._client.chat.completions.create(
+        client = self._client if timeout is None else self._client.with_options(timeout=timeout)
+        response = client.chat.completions.create(
             model=self.model,
             messages=messages,
             max_tokens=1536,

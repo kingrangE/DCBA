@@ -76,6 +76,18 @@ def migrate():
             if not cursor.fetchone():
                 cursor.execute("CREATE TABLE IF NOT EXISTS deleted_exercise (exercise_id BIGINT PRIMARY KEY) ENGINE=InnoDB")
                 cursor.execute("INSERT INTO schema_migration (version) VALUES (4)")
+            cursor.execute("SELECT version FROM schema_migration WHERE version = 5")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE selected_exercise ADD COLUMN IF NOT EXISTS review_again BOOLEAN NOT NULL DEFAULT FALSE")
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS exercise_feedback_rubric (
+                        exercise_id BIGINT PRIMARY KEY,
+                        criteria_json JSON NOT NULL,
+                        CONSTRAINT fk_feedback_rubric_exercise FOREIGN KEY (exercise_id)
+                            REFERENCES exercise(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB
+                """)
+                cursor.execute("INSERT INTO schema_migration (version) VALUES (5)")
     finally:
         connection.close()
 
