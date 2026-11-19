@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [optionsLoading, setOptionsLoading] = useState(true)
   const [optionsAttempt, setOptionsAttempt] = useState(0)
   const [filters, setFilters] = useState({ view: 'all', subject: '', level: '', q: '', ...firstPage })
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [searchTooLong, setSearchTooLong] = useState(false)
   const [list, setList] = useState(null)
@@ -57,6 +58,10 @@ export default function DashboardPage() {
   const loading = !current || current.attempt !== listAttempt
   const listError = loading ? '' : current.error
   const isFiltered = Boolean(filters.subject || filters.level)
+  const filterSummary = [
+    options.subjects.find(({ value }) => value === filters.subject)?.label,
+    options.levels.find(({ value }) => value === filters.level)?.label,
+  ].filter(Boolean).join(' · ')
   const canSearch = filters.view !== 'banned'
   const isFirstPage = !filters.before && !filters.after
   const showGenerationLink = !optionsLoading && !optionsError && options.generationEnabled !== false
@@ -268,7 +273,17 @@ export default function DashboardPage() {
               {filters.q && <p className="field-help" role="status">적용 검색어 · <strong>{filters.q}</strong></p>}
             </form>
           )}
-          <div className="filters">
+          <button
+            className="filter-toggle"
+            type="button"
+            aria-controls="exercise-filters"
+            aria-expanded={filtersExpanded}
+            onClick={() => setFiltersExpanded((expanded) => !expanded)}
+          >
+            <span>필터{filterSummary && <small>{filterSummary}</small>}</span>
+            <span className="filter-chevron" aria-hidden="true" />
+          </button>
+          <div className="filters" id="exercise-filters">
             <label>
               분야
               <select value={filters.subject} disabled={optionsLoading || Boolean(optionsError)} onChange={(event) => changeFilters({ subject: event.target.value })}>
