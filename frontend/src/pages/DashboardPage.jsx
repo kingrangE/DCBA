@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [optionsLoading, setOptionsLoading] = useState(true)
   const [optionsAttempt, setOptionsAttempt] = useState(0)
   const [filters, setFilters] = useState({ view: 'all', subject: '', level: '', ...firstPage })
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [list, setList] = useState(null)
   const [listAttempt, setListAttempt] = useState(0)
   const [actionStatus, setActionStatus] = useState('')
@@ -54,6 +55,10 @@ export default function DashboardPage() {
   const loading = !current || current.attempt !== listAttempt
   const listError = loading ? '' : current.error
   const isFiltered = Boolean(filters.subject || filters.level)
+  const filterSummary = [
+    options.subjects.find(({ value }) => value === filters.subject)?.label,
+    options.levels.find(({ value }) => value === filters.level)?.label,
+  ].filter(Boolean).join(' · ')
   const isFirstPage = !filters.before && !filters.after
   const showGenerationLink = !optionsLoading && !optionsError && options.generationEnabled !== false
 
@@ -210,7 +215,17 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
-          <div className="filters">
+          <button
+            className="filter-toggle"
+            type="button"
+            aria-controls="exercise-filters"
+            aria-expanded={filtersExpanded}
+            onClick={() => setFiltersExpanded((expanded) => !expanded)}
+          >
+            <span>필터{filterSummary && <small>{filterSummary}</small>}</span>
+            <span className="filter-chevron" aria-hidden="true" />
+          </button>
+          <div className="filters" id="exercise-filters">
             <label>
               분야
               <select value={filters.subject} disabled={optionsLoading || Boolean(optionsError)} onChange={(event) => changeFilters({ subject: event.target.value })}>

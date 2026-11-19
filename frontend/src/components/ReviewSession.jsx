@@ -165,6 +165,7 @@ export default function ReviewSession({ initialItems, onReturn }) {
           <h1 id="review-heading" ref={heading} tabIndex={-1}>{complete ? '연습 완료' : '저장한 문제 연습'}</h1>
           {!complete && <span className="muted" aria-label={`총 ${items.length}문제 중 ${position + 1}번째`}>{position + 1} / {items.length}</span>}
         </header>
+        {!complete && <progress className="review-progress" value={position + 1} max={items.length} aria-hidden="true" />}
         {complete ? (
           <div className="review-content">
             <p>진행한 문제 <strong>{position}개</strong></p>
