@@ -6,12 +6,16 @@ on:
     branches: ["JavaApp"]
     paths:
       - "DCBA/**"
+      - "LLM-Server/app/migrate.py"
+      - "LLM-Server/migrations/**"
       - ".github/workflows/java-ci-cd.yml"
       - "!DCBA/**/*.md"
   pull_request:
     branches: ["main", "review/**"]
     paths:
       - "DCBA/**"
+      - "LLM-Server/app/migrate.py"
+      - "LLM-Server/migrations/**"
       - ".github/workflows/java-ci-cd.yml"
       - "!DCBA/**/*.md"
 concurrency:
@@ -78,6 +82,30 @@ jobs:
           SPRING_JPA_HIBERNATE_DDL_AUTO: create
           REVIEW_TEST_REDIS_PORT: 6379
         run: ./gradlew test --rerun bootJar --build-cache
+      - name: Test the migrated MariaDB search index
+        env:
+          MARIADB_CONTAINER: ${{ job.services.mariadb.id }}
+          MARIADB_HOST: 127.0.0.1
+          MARIADB_USER: root
+          MARIADB_PASSWORD: '1234'
+          MARIADB_DATABASE: test_search_index
+          SPRING_DATASOURCE_URL: jdbc:mariadb://localhost:3306/test_search_index
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: '1234'
+          SEARCH_INDEX_INTEGRATION_TEST: 'true'
+        run: |
+          db() { docker exec -e MYSQL_PWD="$MARIADB_PASSWORD" "$MARIADB_CONTAINER" mariadb -uroot --default-character-set=utf8mb4 "$@"; }
+          db -e 'CREATE DATABASE test_search_index CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci'
+          python3 -m venv "$RUNNER_TEMP/dcba-migrate"
+          migrate_python="$RUNNER_TEMP/dcba-migrate/bin/python"
+          "$migrate_python" -m pip install pymysql
+          (
+            cd ../LLM-Server
+            "$migrate_python" -m app.migrate
+            db "$MARIADB_DATABASE" -e "INSERT INTO exercise (subject, level, question, answer) VALUES ('OPERATING_SYSTEM', 'MEDIUM', '교착 상태 기존 문항', '해설')"
+            "$migrate_python" -m app.migrate --search-index
+          )
+          ./gradlew test --tests '*MigratedSearchIndexTests'
       - name: Keep the tested application
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
