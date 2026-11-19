@@ -58,17 +58,15 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
             select e from Exercise e
             where (:subject is null or e.subject = :subject)
               and (:level is null or e.level = :level)
+              and (:keyword is null or locate(lower(:keyword), lower(e.question)) > 0)
               and (:before is null or e.id < :before)
               and (:after is null or e.id > :after)
               and not exists (select b.id from BannedExercise b
                               where b.user.id = :userId and b.exercise = e)
             """)
-    Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, Long before, Long after, Pageable pageable);
+    Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, String keyword,
+                                         Long before, Long after, Pageable pageable);
 
-    @Query("select e from Exercise e where (:before is null or e.id < :before) and (:after is null or e.id > :after)")
-    Slice<Exercise> findPool(Long before, Long after, Pageable pageable);
-
-    @Lock(LockModeType.PESSIMISTIC_READ)
     @Query("select e from Exercise e where e.id = :id")
     Optional<Exercise> findForPreference(Long id);
 

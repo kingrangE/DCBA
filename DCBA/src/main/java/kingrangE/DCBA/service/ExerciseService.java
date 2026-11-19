@@ -36,8 +36,9 @@ public class ExerciseService {
     public Slice<Exercise> getExercises( Long userId,
                                        @Nullable Subject subject,
                                        @Nullable Level level,
+                                       @Nullable String keyword,
                                         Long before, Long after) {
-        return exerciseRepository.findVisibleExercises(userId, subject, level, before, after, cursorPage(before, after));
+        return exerciseRepository.findVisibleExercises(userId, subject, level, keyword, before, after, cursorPage(before, after));
     }
 
     public Slice<Exercise> getExercisePool(Long before, Long after) {
@@ -138,8 +139,8 @@ public class ExerciseService {
      * @param before 이 식별자보다 오래된 문제
      * @return 저장한 문제와 다음 구간 존재 여부
      */
-    public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, Long before, Long after) {
-        return selectedExerciseRepository.findExercises(userId, subject, level, before, after, cursorPage(before, after));
+    public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, String keyword, Long before, Long after) {
+        return selectedExerciseRepository.findExercises(userId, subject, level, keyword, before, after, cursorPage(before, after));
     }
 
     /**

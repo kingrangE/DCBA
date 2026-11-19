@@ -67,3 +67,16 @@ it('sends review mutations with CSRF and surfaces Retry-After for feedback limit
     method: 'POST', body: '{"answer":"답변"}', headers: expect.objectContaining({ 'X-CSRF-TOKEN': 'review-token' }),
   }))
 })
+
+it('keeps literal keywords with filters and cursors only on searchable tabs', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{}')))
+  const q = '교착 상태 100%_\\'
+  await api.exercises({ view: 'selected', subject: 'OPERATING_SYSTEM', level: 'EASY', before: 42, q })
+  await api.exercises({ view: 'all', after: 34, q })
+  await api.exercises({ view: 'banned', q })
+  await api.exercises({ view: 'all', q: '' })
+  const params = fetch.mock.calls.map(([path]) => new URL(path, 'https://example.test').searchParams)
+  expect(Object.fromEntries(params[0])).toEqual({ view: 'selected', subject: 'OPERATING_SYSTEM', level: 'EASY', before: '42', q })
+  expect(Object.fromEntries(params[1])).toEqual({ view: 'all', after: '34', q })
+  expect(params.slice(2).every((value) => !value.has('q'))).toBe(true)
+})
