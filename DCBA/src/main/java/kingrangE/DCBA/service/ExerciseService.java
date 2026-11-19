@@ -12,6 +12,8 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.jdbc.core.ConnectionCallback;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,8 @@ public class ExerciseService {
     private final SelectedExerciseRepository selectedExerciseRepository;
     private final BannedExerciseRepository bannedExerciseRepository;
     private final UserRepository userRepository;
+    private final JdbcTemplate jdbc;
+    private volatile boolean searchIndexAvailable;
 
     /**
      * 조건에 따라 문제 Get
@@ -36,8 +40,39 @@ public class ExerciseService {
     public Slice<Exercise> getExercises( Long userId,
                                        @Nullable Subject subject,
                                        @Nullable Level level,
+                                       @Nullable String keyword,
                                         Long before, Long after) {
-        return exerciseRepository.findVisibleExercises(userId, subject, level, before, after, cursorPage(before, after));
+        Pageable page = cursorPage(before, after);
+        if (subject == null && level == null && keyword != null
+                && keyword.codePointCount(0, keyword.length()) >= 3 && hasSearchIndex()) {
+            return exerciseRepository.findIndexedExercises(userId, keyword, before, after,
+                    PageRequest.of(0, page.getPageSize(), Sort.by(after == null ? Sort.Direction.DESC : Sort.Direction.ASC, "exercise_id")));
+        }
+        return exerciseRepository.findVisibleExercises(userId, subject, level, keyword, before, after, page);
+    }
+
+    private boolean hasSearchIndex() {
+        // The detached backfill can finish while this process is serving fallback searches.
+        if (!searchIndexAvailable) {
+            boolean ready = Boolean.TRUE.equals(jdbc.execute((ConnectionCallback<Boolean>) connection -> {
+                if (!"MariaDB".equals(connection.getMetaData().getDatabaseProductName())) return false;
+                try (var tables = connection.getMetaData().getTables(
+                        connection.getCatalog(), null, "exercise_search_gram", new String[]{"TABLE"})) {
+                    if (!tables.next()) return false;
+                }
+                try (var statement = connection.createStatement();
+                     var rows = statement.executeQuery("""
+                        SELECT 1 FROM information_schema.COLUMNS c
+                        JOIN schema_migration m ON m.version = 6
+                        WHERE c.TABLE_SCHEMA = DATABASE() AND c.TABLE_NAME = 'exercise'
+                          AND c.COLUMN_NAME = 'question' AND c.COLLATION_NAME = 'utf8mb4_general_ci'
+                        """)) {
+                    return rows.next();
+                }
+            }));
+            if (ready) searchIndexAvailable = true;
+        }
+        return searchIndexAvailable;
     }
 
     public Slice<Exercise> getExercisePool(Long before, Long after) {
@@ -138,8 +173,8 @@ public class ExerciseService {
      * @param before 이 식별자보다 오래된 문제
      * @return 저장한 문제와 다음 구간 존재 여부
      */
-    public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, Long before, Long after) {
-        return selectedExerciseRepository.findExercises(userId, subject, level, before, after, cursorPage(before, after));
+    public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, String keyword, Long before, Long after) {
+        return selectedExerciseRepository.findExercises(userId, subject, level, keyword, before, after, cursorPage(before, after));
     }
 
     /**

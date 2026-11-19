@@ -30,6 +30,16 @@ services:
       - dcba-network
     restart: "no"
 
+  search-index:
+    extends:
+      service: schema-migrate
+    profiles: ["search-index"]
+    command: ["python", "-m", "app.migrate", "--search-index"]
+    depends_on:
+      schema-migrate:
+        condition: service_completed_successfully
+    restart: "on-failure:3"
+
   llm-server:
     profiles: ["llm"]
     build:

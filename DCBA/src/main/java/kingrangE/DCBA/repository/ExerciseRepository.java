@@ -58,12 +58,28 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
             select e from Exercise e
             where (:subject is null or e.subject = :subject)
               and (:level is null or e.level = :level)
+              and (:keyword is null or locate(lower(:keyword), lower(e.question)) > 0)
               and (:before is null or e.id < :before)
               and (:after is null or e.id > :after)
               and not exists (select b.id from BannedExercise b
                               where b.user.id = :userId and b.exercise = e)
             """)
-    Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, Long before, Long after, Pageable pageable);
+    Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, String keyword,
+                                         Long before, Long after, Pageable pageable);
+
+    // shortcut: shared head and tail grams still load candidates, probe an interior gram if those terms dominate latency.
+    @Query(value = """
+            SELECT e.* FROM exercise_search_gram g
+            STRAIGHT_JOIN exercise_search_gram tail ON tail.exercise_id = g.exercise_id
+              AND tail.gram = LOWER(RIGHT(CONVERT(:keyword USING utf8mb4), 3)) COLLATE utf8mb4_general_ci
+            STRAIGHT_JOIN exercise e ON e.id = g.exercise_id
+            WHERE g.gram = LOWER(SUBSTRING(CONVERT(:keyword USING utf8mb4), 1, 3)) COLLATE utf8mb4_general_ci
+              AND (:before IS NULL OR g.exercise_id < :before)
+              AND (:after IS NULL OR g.exercise_id > :after)
+              AND LOCATE(LOWER(:keyword), LOWER(e.question)) > 0
+              AND NOT EXISTS (SELECT 1 FROM banned_exercise b WHERE b.user_id = :userId AND b.exercise_id = e.id)
+            """, nativeQuery = true)
+    Slice<Exercise> findIndexedExercises(Long userId, String keyword, Long before, Long after, Pageable pageable);
 
     @Query("select e from Exercise e where (:before is null or e.id < :before) and (:after is null or e.id > :after)")
     Slice<Exercise> findPool(Long before, Long after, Pageable pageable);

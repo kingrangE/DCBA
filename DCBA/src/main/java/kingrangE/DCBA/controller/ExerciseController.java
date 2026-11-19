@@ -45,13 +45,22 @@ public class ExerciseController {
             @RequestParam(defaultValue = "all") String view,
             @RequestParam(required = false) Subject subject,
             @RequestParam(required = false) Level level,
+            @RequestParam(required = false) String q,
             @RequestParam(required = false) Long before,
             @RequestParam(required = false) Long after,
             HttpSession session) {
         User user = requireUser(session);
+        String keyword = q == null ? "" : trimSearchKeyword(q);
+        if (keyword.length() > 100) {
+            throw new IllegalArgumentException("검색어는 100자 이하로 입력해 주세요.");
+        }
+        if (view.equals("banned") && !keyword.isEmpty()) {
+            throw new IllegalArgumentException("차단한 문제에서는 검색을 사용할 수 없어요.");
+        }
+        String search = keyword.isEmpty() ? null : keyword;
         Slice<Exercise> slice = switch (view) {
-            case "all" -> exerciseService.getExercises(user.getId(), subject, level, before, after);
-            case "selected" -> exerciseService.getSelectedExercises(user.getId(), subject, level, before, after);
+            case "all" -> exerciseService.getExercises(user.getId(), subject, level, search, before, after);
+            case "selected" -> exerciseService.getSelectedExercises(user.getId(), subject, level, search, before, after);
             case "banned" -> exerciseService.getBannedExercises(user.getId(), subject, level, before, after);
             default -> throw new IllegalArgumentException("지원하지 않는 문제 보기 방식입니다.");
         };
@@ -64,6 +73,19 @@ public class ExerciseController {
         return new PageResponse<>(content.stream().map(e -> ExerciseResponse.from(e, savedIds, bannedIds)).toList(),
                 after == null ? before != null : slice.hasNext(), after != null || slice.hasNext(),
                 content.isEmpty() ? null : ids.getFirst(), content.isEmpty() ? null : ids.getLast());
+    }
+
+    private static String trimSearchKeyword(String keyword) {
+        int start = 0;
+        int end = keyword.length();
+        while (start < end && isSearchWhitespace(keyword.charAt(start))) start++;
+        while (end > start && isSearchWhitespace(keyword.charAt(end - 1))) end--;
+        return keyword.substring(start, end);
+    }
+
+    // Match JavaScript String.trim(), including non-breaking spaces and the BOM.
+    private static boolean isSearchWhitespace(char character) {
+        return Character.isSpaceChar(character) || (character >= '\t' && character <= '\r') || character == '\uFEFF';
     }
 
     @GetMapping("/options")

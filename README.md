@@ -125,6 +125,8 @@ CI는 Java·Python·React를 검증하며 문서 변경에는 경로 제외 규�
 
 기능 브랜치의 PR에서 테스트를 통과해 `main`에 들어간 커밋은 GitHub Actions가 AMD64·ARM64 이미지를 빌드하고, 커밋 SHA에 맞는 애플리케이션·마이그레이션 이미지를 EC2에 배포합니다. 필요하면 Actions의 **DCBA EC2 Release**에서 `main`을 선택해 수동 실행할 수 있습니다.
 
+웹 API가 응답하면 EC2 배포 스크립트가 `search-index` 작업을 백그라운드에서 시작합니다. 작업이 끝날 때까지 검색은 기존 본문 조건으로 동작하며, 완료되면 앱을 재시작하지 않아도 인덱스 검색이 활성화됩니다. 같은 Compose 설정에서 `docker compose ps -a search-index`와 `docker compose logs search-index`로 작업 상태를 확인할 수 있습니다. 실패하면 원인을 확인한 뒤 `docker compose up -d --force-recreate search-index`로 다시 실행할 수 있습니다.
+
 EC2에는 SSM Agent와 역할, Git, curl, Docker Engine과 Compose 2.24.4 이상이 필요합니다. `/opt/dcba/.env`를 서버에 만들고 파일 권한을 `0600`으로 설정합니다. `MARIADB_PASSWORD`와 `MARIADB_ROOT_PASSWORD`에는 서로 다른 임의 값을 사용합니다. 문제 생성을 쓸 때는 `COMPOSE_PROFILES=llm`과 NVIDIA 환경 변수도 서버에 설정합니다. EC2에서 정기 생성을 사용하려면 `AUTO_GENERATION_ENABLED=true`와 생성 간격(초)인 `AUTO_GENERATION_INTERVAL_SECONDS`를 설정합니다. 워커의 내부 `/ready`에서 적용된 값을 확인할 수 있습니다.
 
 관리자로 지정할 기존 계정의 숫자 ID를 `DCBA_ADMIN_USER_ID`에 설정하면 해당 계정에 관리자 메뉴가 표시됩니다. 관리자 화면에서 자동 생성을 중단하면 Redis에 상태가 저장되므로 워커를 재시작해도 중단 상태가 유지됩니다. 수동 생성과 이미 큐에 들어간 작업은 계속 처리됩니다. 워커의 내부 `/ready`에서 환경 설정은 `auto_generation_enabled`, 관리자 중단 여부는 `auto_generation_paused`로 확인합니다.
