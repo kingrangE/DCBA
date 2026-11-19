@@ -1,6 +1,7 @@
 package kingrangE.DCBA.controller;
 import kingrangE.DCBA.config.SecurityConfig;
 import kingrangE.DCBA.domain.User;
+import kingrangE.DCBA.service.ExerciseGenerationQueueService;
 import kingrangE.DCBA.service.ExerciseService;
 import kingrangE.DCBA.service.GenerationAdminService;
 import kingrangE.DCBA.service.ReviewService;
@@ -20,12 +21,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-@WebMvcTest(controllers = {UserController.class, AdminController.class, ReviewController.class}, properties = "DCBA_ADMIN_USER_ID=17")
+@WebMvcTest(controllers = {UserController.class, AdminController.class, ReviewController.class, ExerciseController.class},
+        properties = "DCBA_ADMIN_USER_ID=17")
 @Import({SecurityConfig.class, GenerationAdminService.class})
 class RestSecurityTests {
  @Autowired MockMvc mvc;
  @MockitoBean UserService users;
  @MockitoBean ExerciseService exercises;
+ @MockitoBean ExerciseGenerationQueueService generationQueue;
  @MockitoBean ReviewService reviews;
  @MockitoBean StringRedisTemplate redis;
  @Test void loginRotatesSessionAndLogoutInvalidatesIt() throws Exception {
@@ -117,6 +120,51 @@ class RestSecurityTests {
   mvc.perform(delete(path + "/45").session(admin).header(adminToken.getHeaderName(), adminToken.getToken()))
           .andExpect(status().isNoContent());
   verify(exercises).deleteExerciseFromPool(45L);
+ }
+
+ @Test void validatesAndNormalizesExerciseKeywords() throws Exception {
+  var path = "/api/exercises";
+  mvc.perform(get(path).param("q", "교착")).andExpect(status().isUnauthorized());
+  var session = new MockHttpSession();
+  session.setAttribute("loginUser", new User(18L, "reader", "hash", null, null));
+  mvc.perform(get(path).session(session).param("q", "a".repeat(101)))
+          .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("검색어는 100자 이하로 입력해 주세요."));
+  mvc.perform(get(path).session(session).param("view", "banned").param("q", " 교착 "))
+          .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").exists());
+  verifyNoInteractions(exercises);
+  var empty = new SliceImpl<kingrangE.DCBA.domain.Exercise>(java.util.List.of());
+  when(exercises.getExercises(eq(18L), isNull(), isNull(), any(), isNull(), isNull())).thenReturn(empty);
+  when(exercises.getBannedExercises(18L, null, null, null, null)).thenReturn(empty);
+  mvc.perform(get(path).session(session).param("q", " \t ")).andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty());
+  mvc.perform(get(path).session(session).param("view", "banned").param("q", " ")).andExpect(status().isOk());
+  var boundary = "🚀".repeat(50);
+  mvc.perform(get(path).session(session).param("q", " " + boundary + " ")).andExpect(status().isOk());
+  verify(exercises).getExercises(18L, null, null, null, null, null);
+  verify(exercises).getExercises(18L, null, null, boundary, null, null);
+ }
+
+ @Test void trimsSearchKeywordsLikeTheBrowserWithoutChangingTheirInterior() throws Exception {
+  var path = "/api/exercises";
+  var session = new MockHttpSession();
+  session.setAttribute("loginUser", new User(18L, "reader", "hash", null, null));
+  var empty = new SliceImpl<kingrangE.DCBA.domain.Exercise>(java.util.List.of());
+  when(exercises.getExercises(eq(18L), isNull(), isNull(), any(), isNull(), isNull())).thenReturn(empty);
+  when(exercises.getBannedExercises(18L, null, null, null, null)).thenReturn(empty);
+
+  String keyword = "교착\u00a0  상태%";
+  for (String input : new String[]{keyword, "\u00a0" + keyword + "\u00a0", "\ufeff\u2028" + keyword + "\u2029"}) {
+      mvc.perform(get(path).session(session).param("q", input)).andExpect(status().isOk());
+  }
+  verify(exercises, times(3)).getExercises(18L, null, null, keyword, null, null);
+  mvc.perform(get(path).session(session).param("q", "\u00a0\u00a0")).andExpect(status().isOk());
+  verify(exercises).getExercises(18L, null, null, null, null, null);
+  var boundary = "🚀".repeat(50);
+  mvc.perform(get(path).session(session).param("q", "\u00a0" + boundary + "\u00a0")).andExpect(status().isOk());
+  verify(exercises).getExercises(18L, null, null, boundary, null, null);
+  mvc.perform(get(path).session(session).param("q", "\u00a0" + boundary + "a\u00a0")).andExpect(status().isBadRequest());
+  mvc.perform(get(path).session(session).param("view", "banned").param("q", "\u00a0")).andExpect(status().isOk());
+  mvc.perform(get(path).session(session).param("view", "banned").param("q", "\u00a0" + keyword + "\u00a0"))
+          .andExpect(status().isBadRequest());
  }
 
  @Test void reviewUsesSessionCsrfStrictInputAndNoStore() throws Exception {

@@ -34,14 +34,17 @@ const preferences = {
 export default function DashboardPage() {
   const { expireSession } = useAuth()
   const listHeading = useRef(null)
+  const composingSearch = useRef(false)
   const requestId = useRef(0)
   const reviewRequestId = useRef(0)
   const [options, setOptions] = useState(emptyOptions)
   const [optionsError, setOptionsError] = useState('')
   const [optionsLoading, setOptionsLoading] = useState(true)
   const [optionsAttempt, setOptionsAttempt] = useState(0)
-  const [filters, setFilters] = useState({ view: 'all', subject: '', level: '', ...firstPage })
+  const [filters, setFilters] = useState({ view: 'all', subject: '', level: '', q: '', ...firstPage })
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchTooLong, setSearchTooLong] = useState(false)
   const [list, setList] = useState(null)
   const [listAttempt, setListAttempt] = useState(0)
   const [actionStatus, setActionStatus] = useState('')
@@ -59,6 +62,7 @@ export default function DashboardPage() {
     options.subjects.find(({ value }) => value === filters.subject)?.label,
     options.levels.find(({ value }) => value === filters.level)?.label,
   ].filter(Boolean).join(' · ')
+  const canSearch = filters.view !== 'banned'
   const isFirstPage = !filters.before && !filters.after
   const showGenerationLink = !optionsLoading && !optionsError && options.generationEnabled !== false
 
@@ -108,12 +112,34 @@ export default function DashboardPage() {
   }
 
   const changeFilters = (values) => {
+    requestId.current += 1
     reviewRequestId.current += 1
     setStartingReview(null)
     setEmptyReview(null)
     setReviewError('')
     setActionStatus('')
     setFilters((previous) => ({ ...previous, ...firstPage, ...values }))
+  }
+
+  const submitSearch = (event) => {
+    event.preventDefault()
+    if (composingSearch.current) return
+    const q = searchInput.trim()
+    if (q.length > 100) {
+      setSearchTooLong(true)
+      event.currentTarget.elements.namedItem('q').focus()
+      return
+    }
+    setSearchTooLong(false)
+    setSearchInput(q)
+    changeFilters({ q })
+  }
+
+  const clearSearch = () => {
+    listHeading.current?.focus({ preventScroll: true })
+    setSearchTooLong(false)
+    setSearchInput('')
+    changeFilters({ q: '' })
   }
 
   const startReview = async (mode) => {
@@ -215,6 +241,38 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
+          {canSearch && (
+            <form className="keyword-search" role="search" aria-label="문제 검색" onSubmit={submitSearch}>
+              <label htmlFor="exercise-keyword">문제 키워드</label>
+              <div className="keyword-search-actions">
+                <input
+                  id="exercise-keyword"
+                  name="q"
+                  type="search"
+                  value={searchInput}
+                  aria-invalid={searchTooLong || undefined}
+                  aria-describedby={searchTooLong ? 'exercise-keyword-error' : undefined}
+                  placeholder="예: 교착 상태"
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  onCompositionStart={() => { composingSearch.current = true }}
+                  onCompositionEnd={() => { composingSearch.current = false }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && (composingSearch.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) {
+                      event.preventDefault()
+                    }
+                  }}
+                />
+                <button className="button button--primary" type="submit">검색</button>
+                {(searchInput || filters.q) && <button className="button button--secondary" type="button" onClick={clearSearch}>검색어 지우기</button>}
+              </div>
+              {searchTooLong && (
+                <p className="form-status form-status--error" id="exercise-keyword-error" role="alert">
+                  양끝 공백을 제외한 검색어를 100자 이하로 줄여 주세요.
+                </p>
+              )}
+              {filters.q && <p className="field-help" role="status">적용 검색어 · <strong>{filters.q}</strong></p>}
+            </form>
+          )}
           <button
             className="filter-toggle"
             type="button"
@@ -249,10 +307,13 @@ export default function DashboardPage() {
             <div className="review-start">
               <div className="card-actions">
                 <button className="button button--primary" type="button" disabled={Boolean(startingReview)}
+                  aria-describedby={filters.q ? 'review-filter-scope' : undefined}
                   onClick={() => startReview('random')}>랜덤으로 3문제 풀기</button>
                 <button className="button button--secondary" type="button" disabled={Boolean(startingReview)}
+                  aria-describedby={filters.q ? 'review-filter-scope' : undefined}
                   onClick={() => startReview('marked')}>다시 풀 문제 연습</button>
               </div>
+              {filters.q && <p id="review-filter-scope" className="field-help">복습에는 분야와 난이도만 적용돼요.</p>}
               <p className="field-help">새로고침하거나 페이지를 떠나면 이번 연습과 답변이 사라질 수 있어요.</p>
               {startingReview && <p role="status">연습 문제를 고르는 중이에요.</p>}
               {reviewError && <p className="notice notice--error" role="alert">{reviewError}</p>}
@@ -284,6 +345,9 @@ export default function DashboardPage() {
             </div>
           )}
           {actionStatus && <p className="notice notice--success" role="status">{actionStatus}</p>}
+          <p role="status" className="exercise-search-status">
+            {canSearch && filters.q && !loading && !listError && result?.content.length > 0 ? '검색 결과를 불러왔어요.' : ''}
+          </p>
           <div className="exercise-results" aria-busy={loading}>
             {listError && (
               <div className="notice notice--error">
@@ -301,13 +365,23 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : loading ? (
-              <div className="empty-state">문제를 불러오는 중이에요.</div>
+              <div className="empty-state" role="status">문제를 불러오는 중이에요.</div>
             ) : !listError && (
               <div className="empty-state">
                 {!isFirstPage ? (
                   <>
                     <strong>이 페이지에 표시할 문제가 없어요.</strong>
                     <button className="button button--secondary" type="button" onClick={() => movePage(firstPage)}>첫 페이지로</button>
+                  </>
+                ) : canSearch && filters.q ? (
+                  <>
+                    <strong role="status">{filters.view === 'selected' ? '저장한' : '전체'} 문제에서 ‘{filters.q}’에 해당하는 결과가 없어요.</strong>
+                    {filters.view === 'selected' ? (
+                      <button className="button button--secondary" type="button" onClick={() => {
+                        listHeading.current?.focus({ preventScroll: true })
+                        changeFilters({ view: 'all' })
+                      }}>전체 문제에서 검색</button>
+                    ) : <span>검색어를 바꾸거나 지우고, 분야나 난이도를 조정해 보세요.</span>}
                   </>
                 ) : isFiltered ? (
                   <>

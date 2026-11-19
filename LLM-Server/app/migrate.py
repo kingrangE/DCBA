@@ -1,11 +1,62 @@
-"""Run once before either application starts; never discard existing rows."""
+"""Apply required schema changes or backfill the optional search index."""
+import argparse
 import os
 from pathlib import Path
 
 import pymysql
 
 
-def migrate():
+def index_exercise_questions(cursor):
+    cursor.execute("""
+        SELECT COLLATION_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'exercise' AND COLUMN_NAME = 'question'
+    """)
+    if cursor.fetchone() != ("utf8mb4_general_ci",):
+        return
+    sql = Path(__file__).resolve().parent.parent / "migrations/006_exercise_search_grams.sql"
+    cursor.execute(sql.read_text())
+    grams = """
+        INSERT INTO exercise_search_gram (gram, exercise_id)
+        SELECT DISTINCT SUBSTRING(LOWER(NEW.question), seq, 3), NEW.id
+        FROM seq_1_to_65535 WHERE seq <= CHAR_LENGTH(NEW.question) - 2
+        ON DUPLICATE KEY UPDATE gram = VALUES(gram)
+    """
+    cursor.execute(f"""
+        CREATE TRIGGER IF NOT EXISTS exercise_search_insert AFTER INSERT ON exercise
+        FOR EACH ROW {grams}
+    """)
+    cursor.execute(f"""
+        CREATE TRIGGER IF NOT EXISTS exercise_search_update AFTER UPDATE ON exercise
+        FOR EACH ROW
+        BEGIN
+            IF BINARY OLD.question <> BINARY NEW.question THEN
+                DELETE FROM exercise_search_gram WHERE exercise_id = NEW.id;
+                {grams};
+            END IF;
+        END
+    """)
+    after_id = 0
+    while True:
+        cursor.execute("""
+            SELECT MAX(id), MAX(CHAR_LENGTH(question)) FROM (
+                SELECT id, question FROM exercise WHERE id > %s ORDER BY id LIMIT 250
+            ) batch
+        """, (after_id,))
+        last_id, max_chars = cursor.fetchone()
+        if last_id is None:
+            break
+        if max_chars >= 3:
+            cursor.execute(f"""
+                INSERT INTO exercise_search_gram (gram, exercise_id)
+                SELECT DISTINCT SUBSTRING(LOWER(e.question), seq, 3), e.id
+                FROM exercise e JOIN seq_1_to_{int(max_chars) - 2} ON seq <= CHAR_LENGTH(e.question) - 2
+                WHERE e.id > %s AND e.id <= %s
+                ON DUPLICATE KEY UPDATE gram = VALUES(gram)
+            """, (after_id, last_id))
+        after_id = last_id
+
+
+def migrate(*, search_index=False):
     connection = pymysql.connect(
         host=os.getenv("MARIADB_HOST", "localhost"),
         port=int(os.getenv("MARIADB_PORT", "3306")),
@@ -15,9 +66,19 @@ def migrate():
     )
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT GET_LOCK('dcba:schema-migration', 60)")
+            lock = "dcba:exercise-search-index" if search_index else "dcba:schema-migration"
+            cursor.execute("SELECT GET_LOCK(%s, 60)", (lock,))
             if cursor.fetchone()[0] != 1:
-                raise RuntimeError("Could not acquire schema migration lock")
+                raise RuntimeError(f"Could not acquire migration lock {lock}")
+            if search_index:
+                cursor.execute("SELECT version FROM schema_migration WHERE version = 5")
+                if not cursor.fetchone():
+                    raise RuntimeError("Apply the required schema before starting the search index")
+                cursor.execute("SELECT version FROM schema_migration WHERE version = 6")
+                if not cursor.fetchone():
+                    index_exercise_questions(cursor)
+                    cursor.execute("INSERT INTO schema_migration (version) VALUES (6)")
+                return
             cursor.execute("CREATE TABLE IF NOT EXISTS schema_migration (version INT PRIMARY KEY)")
             cursor.execute("SELECT version FROM schema_migration WHERE version = 1")
             if not cursor.fetchone():
@@ -93,4 +154,6 @@ def migrate():
 
 
 if __name__ == "__main__":
-    migrate()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--search-index", action="store_true", help="backfill the index after the required schema is ready")
+    migrate(search_index=parser.parse_args().search_index)

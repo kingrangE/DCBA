@@ -44,7 +44,7 @@ class ConcurrentExerciseTests {
         service.deleteExerciseFromPool(target.getId());
         service.deleteExerciseFromPool(target.getId());
         assertThat(exercises.findById(target.getId())).isEmpty();
-        assertThat(service.getSelectedExercises(reader.getId(), null, null, null, null))
+        assertThat(service.getSelectedExercises(reader.getId(), null, null, null, null, null))
                 .extracting(Exercise::getId).containsExactly(other.getId());
         assertThat(service.getBannedExercises(reader.getId(), null, null, null, null))
                 .extracting(Exercise::getId).containsExactly(other.getId());
@@ -63,10 +63,10 @@ class ConcurrentExerciseTests {
         });
         assertThat(selected.findAllByUser(user, Pageable.unpaged()).getTotalElements()).isEqualTo(1);
         assertThat(banned.findAllByUser(user, Pageable.unpaged()).getTotalElements()).isEqualTo(1);
-        assertThat(service.getExercises(user.getId(), null, null, null, null).getContent())
+        assertThat(service.getExercises(user.getId(), null, null, null, null, null).getContent())
                 .extracting(Exercise::getId).doesNotContain(exercise.getId());
-        assertThat(service.getSelectedExercises(user.getId(), Subject.ALGORITHM, Level.EASY, null, null).getContent()).hasSize(1);
-        assertThat(service.getSelectedExercises(user.getId(), Subject.DATABASE, null, null, null).getContent()).isEmpty();
+        assertThat(service.getSelectedExercises(user.getId(), Subject.ALGORITHM, Level.EASY, null, null, null).getContent()).hasSize(1);
+        assertThat(service.getSelectedExercises(user.getId(), Subject.DATABASE, null, null, null, null).getContent()).isEmpty();
         assertThat(service.getSavedExerciseIds(user.getId(), java.util.List.of(exercise.getId()))).containsExactly(exercise.getId());
         assertThat(service.getBannedExerciseIds(user.getId(), java.util.List.of())).isEmpty();
         runTogether(() -> {
@@ -98,9 +98,9 @@ class ConcurrentExerciseTests {
         assertThat(statistics.getEntityLoadCount()).isEqualTo(1);
         service.cancelSaveExercise(owner.getId(), exercise.getId());
         service.cancelBanExercise(owner.getId(), exercise.getId());
-        assertThat(service.getSelectedExercises(owner.getId(), null, null, null, null)).isEmpty();
+        assertThat(service.getSelectedExercises(owner.getId(), null, null, null, null, null)).isEmpty();
         assertThat(service.getBannedExercises(owner.getId(), null, null, null, null)).isEmpty();
-        assertThat(service.getSelectedExercises(other.getId(), null, null, null, null)).hasSize(1);
+        assertThat(service.getSelectedExercises(other.getId(), null, null, null, null, null)).hasSize(1);
         assertThat(service.getBannedExercises(other.getId(), null, null, null, null)).hasSize(1);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.cancelSaveExercise(owner.getId(), Long.MAX_VALUE))
                 .isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
@@ -122,9 +122,9 @@ class ConcurrentExerciseTests {
         for (String view : java.util.List.of("all", "selected", "banned")) {
             statistics.clear();
             var slice = switch (view) {
-                case "selected" -> service.getSelectedExercises(owner.getId(), Subject.DATABASE, Level.HARD, null, null);
+                case "selected" -> service.getSelectedExercises(owner.getId(), Subject.DATABASE, Level.HARD, null, null, null);
                 case "banned" -> service.getBannedExercises(owner.getId(), Subject.DATABASE, Level.HARD, null, null);
-                default -> service.getExercises(reader.getId(), Subject.DATABASE, Level.HARD, null, null);
+                default -> service.getExercises(reader.getId(), Subject.DATABASE, Level.HARD, null, null, null);
             };
             assertThat(slice.getContent()).hasSize(9);
             assertThat(slice.hasNext()).isTrue();

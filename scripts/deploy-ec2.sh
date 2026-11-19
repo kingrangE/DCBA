@@ -27,3 +27,4 @@ compose=(docker compose -p dcba --env-file ../.env -f docker-compose.yml -f dock
 curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 2 \
   --output /dev/null http://127.0.0.1:8080/api/auth/csrf
 echo "DCBA $release is serving web requests"
+"${compose[@]}" up -d --no-build --no-deps --force-recreate search-index

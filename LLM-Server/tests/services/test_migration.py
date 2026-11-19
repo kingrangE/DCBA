@@ -11,6 +11,7 @@ def test_completed_migration_does_not_change_schema(mocker, monkeypatch):
     queries = [call.args[0] for call in cursor.execute.call_args_list]
     assert len(queries) == 7
     assert not any("ALTER TABLE" in query for query in queries)
+    assert not any("exercise_search_gram" in query or "version = 6" in query for query in queries)
 
 
 def test_duplicate_preferences_stop_without_deleting_rows(mocker, monkeypatch):
@@ -56,3 +57,28 @@ def test_review_migration_adds_default_mark_and_cascades_rubric_on_delete(mocker
     assert any("ADD COLUMN IF NOT EXISTS review_again BOOLEAN NOT NULL DEFAULT FALSE" in query for query in queries)
     assert any("exercise_feedback_rubric" in query and "ON DELETE CASCADE" in query for query in queries)
     assert "INSERT INTO schema_migration (version) VALUES (5)" in queries
+
+
+def test_search_migration_backfills_and_installs_write_triggers(mocker, monkeypatch):
+    monkeypatch.setenv("MARIADB_USER", "test")
+    monkeypatch.setenv("MARIADB_PASSWORD", "test")
+    cursor = mocker.patch("app.migrate.pymysql.connect").return_value.cursor.return_value.__enter__.return_value
+    cursor.fetchone.side_effect = [(1,), (5,), None, ("utf8mb4_general_ci",), (250, 65), (None, None)]
+    migrate(search_index=True)
+    queries = [call.args[0] for call in cursor.execute.call_args_list]
+    assert cursor.execute.call_args_list[0].args[1] == ("dcba:exercise-search-index",)
+    assert any("ON DELETE CASCADE" in query for query in queries)
+    assert any("CREATE TRIGGER IF NOT EXISTS exercise_search_insert" in query for query in queries)
+    assert any("CREATE TRIGGER IF NOT EXISTS exercise_search_update" in query for query in queries)
+    assert any("seq_1_to_63" in query for query in queries)
+    assert queries[-1] == "INSERT INTO schema_migration (version) VALUES (6)"
+
+
+def test_search_migration_requires_base_schema(mocker, monkeypatch):
+    monkeypatch.setenv("MARIADB_USER", "test")
+    monkeypatch.setenv("MARIADB_PASSWORD", "test")
+    cursor = mocker.patch("app.migrate.pymysql.connect").return_value.cursor.return_value.__enter__.return_value
+    cursor.fetchone.side_effect = [(1,), None]
+    with pytest.raises(RuntimeError, match="required schema"):
+        migrate(search_index=True)
+    assert cursor.execute.call_count == 2

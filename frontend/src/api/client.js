@@ -69,12 +69,13 @@ export const api = {
     ...await response.json(),
     generationEnabled: response.headers.get('X-DCBA-Generation-Enabled') !== 'false',
   })),
-  exercises: ({ view, subject, level, before, after }) => {
+  exercises: ({ view, subject, level, q, before, after }) => {
     const params = new URLSearchParams({ view })
     if (before) params.set('before', String(before))
     if (after) params.set('after', String(after))
     if (subject) params.set('subject', subject)
     if (level) params.set('level', level)
+    if (q && (view === 'all' || view === 'selected')) params.set('q', q)
     return request(`/api/exercises?${params}`)
   },
   save: (id) => request(`/api/exercises/${id}/saved`, { method: 'POST' }),

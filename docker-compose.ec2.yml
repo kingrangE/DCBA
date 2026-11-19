@@ -7,7 +7,9 @@ services:
     image: kingrange/dcba-java-app:${DCBA_RELEASE:?Set DCBA_RELEASE to a commit SHA}
     ports: !reset []
   schema-migrate:
-    image: kingrange/dcba-llm-server:migration-${DCBA_RELEASE:?Set DCBA_RELEASE to a commit SHA}
+    image: &migration-image kingrange/dcba-llm-server:migration-${DCBA_RELEASE:?Set DCBA_RELEASE to a commit SHA}
+  search-index:
+    image: *migration-image
   llm-server:
     image: kingrange/dcba-llm-server:${DCBA_RELEASE:?Set DCBA_RELEASE to a commit SHA}
     environment:
