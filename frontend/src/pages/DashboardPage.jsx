@@ -292,10 +292,13 @@ export default function DashboardPage() {
             <div className="review-start">
               <div className="card-actions">
                 <button className="button button--primary" type="button" disabled={Boolean(startingReview)}
+                  aria-describedby={filters.q ? 'review-filter-scope' : undefined}
                   onClick={() => startReview('random')}>랜덤으로 3문제 풀기</button>
                 <button className="button button--secondary" type="button" disabled={Boolean(startingReview)}
+                  aria-describedby={filters.q ? 'review-filter-scope' : undefined}
                   onClick={() => startReview('marked')}>다시 풀 문제 연습</button>
               </div>
+              {filters.q && <p id="review-filter-scope" className="field-help">복습에는 분야와 난이도만 적용돼요.</p>}
               <p className="field-help">새로고침하거나 페이지를 떠나면 이번 연습과 답변이 사라질 수 있어요.</p>
               {startingReview && <p role="status">연습 문제를 고르는 중이에요.</p>}
               {reviewError && <p className="notice notice--error" role="alert">{reviewError}</p>}
