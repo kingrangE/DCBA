@@ -153,7 +153,7 @@ def generate(service, request, repository, connection, deduplication, budget, re
             raise GenerationRejected("invalid_request")
 
     public_intent = intent.model_dump() if intent else None
-    try_recommendation = recommend is not None and intent is not None and intent.objective is not None
+    try_recommendation = recommend is not None and intent is not None
     while True:
         if plan is None:
             result = parse(PlanningResult, call(
@@ -181,8 +181,9 @@ def generate(service, request, repository, connection, deduplication, budget, re
 
         if try_recommendation:
             budget("embedding")
+            search_text = f"{intent.concept}\n{intent.objective}" if intent.objective else intent.concept
             candidate_ids = search(deduplication.candidate_ids, request.subject.value, request.level.value,
-                                   f"{intent.concept}\n{intent.objective}")
+                                   search_text)
             rows = repository.recommendation_candidates(
                 request.subject.value, request.level.value, request.requester_id, intent.concept, candidate_ids, connection)
             candidates = [{"id": row["id"], "question": row["question"][:1800], "answer": row["answer"][:2400],
@@ -193,16 +194,17 @@ def generate(service, request, repository, connection, deduplication, budget, re
                 choice = parse(Recommendation, call(
                     "recommend", "기존 문항 비교 검수자",
                     "먼저 출제안이 사용자 학습 의도의 개념과 판단을 지키는지 판정한다. 이어 각 문항을 사용자 의도와 직접 비교한다. "
-                    "주제가 같아도 다른 판단이나 정의만 요구하면 제외한다. 불확실하면 exercise_id=null이다. "
+                    "명시한 판단이 있으면 문항이 그 판단을 직접 요구해야 한다. 판단이 없으면 개념 자체가 문항의 핵심 학습 내용인지 확인한다. "
+                    "개념이 본문에 언급만 되거나 정답을 도출하는 데 필요하지 않으면 제외한다. 근거가 부족하면 exercise_id=null이다. "
                     "출력은 {plan_matches_intent: 불리언, exercise_id: 정수 또는 null}이다.",
                     {"user_intent": public_intent, "plan": plan.model_dump(), "candidates": candidates},
                 ))
-                if choice and not choice.plan_matches_intent:
+                if choice and not choice.plan_matches_intent and intent.objective:
                     feedback = "출제안의 판단이 사용자 학습 의도와 달라 원래 판단으로 다시 기획해야 합니다."
                     plan = None
                     try_recommendation = True
                     continue
-                if choice and choice.exercise_id in {row["id"] for row in candidates}:
+                if choice and choice.plan_matches_intent and choice.exercise_id in {row["id"] for row in candidates}:
                     budget()
                     existing = recommend(choice.exercise_id)
                     if existing is not None:

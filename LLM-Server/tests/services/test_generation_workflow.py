@@ -250,12 +250,32 @@ def test_extractor_cannot_replace_original_concept():
     service.client.generate.assert_called_once()
 
 
-def test_concept_only_request_generates_without_recommendation():
-    service, repo, request, dedup, budget, _ = run([CONCEPT_ONLY, PLAN, WRITTEN, PASS], intent="팬텀 리드")
-    recommend = Mock()
-    assert generate(service, request, repo, None, dedup, budget, recommend)[0] == json.loads(WRITTEN)["question"]
-    dedup.candidate_ids.assert_not_called()
-    recommend.assert_not_called()
+@pytest.mark.parametrize("choice", [None, "ambiguous", "matched"])
+def test_concept_only_request_recommends_or_writes_based_on_evidence(choice):
+    responses = [CONCEPT_ONLY, PLAN]
+    if choice:
+        responses.append(json.dumps({"plan_matches_intent": True, "exercise_id": 7 if choice == "matched" else None}))
+    if choice != "matched":
+        responses.extend([WRITTEN, PASS])
+    service, repo, request, dedup, budget, reservations = run(responses, intent="팬텀 리드")
+    dedup.candidate_ids.return_value = [7] if choice else []
+    repo.recommendation_candidates.return_value = [{
+        "id": 7, "question": "팬텀 리드가 발생하는 이유를 설명하세요.", "answer": "격리 수준과 커밋 순서를 확인합니다.",
+        "concept": "팬텀 리드", "objective": None,
+    }] if choice else []
+    recommend = Mock(return_value="existing")
+    result = generate(service, request, repo, None, dedup, budget, recommend)
+    dedup.candidate_ids.assert_called_once_with("DATABASE", "HARD", "팬텀 리드")
+    repo.recommendation_candidates.assert_called_once_with("DATABASE", "HARD", 1, "팬텀 리드",
+                                                            [7] if choice else [], None)
+    if choice == "matched":
+        assert result == "existing"
+        recommend.assert_called_once_with(7)
+        assert reservations == ["model", "model", "embedding", "model"]
+    else:
+        assert result[0] == json.loads(WRITTEN)["question"]
+        recommend.assert_not_called()
+        assert reservations.count("model") == (5 if choice else 4)
 
 
 @pytest.mark.parametrize(("port", "formatted"), [
