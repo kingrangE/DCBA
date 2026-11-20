@@ -22,7 +22,7 @@ class NvidiaGenerator:
     def close(self) -> None:
         self._client.close()
 
-    def generate(self, messages: list[dict[str, str]], *, timeout: float | None = None) -> str:
+    def generate(self, messages: list[dict[str, str]], *, timeout: float | None = None, on_usage=None) -> str:
         is_nemotron_ultra = self.model == "nvidia/nemotron-3-ultra-550b-a55b"
         client = self._client if timeout is None else self._client.with_options(timeout=timeout)
         response = client.chat.completions.create(
@@ -34,7 +34,12 @@ class NvidiaGenerator:
             # Nemotron Ultra's default reasoning can exhaust the budget before emitting an answer.
             extra_body={"chat_template_kwargs": {"enable_thinking": False}} if is_nemotron_ultra else None,
         )
-        if not isinstance(response, ChatCompletion) or not getattr(response, "choices", None):
+        if not isinstance(response, ChatCompletion):
+            return ""
+        prompt_tokens = getattr(response.usage, "prompt_tokens", None)
+        if on_usage is not None and isinstance(prompt_tokens, int):
+            on_usage(prompt_tokens)
+        if not response.choices:
             return ""
         choice = response.choices[0]
         content = getattr(getattr(choice, "message", None), "content", None)

@@ -5,13 +5,17 @@ import asyncio
 import random
 import uuid
 import time
-from prometheus_client import Counter
-from openai import APIError, APIStatusError
+from prometheus_client import Counter, Histogram
+from openai import APIStatusError
 
 TASK_RESULTS = Counter("dcba_generation_tasks_total", "Generation task outcomes", ["result"])
+MODEL_CALLS = Counter("dcba_generation_provider_calls_total", "Provider calls reserved by the worker", ["kind"])
+QUEUE_WAIT = Histogram("dcba_generation_queue_wait_seconds", "Time from enqueue to first delivery")
+WORK_TIME = Histogram("dcba_generation_work_seconds", "Time handling a generation delivery")
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.exercise_service import exercise_service
-from app.models.exercise import ExerciseRequest, Level, SUBJECT_LABELS
+from app.models.exercise import QueuedExerciseRequest, Level, SUBJECT_LABELS
+from app.services.generation_workflow import GenerationRejected
 
 class RedisQueue:
     AUTO_GENERATION_PAUSE_KEY = "exercise:auto_generation_paused"
@@ -29,8 +33,8 @@ class RedisQueue:
         self.claim_cursor = "0-0"
 
     def enqueue(self, task: dict, *, only_when_idle: bool = False) -> bool:
-        request = ExerciseRequest(**task)
-        payload = {**request.model_dump(mode="json"), "task_id": str(uuid.uuid4())}
+        request = QueuedExerciseRequest(subject=task["subject"], level=task["level"], request_type="automatic")
+        payload = {**request.model_dump(mode="json", exclude_none=True), "task_id": str(uuid.uuid4())}
         result = self.redis_client.eval("""
             if ARGV[2] == '1' and redis.call('EXISTS', KEYS[3]) == 1 then return -1 end
             local depth = redis.call('XLEN', KEYS[1]) + redis.call('LLEN', KEYS[2])
@@ -81,44 +85,81 @@ class RedisQueue:
             "_attempt": self.redis_client.hincrby(self.attempts_key, message_id, 1),
             "_payload": fields.get("payload", ""),
         }
-        if message["_attempt"] > 5:
-            self.reject(message, "Retry limit reached after interrupted processing")
-            return None
         try:
             payload = json.loads(message["_payload"])
-            request = ExerciseRequest(**payload)
             task_id = payload.get("task_id") or "legacy:" + message_id
             if not isinstance(task_id, str) or len(task_id) > 128:
                 raise ValueError("Invalid task identity")
+            message["task_id"] = task_id
+            request = QueuedExerciseRequest(**payload)
+            if message["_attempt"] > 5:
+                self.reject(message, "temporary_failure")
+                return None
             return {**request.model_dump(mode="json"), "task_id": task_id, **message}
-        except (ValueError, TypeError):
-            self.reject(message, "Invalid task payload")
+        except (ValueError, TypeError, AttributeError):
+            self.reject(message, "invalid_request")
             return None
+
+    def state_key(self, task_id):
+        return f"exercise:generation_request:{task_id}"
+
+    def start(self, task):
+        key = self.state_key(task["task_id"])
+        if self.redis_client.hget(key, "status") == "failed":
+            return False
+        if task["_attempt"] == 1:
+            QUEUE_WAIT.observe(max(0, time.time() - int(task["_message_id"].split("-")[0]) / 1000))
+        if task.get("requester_id") is not None:
+            self.redis_client.hset(key, "status", "running")
+        return True
+
+    def reserve_call(self, task_id, kind):
+        count = self.redis_client.eval("""
+            local count = tonumber(redis.call('HGET', KEYS[1], ARGV[1]) or '0')
+            if ARGV[1] == 'model' and count >= 6 then return -1 end
+            return redis.call('HINCRBY', KEYS[1], ARGV[1], 1)
+        """, 1, self.state_key(task_id), kind)
+        if count == -1:
+            raise GenerationRejected("generation_limit")
+        MODEL_CALLS.labels(kind).inc()
 
     def acknowledge(self, task):
         with self.redis_client.pipeline() as transaction:
             transaction.xack(self.queue_key, self.group, task["_message_id"])
             transaction.xdel(self.queue_key, task["_message_id"])
             transaction.hdel(self.attempts_key, task["_message_id"])
+            if task.get("task_id"):
+                transaction.expire(self.state_key(task["task_id"]), 604800)
             transaction.execute()
 
     def reject(self, task, reason):
-        # Preserve the original payload before removing pending work; Lua stops before removal if storage fails.
+        # Keep only fields needed to diagnose or requeue the task, with no free text.
+        try:
+            payload = json.loads(task["_payload"])
+            request = QueuedExerciseRequest(subject=payload["subject"], level=payload["level"])
+            safe_payload = request.model_dump(mode="json", include={"subject", "level"})
+        except (ValueError, TypeError, KeyError):
+            safe_payload = {}
+        task_id = task.get("task_id")
+        if task_id:
+            safe_payload["task_id"] = task_id
         self.redis_client.eval("""
             redis.call('XADD', KEYS[2], '*', 'original_id', ARGV[1], 'payload', ARGV[2], 'reason', ARGV[3])
+            if ARGV[5] == '1' then redis.call('HSET', KEYS[4], 'status', 'failed', 'reason', ARGV[3]) end
             redis.call('XACK', KEYS[1], ARGV[4], ARGV[1])
             redis.call('XDEL', KEYS[1], ARGV[1])
             redis.call('HDEL', KEYS[3], ARGV[1])
             return 1
-        """, 3, self.queue_key, self.failed_key, self.attempts_key,
-            task["_message_id"], task["_payload"], reason, self.group)
+        """, 4, self.queue_key, self.failed_key, self.attempts_key, self.state_key(task_id),
+            task["_message_id"], json.dumps(safe_payload), reason, self.group, "1" if task_id else "0")
         TASK_RESULTS.labels("dead_letter").inc()
 
     def failed(self, task, error):
         permanent_api_error = (isinstance(error, APIStatusError)
                                and error.status_code < 500 and error.status_code not in (408, 409, 429))
         if isinstance(error, ValueError) or permanent_api_error or task["_attempt"] >= 5:
-            self.reject(task, type(error).__name__)
+            self.reject(task, error.code if isinstance(error, GenerationRejected) else
+                        "invalid_request" if isinstance(error, ValueError) else "temporary_failure")
 
     def failed_size(self):
         return self.redis_client.xlen(self.failed_key)
@@ -193,9 +234,13 @@ class AutomationService:
                     print(f"[Consumer] Processing: {task['subject']} ({task['level']})")
                     # 문제 생성 시작
                     try:
-                        saved_exercise = await loop.run_in_executor(
-                            None, exercise_service.generate_and_save, task['subject'], task['level'], task['task_id']
-                        )
+                        saved_exercise = None
+                        if await loop.run_in_executor(None, self.queue.start, task):
+                            with WORK_TIME.time():
+                                saved_exercise = await loop.run_in_executor(
+                                    None, exercise_service.run_queued, task["task_id"], QueuedExerciseRequest(**task),
+                                    self.queue.reserve_call,
+                                )
                         await loop.run_in_executor(None, self.queue.acknowledge, task)
                         self.consecutive_failures = 0
                         if saved_exercise is not None:
@@ -206,10 +251,12 @@ class AutomationService:
 
                     except Exception as e:
                         await loop.run_in_executor(None, self.queue.failed, task, e)
-                        self.consecutive_failures += 1
-                        TASK_RESULTS.labels("failure").inc()
-                        detail = type(e).__name__ if isinstance(e, APIError) else str(e)
-                        print(f"[Consumer] Failed generation: {detail}")
+                        if isinstance(e, GenerationRejected):
+                            TASK_RESULTS.labels("content_rejected").inc()
+                        else:
+                            self.consecutive_failures += 1
+                            TASK_RESULTS.labels("failure").inc()
+                        print(f"[Consumer] Failed generation: {type(e).__name__}")
                 
                 await asyncio.sleep(0.1) 
                 
@@ -217,7 +264,7 @@ class AutomationService:
                 self.consecutive_failures += 1
                 self.queue_depth = -1
                 TASK_RESULTS.labels("queue_failure").inc()
-                print(f"[Error] {e}")
+                print(f"[Error] {type(e).__name__}")
                 await asyncio.sleep(1)
 
     # 종료 

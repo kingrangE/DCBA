@@ -20,12 +20,14 @@ class DeduplicationService:
             embedding_function=None,
         )
 
-    def synchronize(self, repository, connection):
+    def synchronize(self, repository, connection, before_embedding=None):
         self.collection = self.client.get_collection(self.collection_name, embedding_function=None)
         after_id = int((self.collection.metadata or {}).get("last_exercise_id", 0))
         while rows := repository.find_after(after_id, connection):
             requests = [ExerciseRequest(subject=row["subject"], level=row["level"]) for row in rows]
             documents = [f"Q: {row['question']}\nA: {row['answer']}" for row in rows]
+            if before_embedding is not None:
+                before_embedding()
             self.collection.upsert(
                 ids=[str(row["id"]) for row in rows], documents=documents,
                 embeddings=self.embeddings.embed_documents(documents),

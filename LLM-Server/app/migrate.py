@@ -149,6 +149,13 @@ def migrate(*, search_index=False):
                     ) ENGINE=InnoDB
                 """)
                 cursor.execute("INSERT INTO schema_migration (version) VALUES (5)")
+            cursor.execute("SELECT version FROM schema_migration WHERE version = 7")
+            if not cursor.fetchone():
+                sql = (Path(__file__).resolve().parent.parent / "migrations/007_generation_history.sql").read_text()
+                for statement in sql.split(";"):
+                    if statement.strip():
+                        cursor.execute(statement)
+                cursor.execute("INSERT INTO schema_migration (version) VALUES (7)")
     finally:
         connection.close()
 

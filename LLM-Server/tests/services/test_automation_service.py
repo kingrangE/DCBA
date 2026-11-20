@@ -1,7 +1,7 @@
 import json
 import pytest
 from unittest.mock import MagicMock
-from app.models.exercise import Level
+from app.models.exercise import Level, QueuedExerciseRequest
 from app.services.automation_service import AutomationService, automation_service, RedisQueue
 
 
@@ -100,11 +100,11 @@ async def test_consumer_acknowledges_only_committed_tasks(mocker, outcome):
     acknowledge = mocker.patch.object(automation_service.queue, "acknowledge")
     service = mocker.patch("app.services.automation_service.exercise_service")
     if outcome == "failed":
-        service.generate_and_save.side_effect = RuntimeError("database unavailable")
+        service.run_queued.side_effect = RuntimeError("database unavailable")
     else:
-        service.generate_and_save.return_value = None if outcome == "deleted" else MagicMock(id=123)
+        service.run_queued.return_value = None if outcome == "deleted" else MagicMock(id=123)
     await automation_service.start_consumer()
-    service.generate_and_save.assert_called_once_with("DATABASE", "HARD", "task-1")
+    service.run_queued.assert_called_once_with("task-1", QueuedExerciseRequest(**task), automation_service.queue.reserve_call)
     if outcome == "failed":
         acknowledge.assert_not_called()
     else:
@@ -119,7 +119,7 @@ def test_failed_tasks_are_preserved_after_retry_limit():
     task["_attempt"] = 5
     queue.failed(task, RuntimeError("permanent"))
     args = queue.redis_client.eval.call_args.args
-    assert queue.failed_key in args and task["_payload"] in args
+    assert queue.failed_key in args and json.loads(args[-4]) == json.loads(task["_payload"])
     assert args[0].index("XADD") < args[0].index("XACK") < args[0].index("XDEL")
 
 
@@ -129,7 +129,8 @@ def test_invalid_payload_is_quarantined_without_stopping_consumer(payload):
     queue.redis_client.hincrby.return_value = 1
     queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": payload})], []]
     assert queue.dequeue() is None
-    assert queue.redis_client.eval.call_args.args[-3] == payload
+    assert queue.redis_client.eval.call_args.args[-3] == "invalid_request"
+    assert json.loads(queue.redis_client.eval.call_args.args[-4]).get("task_id") in (None, "legacy:1-0")
 
 
 def test_interrupted_tasks_stop_after_five_processing_attempts():
@@ -137,7 +138,7 @@ def test_interrupted_tasks_stop_after_five_processing_attempts():
     queue.redis_client.hincrby.return_value = 6
     queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": '{"subject":"DATABASE","level":"EASY"}'})], []]
     assert queue.dequeue() is None
-    assert queue.redis_client.eval.call_args.args[-2] == "Retry limit reached after interrupted processing"
+    assert queue.redis_client.eval.call_args.args[-3] == "temporary_failure"
 
 
 @pytest.mark.parametrize("status,quarantined", [(401, True), (429, False), (503, False)])
@@ -149,3 +150,13 @@ def test_permanent_api_errors_do_not_cycle_through_queue(status, quarantined):
     response = httpx.Response(status, request=httpx.Request("POST", "http://example.invalid"))
     queue.failed(task, APIStatusError("failed", response=response, body=None))
     assert queue.redis_client.eval.called == quarantined
+
+
+def test_dead_letter_does_not_preserve_free_text():
+    queue = RedisQueue()
+    task = {"_message_id": "1-0", "task_id": "known-task",
+            "_payload": '{"subject":"DATABASE","level":"HARD","requester_id":1,"learning_intent":"private example"}'}
+    queue.reject(task, "out_of_scope")
+    script_args = queue.redis_client.eval.call_args.args
+    assert json.loads(script_args[-4]) == {"subject": "DATABASE", "level": "HARD", "task_id": "known-task"}
+    assert "private example" not in str(script_args)
