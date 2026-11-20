@@ -8,6 +8,8 @@ UUID = re.compile(r"(?i)\b[0-9a-f]{8}(?:[\s‐‑–—-][0-9a-f]{4}){3}[\s‐�
 LABEL = re.compile(r"(?i)(?:계정|사용자|사번|식별자|조직|고객|user|account|employee|tenant|org)\s*(?:id|번호|코드)?\s*[:=]\s*([a-z0-9][a-z0-9_.@+/-]{1,63})")
 HANDLE = re.compile(r"(?i)\b(?:qa|test|demo|acct|account|user|tenant|org|employee|customer|cust|private|corp|staff|id)[\W_]{0,8}[0-9]{1,12}\b")
 LOCAL_HOST = re.compile(r"(?i)\b[\w-]+(?:\.[\w-]+)*\.(?:internal|corp|local)\b")
+SERIAL = re.compile(r"(?i)(?<![a-z0-9])([a-z]{2,24})([\s._·‐‑–—*-]{0,8})([0-9]{3,12})(?![a-z0-9])")
+TECHNICAL_PREFIXES = {"aes", "ascii", "http", "ieee", "iso", "md", "rfc", "sha", "tls", "utf"}
 
 
 def normalize(text):
@@ -19,6 +21,9 @@ def identifier_fragments(text):
     text = normalize(text)
     return {match.group(0) for pattern in (EMAIL, PHONE, UUID, HANDLE, LOCAL_HOST) for match in pattern.finditer(text)} | {
         match.group(1) for match in LABEL.finditer(text)
+    } | {
+        match.group(0) for match in SERIAL.finditer(text)
+        if match.group(1) not in TECHNICAL_PREFIXES and (not match.group(2).isspace() or len(match.group(3)) >= 5)
     }
 
 
@@ -26,17 +31,22 @@ def contains_identifier(text):
     return bool(identifier_fragments(text))
 
 
-def public_text(values, intent=None):
+def compact(text):
+    return "".join(re.findall(r"[^\W_]+", normalize(text)))
+
+
+def private_fragments(intent):
+    words = re.findall(r"[^\W_]+", normalize(intent))
+    excerpts = {"".join(words[i:i + 3]) for i in range(len(words) - 2)}
+    identifiers = identifier_fragments(intent)
+    parts = {part for identifier in identifiers
+             for part in re.findall(r"[^\W_]+", identifier) if len(part) >= 4}
+    return {value for value in excerpts if len(value) >= 16} | {compact(value) for value in identifiers} | parts
+
+
+def public_text(values, fragments=()):
     text = "\n".join(values)
     if contains_identifier(text):
         return False
-    if not intent:
-        return True
-    # Match long copied excerpts after case, width, whitespace, and punctuation normalization.
-    words = re.findall(r"[^\W_]+", normalize(intent))
-    compact = "".join(re.findall(r"[^\W_]+", normalize(text)))
-    for index in range(len(words) - 2):
-        fragment = "".join(words[index:index + 3])
-        if len(fragment) >= 16 and fragment in compact:
-            return False
-    return True
+    normalized = compact(text)
+    return not any(fragment in normalized for fragment in fragments)

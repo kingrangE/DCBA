@@ -184,3 +184,20 @@ def test_empty_search_can_continue_but_search_error_cannot_reach_review():
     with pytest.raises(SearchUnavailable):
         generate(service, request, repo, None, dedup, budget)
     assert service.client.generate.call_count == 2
+
+@pytest.mark.parametrize("intent", ["dummy-12345", "격리 수준과 관련해 dummy-12345 예시를 배우고 싶어요", "DUMMY 12345", "ＤＵＭＭＹ — １２３４５"])
+def test_new_identifier_formats_are_blocked_before_even_planning(intent):
+    service, repo, request, dedup, budget, _ = run([PLAN, WRITTEN, PASS], intent=intent)
+    with pytest.raises(GenerationRejected, match="private_input"):
+        generate(service, request, repo, None, dedup, budget, Mock())
+    service.client.generate.assert_not_called()
+    repo.recent_history.assert_not_called()
+    dedup.candidate_ids.assert_not_called()
+
+
+def test_identifier_fragments_block_copy_even_without_the_prefix():
+    from app.services.generation_privacy import private_fragments, public_text
+    fragments = private_fragments("격리 수준에서 dummy-12345 사례")
+    assert not public_text(["１２３４５"], fragments)
+    assert not public_text(["DUMMY · １２３４５"], fragments)
+    assert public_text(["팬텀 리드", "SHA-256"], fragments)

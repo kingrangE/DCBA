@@ -46,7 +46,10 @@ public class ExerciseController {
             + "|\\b(?:qa|test|demo|acct|account|user|tenant|org|employee|customer|cust|private|corp|staff|id)[\\W_]{0,8}[0-9]{1,12}\\b"
             + "|(?:계정|사용자|사번|식별자|조직|고객|user|account|employee|tenant|org)\\s*(?:id|번호|코드)?\\s*[:=]\\s*[a-z0-9][a-z0-9_.@+/-]+"
             + "|\\b[0-9a-f]{8}(?:[\\s‐‑–—-][0-9a-f]{4}){3}[\\s‐‑–—-][0-9a-f]{12}\\b"
-            + "|\\b[\\w-]+(?:\\.[\\w-]+)*\\.(?:internal|corp|local)\\b");
+            + "|\\b[\\w-]+(?:\\.[\\w-]+)*\\.(?:internal|corp|local)\\b"
+            + "|(?<![a-z0-9])(?!(?:aes|ascii|http|ieee|iso|md|rfc|sha|tls|utf)[\\W_]{0,8}[0-9])"
+            + "[a-z]{2,24}(?:[0-9]{3,12}|\\s{1,8}[0-9]{5,12}"
+            + "|[\\s._·‐‑–—*-]{0,7}[._·‐‑–—*-][\\s._·‐‑–—*-]{0,7}[0-9]{3,12})(?![a-z0-9])");
 
     private final ExerciseService exerciseService;
     private final ExerciseGenerationQueueService exerciseGenerationQueueService;

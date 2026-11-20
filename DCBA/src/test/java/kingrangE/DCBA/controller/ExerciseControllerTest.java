@@ -89,7 +89,7 @@ class ExerciseControllerTest {
     void rejectsIdentifyingInputBeforeEnqueueing() {
         var session = new MockHttpSession();
         session.setAttribute("loginUser", new User(15L, "tester", "password", null, null));
-        for (String intent : new String[]{"qa · ７", "개인 @ example . invalid", "계정 ID: acme-west"}) {
+        for (String intent : new String[]{"qa · ７", "개인 @ example . invalid", "계정 ID: acme-west", "dummy-12345", "격리 수준과 관련해 dummy-12345 예시", "ＤＵＭＭＹ — １２３４５"}) {
             assertThatThrownBy(() -> controller.requestGeneration(
                     new GenerationRequest(Subject.DATABASE, Level.HARD, intent), session))
                     .isInstanceOf(IllegalArgumentException.class)

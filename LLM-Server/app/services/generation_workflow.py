@@ -8,7 +8,7 @@ from prometheus_client import Histogram
 from openai import APIStatusError
 
 from app.models.exercise import LEVEL_LABELS, SUBJECT_LABELS
-from app.services.generation_privacy import public_text
+from app.services.generation_privacy import contains_identifier, private_fragments, public_text
 
 RULES = json.loads((Path(__file__).resolve().parents[2] / "instructions/generation_rules.json").read_text(encoding="utf-8"))
 HISTORY_TIME = Histogram("dcba_generation_history_seconds", "Time to fetch scoped generation history")
@@ -87,14 +87,18 @@ def summarize_history(rows):
 def generate(service, request, repository, connection, deduplication, budget, recommend=None):
     from app.services.exercise_service import unique_object
 
+    intent = request.learning_intent if request.request_type == "manual" and request.requester_id else None
+    if intent and contains_identifier(intent):
+        raise GenerationRejected("private_input")
+    fragments = private_fragments(intent or "")
+
     with HISTORY_TIME.time():
         rows = repository.recent_history(request.subject.value, request.level.value, connection)
-        history = summarize_history([row for row in rows if public_text(row.values())])
+        history = summarize_history([row for row in rows if public_text(row.values(), fragments)])
     HISTORY_INPUT.observe(len(json.dumps(history, ensure_ascii=False).encode()))
     rules = RULES["levels"][request.level.value]
     scope = {"subject": SUBJECT_LABELS[request.subject.value], "level": LEVEL_LABELS[request.level.value],
              "rules": rules, "example": RULES["examples"][request.subject.value][request.level.value]}
-    intent = request.learning_intent if request.request_type == "manual" and request.requester_id else None
     duplicates = deque(maxlen=3)
     feedback = None
     plan = None
@@ -130,7 +134,7 @@ def generate(service, request, repository, connection, deduplication, budget, re
             if not result or result.decision != "plan" or not result.plan or result.plan.question_type not in rules["types"]:
                 continue
             plan = result.plan
-            if not public_text([plan.concept, plan.objective, plan.question_type, plan.scenario, plan.reasoning, *plan.clues], intent):
+            if not public_text([plan.concept, plan.objective, plan.question_type, plan.scenario, plan.reasoning, *plan.clues], fragments):
                 raise GenerationRejected("private_output")
             feedback = None
 
@@ -143,7 +147,7 @@ def generate(service, request, repository, connection, deduplication, budget, re
                 request.subject.value, request.level.value, request.requester_id, plan.concept, candidate_ids, connection)
             candidates = [{"id": row["id"], "question": row["question"][:1800], "answer": row["answer"][:2400],
                            "concept": row["concept"], "objective": row["objective"]} for row in rows
-                          if public_text([row["question"], row["answer"], row["concept"] or "", row["objective"] or ""], intent)]
+                          if public_text([row["question"], row["answer"], row["concept"] or "", row["objective"] or ""], fragments)]
             if candidates:
                 choice = parse(Recommendation, call(
                     "recommend", "기존 문항 비교 검수자",
@@ -166,14 +170,14 @@ def generate(service, request, repository, connection, deduplication, budget, re
         if written is None:
             continue
         question, answer = written.question, service.format_answer(written)
-        if not public_text((question, answer), intent):
+        if not public_text((question, answer), fragments):
             raise GenerationRejected("private_output")
         budget("embedding")
         duplicate, embedding = search(deduplication.check_duplicate, request.subject.value,
                                       request.level.value, f"Q: {question}\nA: {answer}")
         if duplicate is not None:
             duplicates.append({"rejected_question": question[:500], "existing_exercise_excerpt":
-                               duplicate[:500] if public_text([duplicate], intent) else ""})
+                               duplicate[:500] if public_text([duplicate], fragments) else ""})
             plan = None
             continue
         outcome = parse(Review, call(
@@ -185,7 +189,7 @@ def generate(service, request, repository, connection, deduplication, budget, re
         ))
         if outcome and outcome.decision == "pass":
             return question, answer, embedding, (plan.concept, plan.objective, plan.question_type, RULES["version"])
-        feedback = (outcome.reason if outcome and public_text([outcome.reason], intent) else
+        feedback = (outcome.reason if outcome and public_text([outcome.reason], fragments) else
                     "같은 목표에서 답과 단서를 명확히 작성하세요.")
         if outcome and outcome.decision == "replan":
             plan = None
