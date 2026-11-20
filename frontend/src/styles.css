@@ -157,6 +157,11 @@ input[aria-invalid='true'] { border-color: var(--error); }
 .generation-panel { scroll-margin-top: 1rem; }
 .generation-panel > p, .generation-unavailable { margin-top: .5rem; font-size: .9rem; }
 .generation-form, .generation-unavailable .button { margin-top: 1rem; }
+.generation-form textarea { width: 100%; min-width: 0; resize: vertical; font: inherit; }
+.generation-progress { display: grid; gap: .375rem; margin-top: 1rem; }
+.generation-notifications ul { display: grid; gap: 1rem; margin: 0; padding: 0; list-style: none; }
+.generation-notifications li + li { padding-top: 1rem; border-top: 1px solid var(--line); }
+.generation-notifications .card-actions { margin-top: .625rem; }
 
 .auth-page { display: grid; align-content: center; justify-items: center; gap: 1.25rem; min-height: 100dvh; padding: 1.5rem var(--gutter); }
 .auth-panel, .auth-brand { width: min(100%, 28rem); }

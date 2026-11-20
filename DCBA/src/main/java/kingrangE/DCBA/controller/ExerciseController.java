@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import jakarta.servlet.http.HttpSession;
 import kingrangE.DCBA.domain.Exercise;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -129,24 +131,56 @@ public class ExerciseController {
     public ResponseEntity<GenerationResponse> requestGeneration(
             @RequestBody GenerationRequest request,
             HttpSession session) {
-        requireUser(session);
+        User user = requireUser(session);
         if (request.subject() == null || request.level() == null) {
             throw new IllegalArgumentException("분야와 난이도를 모두 선택해 주세요.");
         }
+        String intent = request.learningIntent() == null ? "" : trimSearchKeyword(request.learningIntent());
+        if (intent.codePointCount(0, intent.length()) > 200) {
+            throw new IllegalArgumentException("학습하고 싶은 내용은 200자 이하로 입력해 주세요.");
+        }
 
         try {
-            Long queueSize = exerciseGenerationQueueService.enqueue(request.subject(), request.level());
-            long safeQueueSize = queueSize == null ? 0 : queueSize;
+            var accepted = exerciseGenerationQueueService.enqueue(request.subject(), request.level(), user.getId(),
+                    intent.isEmpty() ? null : intent);
             String message = "%s · Level %d 문제 생성 요청이 등록되었습니다."
                     .formatted(request.subject().getSubjectName(), request.level().getLevel());
             return ResponseEntity.status(HttpStatus.ACCEPTED)
-                    .body(new GenerationResponse(message, safeQueueSize));
+                    .body(new GenerationResponse(message, accepted.queueSize(), accepted.requestId()));
         } catch (RuntimeException exception) {
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "문제 생성 요청을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.",
                     exception);
         }
+    }
+
+    @GetMapping("/generation-requests/{requestId}")
+    public ExerciseGenerationQueueService.Status generationStatus(@PathVariable UUID requestId, HttpSession session) {
+        return exerciseGenerationQueueService.status(requestId, requireUser(session).getId());
+    }
+
+    @GetMapping("/generation-requests/notifications")
+    public ExerciseGenerationQueueService.Notifications generationNotifications(
+            @RequestParam(defaultValue = "0") int page, HttpSession session) {
+        return exerciseGenerationQueueService.notifications(requireUser(session).getId(), page);
+    }
+
+    @PutMapping("/generation-requests/{requestId}/read")
+    public ResponseEntity<Void> markGenerationRead(@PathVariable UUID requestId, HttpSession session) {
+        exerciseGenerationQueueService.markRead(requestId, requireUser(session).getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/generation-requests/{requestId}/exercise")
+    public ExerciseResponse generatedExercise(@PathVariable UUID requestId, HttpSession session) {
+        Long userId = requireUser(session).getId();
+        Long exerciseId = exerciseGenerationQueueService.completedExercise(requestId, userId);
+        if (exerciseId == null || !exerciseService.getBannedExerciseIds(userId, List.of(exerciseId)).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문제를 열 수 없어요.");
+        }
+        Exercise exercise = exerciseService.findExercise(exerciseId);
+        return ExerciseResponse.from(exercise, Set.copyOf(exerciseService.getSavedExerciseIds(userId, List.of(exerciseId))), Set.of());
     }
 
     private User requireUser(HttpSession session) {
