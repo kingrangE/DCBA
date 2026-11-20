@@ -119,7 +119,7 @@ def test_failed_tasks_are_preserved_after_retry_limit():
     task["_attempt"] = 5
     queue.failed(task, RuntimeError("permanent"))
     args = queue.redis_client.eval.call_args.args
-    assert queue.failed_key in args and json.loads(args[-4]) == json.loads(task["_payload"])
+    assert queue.failed_key in args and json.loads(args[-5]) == json.loads(task["_payload"])
     assert args[0].index("XADD") < args[0].index("XACK") < args[0].index("XDEL")
 
 
@@ -129,8 +129,8 @@ def test_invalid_payload_is_quarantined_without_stopping_consumer(payload):
     queue.redis_client.hincrby.return_value = 1
     queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": payload})], []]
     assert queue.dequeue() is None
-    assert queue.redis_client.eval.call_args.args[-3] == "invalid_request"
-    assert json.loads(queue.redis_client.eval.call_args.args[-4]).get("task_id") in (None, "legacy:1-0")
+    assert queue.redis_client.eval.call_args.args[-4] == "invalid_request"
+    assert json.loads(queue.redis_client.eval.call_args.args[-5]).get("task_id") in (None, "legacy:1-0")
 
 
 def test_interrupted_tasks_stop_after_five_processing_attempts():
@@ -138,7 +138,7 @@ def test_interrupted_tasks_stop_after_five_processing_attempts():
     queue.redis_client.hincrby.return_value = 6
     queue.redis_client.xautoclaim.return_value = ["0-0", [("1-0", {"payload": '{"subject":"DATABASE","level":"EASY"}'})], []]
     assert queue.dequeue() is None
-    assert queue.redis_client.eval.call_args.args[-3] == "temporary_failure"
+    assert queue.redis_client.eval.call_args.args[-4] == "temporary_failure"
 
 
 @pytest.mark.parametrize("status,quarantined", [(401, True), (429, False), (503, False)])
@@ -158,5 +158,5 @@ def test_dead_letter_does_not_preserve_free_text():
             "_payload": '{"subject":"DATABASE","level":"HARD","requester_id":1,"learning_intent":"private example"}'}
     queue.reject(task, "out_of_scope")
     script_args = queue.redis_client.eval.call_args.args
-    assert json.loads(script_args[-4]) == {"subject": "DATABASE", "level": "HARD", "task_id": "known-task"}
+    assert json.loads(script_args[-5]) == {"subject": "DATABASE", "level": "HARD", "task_id": "known-task"}
     assert "private example" not in str(script_args)

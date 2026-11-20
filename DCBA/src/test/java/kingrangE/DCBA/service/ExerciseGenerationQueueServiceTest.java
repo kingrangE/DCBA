@@ -25,12 +25,13 @@ class ExerciseGenerationQueueServiceTest {
 
     @Test
     void enqueuesTheServerOwnedTaskAndCommitsInitialStateInTheSameScript() throws Exception {
-        when(redis.execute(any(RedisScript.class), anyList(), anyString(), eq("42"))).thenReturn(3L);
+        when(redis.execute(any(RedisScript.class), anyList(), anyString(), eq("42"), anyString(), anyString(), anyString(), anyString())).thenReturn(3L);
         var accepted = service.enqueue(Subject.COMPUTER_NETWORK, Level.HARD, 42L, "TCP 흐름 제어");
         var script = ArgumentCaptor.forClass(RedisScript.class);
         var payload = ArgumentCaptor.forClass(String.class);
         verify(redis).execute(script.capture(), eq(List.of("exercise:generation_stream", "exercise:generation_queue",
-                "exercise:generation_request:" + accepted.requestId())), payload.capture(), eq("42"));
+                "exercise:generation_request:" + accepted.requestId(), "exercise:generation_requests_by_owner:42")),
+                payload.capture(), eq("42"), eq(accepted.requestId()), anyString(), eq("컴퓨터 네트워크"), anyString());
         var json = new ObjectMapper().readTree(payload.getValue());
         assertThat(json.get("task_id").asText()).isEqualTo(accepted.requestId());
         assertThat(json.get("request_type").asText()).isEqualTo("manual");
@@ -38,7 +39,7 @@ class ExerciseGenerationQueueServiceTest {
         assertThat(json.get("learning_intent").asText()).isEqualTo("TCP 흐름 제어");
         assertThat(json.get("subject").asText()).isEqualTo("COMPUTER_NETWORK");
         assertThat(json.get("level").asText()).isEqualTo("HARD");
-        assertThat(script.getValue().getScriptAsString()).contains("XADD", "HSET");
+        assertThat(script.getValue().getScriptAsString()).contains("XADD", "HSET", "ZADD");
         assertThat(accepted.queueSize()).isEqualTo(3L);
     }
 

@@ -19,6 +19,8 @@ from app.services.generation_workflow import GenerationRejected, SearchUnavailab
 
 class RedisQueue:
     AUTO_GENERATION_PAUSE_KEY = "exercise:auto_generation_paused"
+    REQUEST_STATE_TTL = 604800
+    EXPIRY_KEY = "exercise:generation_request_expiry"
 
     def __init__(self, host="localhost", port=6379, db=0):
         self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True,
@@ -53,6 +55,7 @@ class RedisQueue:
         return bool(self.redis_client.exists(self.AUTO_GENERATION_PAUSE_KEY))
 
     def dequeue(self, timeout=5):
+        self.clean_expired()
         try:
             self.redis_client.xgroup_create(self.queue_key, self.group, id="0-0", mkstream=True)
         except Exception as error:
@@ -103,6 +106,20 @@ class RedisQueue:
     def state_key(self, task_id):
         return f"exercise:generation_request:{task_id}"
 
+    def clean_expired(self):
+        self.redis_client.eval("""
+            local now = tonumber(redis.call('TIME')[1])
+            for _, entry in ipairs(redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', now, 'LIMIT', 0, 100)) do
+                local owner, request = string.match(entry, '^([^:]+):(.+)$')
+                if owner and redis.call('EXISTS', 'exercise:generation_request:' .. request) == 0 then
+                    redis.call('ZREM', 'exercise:generation_requests_by_owner:' .. owner, request)
+                    redis.call('ZREM', KEYS[1], entry)
+                elseif owner then
+                    redis.call('ZADD', KEYS[1], now + 60, entry)
+                end
+            end
+        """, 1, self.EXPIRY_KEY)
+
     def start(self, task):
         key = self.state_key(task["task_id"])
         if self.redis_client.hget(key, "status") == "failed":
@@ -123,13 +140,15 @@ class RedisQueue:
             raise GenerationRejected("generation_limit")
         MODEL_CALLS.labels(kind).inc()
 
-    def acknowledge(self, task):
+    def acknowledge(self, task, completed=True):
         with self.redis_client.pipeline() as transaction:
             transaction.xack(self.queue_key, self.group, task["_message_id"])
             transaction.xdel(self.queue_key, task["_message_id"])
             transaction.hdel(self.attempts_key, task["_message_id"])
-            if task.get("task_id"):
-                transaction.expire(self.state_key(task["task_id"]), 604800)
+            if completed and task.get("task_id"):
+                transaction.expire(self.state_key(task["task_id"]), self.REQUEST_STATE_TTL)
+                if task.get("requester_id") is not None:
+                    transaction.zrem(f"exercise:generation_requests_by_owner:{task['requester_id']}", task["task_id"])
             transaction.execute()
 
     def reject(self, task, reason):
@@ -145,13 +164,20 @@ class RedisQueue:
             safe_payload["task_id"] = task_id
         self.redis_client.eval("""
             redis.call('XADD', KEYS[2], '*', 'original_id', ARGV[1], 'payload', ARGV[2], 'reason', ARGV[3])
-            if ARGV[5] == '1' then redis.call('HSET', KEYS[4], 'status', 'failed', 'reason', ARGV[3]) end
+            if ARGV[5] ~= '' then
+                redis.call('HSET', KEYS[4], 'status', 'failed', 'reason', ARGV[3])
+                redis.call('EXPIRE', KEYS[4], ARGV[6])
+                local owner = redis.call('HGET', KEYS[4], 'owner')
+                if owner then
+                    redis.call('ZADD', KEYS[5], tonumber(redis.call('TIME')[1]) + tonumber(ARGV[6]), owner .. ':' .. ARGV[5])
+                end
+            end
             redis.call('XACK', KEYS[1], ARGV[4], ARGV[1])
             redis.call('XDEL', KEYS[1], ARGV[1])
             redis.call('HDEL', KEYS[3], ARGV[1])
             return 1
-        """, 4, self.queue_key, self.failed_key, self.attempts_key, self.state_key(task_id),
-            task["_message_id"], json.dumps(safe_payload), reason, self.group, "1" if task_id else "0")
+        """, 5, self.queue_key, self.failed_key, self.attempts_key, self.state_key(task_id), self.EXPIRY_KEY,
+            task["_message_id"], json.dumps(safe_payload), reason, self.group, task_id or "", self.REQUEST_STATE_TTL)
         TASK_RESULTS.labels("dead_letter").inc()
 
     def failed(self, task, error):
@@ -235,13 +261,14 @@ class AutomationService:
                     print(f"[Consumer] Processing: {task['subject']} ({task['level']})")
                     # 문제 생성 시작
                     try:
-                        saved_exercise = None
-                        if await loop.run_in_executor(None, self.queue.start, task):
-                            with WORK_TIME.time():
-                                saved_exercise = await loop.run_in_executor(
-                                    None, exercise_service.run_queued, task["task_id"], QueuedExerciseRequest(**task),
-                                    self.queue.reserve_call,
-                                )
+                        if not await loop.run_in_executor(None, self.queue.start, task):
+                            await loop.run_in_executor(None, self.queue.acknowledge, task, False)
+                            continue
+                        with WORK_TIME.time():
+                            saved_exercise = await loop.run_in_executor(
+                                None, exercise_service.run_queued, task["task_id"], QueuedExerciseRequest(**task),
+                                self.queue.reserve_call,
+                            )
                         await loop.run_in_executor(None, self.queue.acknowledge, task)
                         self.consecutive_failures = 0
                         if saved_exercise is not None:

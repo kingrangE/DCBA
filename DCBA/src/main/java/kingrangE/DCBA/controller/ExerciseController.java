@@ -179,6 +179,11 @@ public class ExerciseController {
         return exerciseGenerationQueueService.notifications(requireUser(session).getId(), page);
     }
 
+    @GetMapping("/generation-requests/recent")
+    public List<ExerciseGenerationQueueService.RecentRequest> recentGenerationRequests(HttpSession session) {
+        return exerciseGenerationQueueService.recent(requireUser(session).getId());
+    }
+
     @PutMapping("/generation-requests/{requestId}/read")
     public ResponseEntity<Void> markGenerationRead(@PathVariable UUID requestId, HttpSession session) {
         exerciseGenerationQueueService.markRead(requestId, requireUser(session).getId());

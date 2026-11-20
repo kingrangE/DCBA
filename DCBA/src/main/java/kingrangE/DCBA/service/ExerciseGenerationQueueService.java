@@ -12,8 +12,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
 import java.time.Instant;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -26,11 +28,27 @@ public class ExerciseGenerationQueueService {
     private static final int PAGE_SIZE = 20;
     private static final DefaultRedisScript<Long> ENQUEUE = new DefaultRedisScript<>("""
         local depth = redis.call('XLEN', KEYS[1]) + redis.call('LLEN', KEYS[2])
-        if depth >= 1000 or redis.call('EXISTS', KEYS[3]) ~= 0 then return -1 end
+        local owner_type = redis.call('TYPE', KEYS[4]).ok
+        if depth >= 1000 or redis.call('EXISTS', KEYS[3]) ~= 0
+            or (owner_type ~= 'none' and owner_type ~= 'zset') then return -1 end
         redis.call('XADD', KEYS[1], '*', 'payload', ARGV[1])
-        redis.call('HSET', KEYS[3], 'owner', ARGV[2], 'status', 'queued')
+        redis.call('HSET', KEYS[3], 'owner', ARGV[2], 'status', 'queued', 'subject', ARGV[5], 'level', ARGV[6], 'requested_at', ARGV[4])
+        redis.call('ZADD', KEYS[4], ARGV[4], ARGV[3])
         return depth + 1
         """, Long.class);
+    private static final DefaultRedisScript<String> RECENT = new DefaultRedisScript<>("""
+        local rows = {}
+        for _, id in ipairs(redis.call('ZREVRANGE', KEYS[1], 0, 99)) do
+            local state = redis.call('HMGET', 'exercise:generation_request:' .. id,
+                                    'owner', 'status', 'reason', 'subject', 'level', 'requested_at')
+            if state[1] == ARGV[1] then
+                table.insert(rows, {id, state[2], state[3], state[4], state[5], state[6]})
+            else
+                redis.call('ZREM', KEYS[1], id)
+            end
+        end
+        return cjson.encode(rows)
+        """, String.class);
 
     private final StringRedisTemplate redisTemplate;
     private final JdbcTemplate jdbc;
@@ -41,6 +59,7 @@ public class ExerciseGenerationQueueService {
     public record Notification(String requestId, long exerciseId, Instant completedAt, Instant readAt,
                                String completionType) {}
     public record Notifications(List<Notification> items, boolean hasNext) {}
+    public record RecentRequest(String requestId, String subject, String level, Instant requestedAt, Status progress) {}
 
     public Accepted enqueue(Subject subject, Level level, long userId, String learningIntent) {
         String requestId = UUID.randomUUID().toString();
@@ -56,8 +75,10 @@ public class ExerciseGenerationQueueService {
 
         try {
             String payload = objectMapper.writeValueAsString(task);
-            Long depth = redisTemplate.execute(ENQUEUE, List.of(QUEUE_KEY, "exercise:generation_queue", stateKey(requestId)),
-                    payload, String.valueOf(userId));
+            Long depth = redisTemplate.execute(ENQUEUE, List.of(QUEUE_KEY, "exercise:generation_queue",
+                            stateKey(requestId), ownerKey(userId)),
+                    payload, String.valueOf(userId), requestId, String.valueOf(System.currentTimeMillis()),
+                    subject.getSubjectName(), level.getPromptName());
             if (depth == null || depth < 0) throw new IllegalStateException("문제 생성 요청이 가득 찼습니다.");
             return new Accepted(requestId, depth);
         } catch (JsonProcessingException e) {
@@ -90,6 +111,26 @@ public class ExerciseGenerationQueueService {
                 rs.getString("completion_type")), requestId.toString(), userId).stream().findFirst().orElse(null);
     }
 
+    public List<RecentRequest> recent(long userId) {
+        String encoded = redisTemplate.execute(RECENT, List.of(ownerKey(userId)), String.valueOf(userId));
+        try {
+            var pending = new java.util.ArrayList<RecentRequest>();
+            for (var row : objectMapper.readTree(encoded)) {
+                pending.add(new RecentRequest(row.get(0).asText(), row.get(3).asText(), row.get(4).asText(),
+                        Instant.ofEpochMilli(row.get(5).asLong()), pendingStatus(row.get(1).asText(), row.get(2).asText())));
+            }
+            if (pending.isEmpty()) return List.of();
+            var ids = pending.stream().map(RecentRequest::requestId).toList();
+            var completed = Set.copyOf(new NamedParameterJdbcTemplate(jdbc).queryForList("""
+                    SELECT task_id FROM generation_task
+                    WHERE requester_id = :owner AND task_id IN (:ids) AND completed_at IS NOT NULL
+                    """, Map.of("owner", userId, "ids", ids), String.class));
+            return pending.stream().filter(request -> !completed.contains(request.requestId())).toList();
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("생성 상태를 읽지 못했어요.", exception);
+        }
+    }
+
     public Notifications notifications(long userId, int page) {
         if (page < 0) throw new IllegalArgumentException("페이지 번호를 확인해 주세요.");
         var rows = jdbc.query("""
@@ -115,6 +156,10 @@ public class ExerciseGenerationQueueService {
 
     private static String stateKey(String requestId) {
         return "exercise:generation_request:" + requestId;
+    }
+
+    private static String ownerKey(long userId) {
+        return "exercise:generation_requests_by_owner:" + userId;
     }
 
     private static Status pendingStatus(String status, String reason) {
