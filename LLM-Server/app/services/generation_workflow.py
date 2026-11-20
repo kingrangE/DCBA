@@ -69,6 +69,12 @@ class Review(BaseModel):
     reason: Text
 
 
+class Recommendation(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    exercise_id: int | None
+
+
 def summarize_history(rows):
     return {
         "concept_frequency": Counter(row["concept"][:60] for row in rows).most_common(5),
@@ -78,7 +84,7 @@ def summarize_history(rows):
     }
 
 
-def generate(service, request, repository, connection, deduplication, budget):
+def generate(service, request, repository, connection, deduplication, budget, recommend=None):
     from app.services.exercise_service import unique_object
 
     with HISTORY_TIME.time():
@@ -92,6 +98,7 @@ def generate(service, request, repository, connection, deduplication, budget):
     duplicates = deque(maxlen=3)
     feedback = None
     plan = None
+    try_recommendation = recommend is not None and bool(intent)
 
     def call(stage, role, instruction, context):
         timeout = budget("model")
@@ -126,6 +133,30 @@ def generate(service, request, repository, connection, deduplication, budget):
             if not public_text([plan.concept, plan.objective, plan.question_type, plan.scenario, plan.reasoning, *plan.clues], intent):
                 raise GenerationRejected("private_output")
             feedback = None
+
+        if try_recommendation:
+            try_recommendation = False
+            budget("embedding")
+            candidate_ids = search(deduplication.candidate_ids, request.subject.value, request.level.value,
+                                   f"{plan.concept}\n{plan.objective}")
+            rows = repository.recommendation_candidates(
+                request.subject.value, request.level.value, request.requester_id, plan.concept, candidate_ids, connection)
+            candidates = [{"id": row["id"], "question": row["question"][:1800], "answer": row["answer"][:2400],
+                           "concept": row["concept"], "objective": row["objective"]} for row in rows
+                          if public_text([row["question"], row["answer"], row["concept"] or "", row["objective"] or ""], intent)]
+            if candidates:
+                choice = parse(Recommendation, call(
+                    "recommend", "기존 문항 비교 검수자",
+                    "핵심 개념과 학습 목표가 모두 일치하고 학습자에게 같은 판단이나 근거를 요구하는 후보만 고른다. "
+                    "주제가 같아도 정의, 판단 기준 또는 난이도가 다르면 제외한다. 불확실하면 null을 반환한다. "
+                    "출력은 {exercise_id: 정수 또는 null}이다.",
+                    {"concept": plan.concept, "objective": plan.objective, "candidates": candidates},
+                ))
+                if choice and choice.exercise_id in {row["id"] for row in candidates}:
+                    budget()
+                    existing = recommend(choice.exercise_id)
+                    if existing is not None:
+                        return existing
 
         content = call("write", service.system_prompt, service.prompt_template.format(
             subject=scope["subject"], level=scope["level"]

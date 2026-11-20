@@ -84,8 +84,14 @@ class ExerciseService:
             search(deduplication.synchronize, exercise_repository, connection,
                    before_embedding=lambda: budget("embedding"))
 
-            question, answer, embedding, history = generate(
-                self, request, exercise_repository, connection, deduplication, budget)
+            def recommend(exercise_id):
+                return exercise_repository.save_recommendation(
+                    task_id, request.requester_id, exercise_id, request.subject.value, request.level.value, connection)
+
+            result = generate(self, request, exercise_repository, connection, deduplication, budget, recommend)
+            if isinstance(result, Exercise):
+                return result
+            question, answer, embedding, history = result
             budget()
             saved = exercise_repository.save_exercise(
                 request.subject.value, request.level.value, question, answer, task_id=task_id,

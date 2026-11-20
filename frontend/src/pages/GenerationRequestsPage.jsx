@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import ExerciseCard from '../components/ExerciseCard'
 import Layout from '../components/Layout'
+import { completionMessage } from '../components/generationMessages'
 
 function CompletionList() {
   const [page, setPage] = useState(0)
@@ -59,7 +60,7 @@ function CompletionList() {
       {result?.items.length > 0 && <ul>
         {result.items.map((item) => <li key={item.requestId}>
           <p>{item.readAt ? '읽음' : '새 알림'} · <time dateTime={item.completedAt}>{new Date(item.completedAt).toLocaleString('ko-KR')}</time></p>
-          <p>요청한 문제가 생성되어 저장한 문제에 추가됐어요.</p>
+          <p>{completionMessage(item.completionType)}</p>
           <div className="card-actions">
             <Link className="button button--primary" to={`/generation-requests/${item.requestId}`}>문제 풀기</Link>
             {!item.readAt && <button className="button button--secondary" type="button" disabled={pending !== null}

@@ -141,3 +141,46 @@ def test_private_input_and_missing_search_stop_before_provider_calls(mocker, mon
     service.client.generate.assert_not_called()
     reserve.assert_not_called()
     repo.save_exercise.assert_not_called()
+
+
+@pytest.mark.parametrize("decision,recommend_result", [(7, "existing"), (7, None), (None, None), (9, None)])
+def test_only_confirmed_current_candidate_skips_writing(decision, recommend_result):
+    from app.models.exercise import Exercise
+
+    same = {"id":7, "question":"격리 수준별 반복 조회 결과 차이를 비교하세요.", "answer":"커밋 순서를 확인합니다.",
+            "concept":"팬텀 리드", "objective":"격리 수준별 결과 비교"}
+    irrelevant = {"id":8, "question":"팬텀 리드의 정의를 답하세요.", "answer":"정의를 답합니다.",
+                  "concept":"팬텀 리드", "objective":"정의 설명"}
+    service, repo, request, dedup, budget, reservations = run(
+        [PLAN, json.dumps({"exercise_id":decision}), WRITTEN, PASS], intent="팬텀 리드")
+    repo.recommendation_candidates.return_value = [same, irrelevant]
+    dedup.candidate_ids.return_value = [7, 8]
+    existing = Exercise(id=7, subject="DATABASE", level="HARD", question=same["question"], answer=same["answer"])
+    recommend = Mock(return_value=existing if recommend_result else None)
+    result = generate(service, request, repo, None, dedup, budget, recommend)
+    comparison = json.loads(service.client.generate.call_args_list[1].kwargs["messages"][1]["content"])
+    assert "intent" not in comparison and comparison["objective"]
+    if recommend_result:
+        assert result == existing
+        assert reservations.count("model") == 2
+        dedup.check_duplicate.assert_not_called()
+    else:
+        assert result[0] == json.loads(WRITTEN)["question"]
+        assert reservations.count("model") == 4
+        dedup.check_duplicate.assert_called_once()
+    assert recommend.call_count == (1 if decision == 7 else 0)
+
+
+def test_empty_search_can_continue_but_search_error_cannot_reach_review():
+    from app.services.generation_workflow import SearchUnavailable
+
+    service, repo, request, dedup, budget, _ = run([PLAN, WRITTEN, PASS], intent="팬텀 리드")
+    dedup.candidate_ids.return_value = []
+    repo.recommendation_candidates.return_value = []
+    assert generate(service, request, repo, None, dedup, budget, Mock())[0] == json.loads(WRITTEN)["question"]
+
+    service, repo, request, dedup, budget, _ = run([PLAN, WRITTEN, PASS], kind="automatic")
+    dedup.check_duplicate.side_effect = RuntimeError("upstream unavailable")
+    with pytest.raises(SearchUnavailable):
+        generate(service, request, repo, None, dedup, budget)
+    assert service.client.generate.call_count == 2

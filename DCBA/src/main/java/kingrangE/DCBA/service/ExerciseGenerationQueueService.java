@@ -37,8 +37,9 @@ public class ExerciseGenerationQueueService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public record Accepted(String requestId, long queueSize) {}
-    public record Status(String status, Long exerciseId, String reason, String message) {}
-    public record Notification(String requestId, long exerciseId, Instant completedAt, Instant readAt) {}
+    public record Status(String status, Long exerciseId, String reason, String message, String completionType) {}
+    public record Notification(String requestId, long exerciseId, Instant completedAt, Instant readAt,
+                               String completionType) {}
     public record Notifications(List<Notification> items, boolean hasNext) {}
 
     public Accepted enqueue(Subject subject, Level level, long userId, String learningIntent) {
@@ -65,52 +66,41 @@ public class ExerciseGenerationQueueService {
     }
 
     public Status status(UUID requestId, long userId) {
-        Long exerciseId = completedExercise(requestId, userId);
-        if (exerciseId != null) return new Status("completed", exerciseId, null, null);
+        Status completed = completedStatus(requestId, userId);
+        if (completed != null) return completed;
 
         var state = redisTemplate.opsForHash().entries(stateKey(requestId.toString()));
+        // A delivery can commit after the first lookup and before we read Redis.
+        completed = completedStatus(requestId, userId);
+        if (completed != null) return completed;
         if (!String.valueOf(userId).equals(state.get("owner"))) throw missing();
-        return switch (String.valueOf(state.get("status"))) {
-            case "queued" -> new Status("queued", null, null, null);
-            case "running" -> {
-                // A delivery can commit after the first lookup and before we read Redis.
-                exerciseId = completedExercise(requestId, userId);
-                yield exerciseId == null ? new Status("running", null, null, null)
-                        : new Status("completed", exerciseId, null, null);
-            }
-            case "failed" -> {
-                exerciseId = completedExercise(requestId, userId);
-                if (exerciseId != null) yield new Status("completed", exerciseId, null, null);
-                String reason = String.valueOf(state.get("reason"));
-                yield switch (reason) {
-                    case "out_of_scope" -> new Status("failed", null, reason, "선택한 분야와 학습하고 싶은 내용이 맞지 않아요. 분야나 내용을 바꿔 다시 요청해 주세요.");
-                    case "generation_limit", "time_limit" -> new Status("failed", null, reason, "설정된 생성 한도 안에 문제를 완성하지 못했어요. 배우고 싶은 내용을 좁혀 다시 요청해 주세요.");
-                    case "invalid_request" -> new Status("failed", null, reason, "요청 내용을 확인하지 못했어요. 입력을 확인하고 다시 요청해 주세요.");
-                    case "private_input", "private_output" -> new Status("failed", null, reason, "개인이나 조직을 식별할 수 있는 내용이 감지됐어요. 공개 가능한 CS 개념과 학습 목표로 다시 요청해 주세요.");
-                    case "search_unavailable", "search_configuration" -> new Status("failed", null, reason, "문제 검색을 사용할 수 없어 요청을 완료하지 못했어요. 잠시 후 다시 요청해 주세요.");
-                    default -> new Status("failed", null, "temporary_failure", "일시적인 문제로 생성을 완료하지 못했어요. 잠시 후 다시 요청해 주세요.");
-                };
-            }
-            default -> throw missing();
-        };
+        return pendingStatus(String.valueOf(state.get("status")), String.valueOf(state.get("reason")));
     }
 
     public Long completedExercise(UUID requestId, long userId) {
+        var status = completedStatus(requestId, userId);
+        return status == null ? null : status.exerciseId();
+    }
+
+    private Status completedStatus(UUID requestId, long userId) {
         return jdbc.query("""
-                SELECT exercise_id FROM generation_task WHERE task_id = ? AND requester_id = ? AND completed_at IS NOT NULL
-                """, (rs, row) -> rs.getLong("exercise_id"), requestId.toString(), userId).stream().findFirst().orElse(null);
+                SELECT exercise_id, completion_type FROM generation_task
+                WHERE task_id = ? AND requester_id = ? AND completed_at IS NOT NULL
+                """, (rs, row) -> new Status("completed", rs.getLong("exercise_id"), null, null,
+                rs.getString("completion_type")), requestId.toString(), userId).stream().findFirst().orElse(null);
     }
 
     public Notifications notifications(long userId, int page) {
         if (page < 0) throw new IllegalArgumentException("페이지 번호를 확인해 주세요.");
         var rows = jdbc.query("""
-                SELECT task_id, exercise_id, completed_at, read_at FROM generation_task
+                SELECT task_id, exercise_id, completed_at, read_at, completion_type FROM generation_task
                 WHERE requester_id = ? AND completed_at IS NOT NULL
                 ORDER BY completed_at DESC, task_id DESC LIMIT ? OFFSET ?
                 """, (rs, row) -> {
             var readAt = rs.getTimestamp("read_at");
             return new Notification(rs.getString("task_id"), rs.getLong("exercise_id"),
-                    rs.getTimestamp("completed_at").toInstant(), readAt == null ? null : readAt.toInstant());
+                    rs.getTimestamp("completed_at").toInstant(), readAt == null ? null : readAt.toInstant(),
+                    rs.getString("completion_type"));
         }, userId, PAGE_SIZE + 1, (long) page * PAGE_SIZE);
         return new Notifications(rows.stream().limit(PAGE_SIZE).toList(), rows.size() > PAGE_SIZE);
     }
@@ -125,6 +115,20 @@ public class ExerciseGenerationQueueService {
 
     private static String stateKey(String requestId) {
         return "exercise:generation_request:" + requestId;
+    }
+
+    private static Status pendingStatus(String status, String reason) {
+        if (status.equals("queued") || status.equals("running")) return new Status(status, null, null, null, null);
+        if (!status.equals("failed")) throw missing();
+        String message = switch (reason) {
+            case "out_of_scope" -> "선택한 분야와 학습하고 싶은 내용이 맞지 않아요. 분야나 내용을 바꿔 다시 요청해 주세요.";
+            case "generation_limit", "time_limit" -> "설정된 생성 한도 안에 문제를 완성하지 못했어요. 배우고 싶은 내용을 좁혀 다시 요청해 주세요.";
+            case "invalid_request" -> "요청 내용을 확인하지 못했어요. 입력을 확인하고 다시 요청해 주세요.";
+            case "private_input", "private_output" -> "개인이나 조직을 식별할 수 있는 내용이 감지됐어요. 공개 가능한 CS 개념과 학습 목표로 다시 요청해 주세요.";
+            case "search_unavailable", "search_configuration" -> "문제 검색을 사용할 수 없어 요청을 완료하지 못했어요. 잠시 후 다시 요청해 주세요.";
+            default -> "일시적인 문제로 생성을 완료하지 못했어요. 잠시 후 다시 요청해 주세요.";
+        };
+        return new Status("failed", null, reason, message, null);
     }
 
     private static ResponseStatusException missing() {

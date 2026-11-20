@@ -97,7 +97,7 @@ cp .env.example .env
 | `NVIDIA_API_KEY` | 없음 | 생성 API 인증 키 |
 | `NVIDIA_MODEL` | 없음 | 엔드포인트에서 사용 가능한 모델 ID |
 | `NVIDIA_BASE_URL` | `https://integrate.api.nvidia.com/v1` | Chat Completions API의 HTTPS 기본 주소 |
-| `DEDUPLICATION_ENABLED` | Compose에서 `true` | 큐 출제에 필요한 중복 검색 활성화 |
+| `DEDUPLICATION_ENABLED` | Compose에서 `true` | 큐 출제와 추천에 필요한 중복 검색 활성화 |
 | `OPENAI_API_KEY` | 없음 | 중복 검사 활성화 시 필요 |
 | `FRONTEND_PORT` | `80` | Web 외부 포트 |
 | `DCBA_SERVER_PORT` | `8080` | Spring API 외부 포트 |
@@ -112,7 +112,7 @@ cp .env.example .env
 
 문제 목록은 전체 건수와 번호 페이지 대신 이전·다음 이동을 사용합니다. 배포 전에 기존 MariaDB와 Redis 데이터를 백업하세요. 공통 스키마 마이그레이션이 성공한 뒤 Java와 LLM 서버가 시작되며 Java 운영 설정은 스키마를 검증만 합니다. 중복 저장 기록, 고아 참조, 필수 값 누락이 발견되면 데이터를 삭제하지 않고 마이그레이션을 중단하므로 운영자가 기존 자료를 확인해야 합니다. Slack 정보는 유지됩니다.
 
-Redis는 내부 네트워크에서만 접근하며 AOF를 매 쓰기마다 동기화합니다. 디스크 지연이 큐 처리 지연에 반영됩니다. MariaDB와 Prometheus 관리 포트는 로컬에만 열고 Java 지표는 내부 9091 포트로 분리합니다. LLM의 직접 생성 API는 내부 접근과 별도 `LLM_API_KEY`가 필요하며 키가 없으면 비활성화됩니다. React의 로그인 사용자 생성 요청은 기존 Java 큐 API로 계속 동작합니다. 큐 출제은 `DEDUPLICATION_ENABLED=true`와 유효한 OpenAI 키가 필요하며, 검색 실패 시 문항 저장을 중단합니다. 중복 검사 인덱스는 기존 Chroma 볼륨에 보관합니다.
+Redis는 내부 네트워크에서만 접근하며 AOF를 매 쓰기마다 동기화합니다. 디스크 지연이 큐 처리 지연에 반영됩니다. MariaDB와 Prometheus 관리 포트는 로컬에만 열고 Java 지표는 내부 9091 포트로 분리합니다. LLM의 직접 생성 API는 내부 접근과 별도 `LLM_API_KEY`가 필요하며 키가 없으면 비활성화됩니다. React의 로그인 사용자 생성 요청은 기존 Java 큐 API로 계속 동작합니다. 큐 출제와 추천은 `DEDUPLICATION_ENABLED=true`와 유효한 OpenAI 키가 필요하며, 검색 실패 시 문항 저장을 중단합니다. 중복 검사 인덱스는 기존 Chroma 볼륨에 보관합니다.
 
 학습 의도에는 공개 가능한 CS 개념과 학습 목표만 입력하세요. 생성 전후 검사에서는 이메일, 휴대전화 번호, 표준 식별자, 알려진 계정 형식과 일부 반복 구절을 차단합니다. 일반 이름, 임의의 사내 표현, 변형된 문장이 모두 감지된다는 보장은 없으므로 공개할 수 없는 정보는 입력에서 빼야 합니다.
 

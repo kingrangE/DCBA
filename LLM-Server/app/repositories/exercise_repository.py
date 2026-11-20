@@ -74,6 +74,53 @@ class ExerciseRepository:
             """, (subject, level))
             return cursor.fetchall()
 
+    def recommendation_candidates(self, subject, level, user_id, concept, candidate_ids, connection):
+        ids = candidate_ids or [0]
+        placeholders = ", ".join(["%s"] * len(ids))
+        with connection.cursor() as cursor:
+            cursor.execute(f"""
+                SELECT e.id, e.question, e.answer, h.concept, h.objective
+                FROM exercise e LEFT JOIN exercise_generation_history h ON h.exercise_id = e.id
+                WHERE e.subject = %s AND e.level = %s
+                  AND (e.id IN ({placeholders}) OR LOCATE(LOWER(%s), LOWER(e.question)) > 0)
+                  AND NOT EXISTS (SELECT 1 FROM banned_exercise b WHERE b.user_id = %s AND b.exercise_id = e.id)
+                ORDER BY e.id NOT IN ({placeholders}), e.id DESC LIMIT 3
+            """, (subject, level, *ids, concept, user_id, *ids))
+            return cursor.fetchall()
+
+    def save_recommendation(self, task_id, user_id, exercise_id, subject, level, connection):
+        connection.begin()
+        try:
+            with connection.cursor() as cursor:
+                # Use the same lock order as preference mutations, then recheck visibility.
+                cursor.execute("SELECT id FROM user WHERE id = %s FOR UPDATE", (user_id,))
+                if not cursor.fetchone():
+                    connection.rollback()
+                    return None
+                cursor.execute("""
+                    SELECT * FROM exercise WHERE id = %s AND subject = %s AND level = %s FOR UPDATE
+                """, (exercise_id, subject, level))
+                exercise = cursor.fetchone()
+                cursor.execute("SELECT id FROM banned_exercise WHERE user_id = %s AND exercise_id = %s", (user_id, exercise_id))
+                if not exercise or cursor.fetchone():
+                    connection.rollback()
+                    return None
+                cursor.execute("SELECT id FROM selected_exercise WHERE user_id = %s AND exercise_id = %s",
+                               (user_id, exercise_id))
+                completion_type = "already_saved" if cursor.fetchone() else "recommended"
+                if completion_type == "recommended":
+                    cursor.execute("INSERT INTO selected_exercise (user_id, exercise_id) VALUES (%s, %s)",
+                                   (user_id, exercise_id))
+                cursor.execute("""
+                    INSERT INTO generation_task (task_id, exercise_id, requester_id, completed_at, completion_type)
+                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP(6), %s)
+                """, (task_id, exercise_id, user_id, completion_type))
+            connection.commit()
+            return Exercise(**exercise)
+        except Exception:
+            connection.rollback()
+            raise
+
     def clear_deleted_ids(self, ids, connection):
         with connection.cursor() as cursor:
             cursor.executemany("DELETE FROM deleted_exercise WHERE exercise_id = %s", [(exercise_id,) for exercise_id in ids])

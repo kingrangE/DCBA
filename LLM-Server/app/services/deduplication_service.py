@@ -52,6 +52,13 @@ class DeduplicationService:
             return results["documents"][0][0] or "", embedding
         return None, embedding
 
+    def candidate_ids(self, subject, level, text):
+        results = self.collection.query(
+            query_embeddings=[self.embeddings.embed_query(text)], n_results=3,
+            where={"$and": [{"subject": subject}, {"level": level}]}, include=[],
+        )
+        return [int(value) for value in results["ids"][0]]
+
     def record(self, exercise, embedding):
         self.collection.upsert(
             ids=[str(exercise.id)], documents=[f"Q: {exercise.question}\nA: {exercise.answer}"],

@@ -156,6 +156,11 @@ def migrate(*, search_index=False):
                     if statement.strip():
                         cursor.execute(statement)
                 cursor.execute("INSERT INTO schema_migration (version) VALUES (7)")
+            cursor.execute("SELECT version FROM schema_migration WHERE version = 8")
+            if not cursor.fetchone():
+                sql = Path(__file__).resolve().parent.parent / "migrations/008_generation_completion_type.sql"
+                cursor.execute(sql.read_text())
+                cursor.execute("INSERT INTO schema_migration (version) VALUES (8)")
     finally:
         connection.close()
 

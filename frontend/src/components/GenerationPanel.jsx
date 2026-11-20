@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { completionMessage } from './generationMessages'
 
 export default function GenerationPanel({ options, optionsLoading, optionsError, onRetryOptions }) {
   const [subject, setSubject] = useState('')
@@ -132,7 +133,7 @@ export default function GenerationPanel({ options, optionsLoading, optionsError,
         {progress.status === 'unavailable' && <p>진행 상태를 다시 확인하고 있어요.</p>}
         {progress.status === 'failed' && <p>실패 · {progress.message}</p>}
         {progress.status === 'completed' && <>
-          <p>완료 · 요청한 문제가 생성되어 저장한 문제에 추가됐어요.</p>
+          <p>완료 · {completionMessage(progress.completionType)}</p>
           <Link to={`/generation-requests/${requestId}`}>문제 풀기</Link>
         </>}
       </div>}
