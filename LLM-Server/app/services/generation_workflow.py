@@ -8,7 +8,7 @@ from prometheus_client import Histogram
 from openai import APIStatusError
 
 from app.models.exercise import LEVEL_LABELS, SUBJECT_LABELS
-from app.services.generation_privacy import contains_identifier, private_fragments, public_text
+from app.services.generation_privacy import compact, contains_identifier, private_fragments, public_text
 
 RULES = json.loads((Path(__file__).resolve().parents[2] / "instructions/generation_rules.json").read_text(encoding="utf-8"))
 HISTORY_TIME = Histogram("dcba_generation_history_seconds", "Time to fetch scoped generation history")
@@ -69,9 +69,24 @@ class Review(BaseModel):
     reason: Text
 
 
+class LearningIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    concept: Annotated[Text, Field(max_length=100)]
+    objective: Annotated[Text, Field(max_length=240)] | None
+
+
+class IntentResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    decision: Literal["intent", "out_of_scope"]
+    intent: LearningIntent | None = None
+
+
 class Recommendation(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    plan_matches_intent: bool
     exercise_id: int | None
 
 
@@ -87,10 +102,10 @@ def summarize_history(rows):
 def generate(service, request, repository, connection, deduplication, budget, recommend=None):
     from app.services.exercise_service import unique_object
 
-    intent = request.learning_intent if request.request_type == "manual" and request.requester_id else None
-    if intent and contains_identifier(intent):
+    raw_intent = request.learning_intent if request.request_type == "manual" and request.requester_id else None
+    if raw_intent and contains_identifier(raw_intent):
         raise GenerationRejected("private_input")
-    fragments = private_fragments(intent or "")
+    fragments = private_fragments(raw_intent or "")
 
     with HISTORY_TIME.time():
         rows = repository.recent_history(request.subject.value, request.level.value, connection)
@@ -102,7 +117,6 @@ def generate(service, request, repository, connection, deduplication, budget, re
     duplicates = deque(maxlen=3)
     feedback = None
     plan = None
-    try_recommendation = recommend is not None and bool(intent)
 
     def call(stage, role, instruction, context):
         timeout = budget("model")
@@ -118,6 +132,28 @@ def generate(service, request, repository, connection, deduplication, budget, re
         except (ValueError, RecursionError):
             return None
 
+    intent = None
+    if raw_intent:
+        extracted = parse(IntentResult, call(
+            "intent", "사용자 학습 의도 확인자",
+            "입력에서 공개 가능한 핵심 CS 개념과 사용자가 직접 요청한 판단을 각각 발췌한다. "
+            "개념과 objective는 원문 안에 연속해서 나오며 사용자가 판단을 정하지 않았으면 objective=null이다. "
+            "입력을 바꾸거나 새 판단을 만들지 않는다. 명확한 분야 불일치는 {decision:out_of_scope}를 반환한다. "
+            "그 외에는 {decision:intent,intent:{concept,objective}}를 반환한다.",
+            {"subject": scope["subject"], "input": raw_intent},
+        ))
+        if extracted and extracted.decision == "out_of_scope":
+            raise GenerationRejected("out_of_scope")
+        if not extracted or not extracted.intent:
+            raise GenerationRejected("invalid_request")
+        intent = extracted.intent
+        source = compact(raw_intent)
+        evidence = [intent.concept] + ([intent.objective] if intent.objective else [])
+        if not public_text(evidence, fragments) or any(not compact(value) or compact(value) not in source for value in evidence):
+            raise GenerationRejected("invalid_request")
+
+    public_intent = intent.model_dump() if intent else None
+    try_recommendation = recommend is not None and intent is not None and intent.objective is not None
     while True:
         if plan is None:
             result = parse(PlanningResult, call(
@@ -126,8 +162,9 @@ def generate(service, request, repository, connection, deduplication, budget, re
                 "의도가 분야와 명확하게 충돌할 때만 decision=out_of_scope를 반환한다. "
                 "그 외에는 decision=plan, plan={concept,objective,question_type,scenario,clues,reasoning}을 반환한다. "
                 "objective는 한 문장, clues는 문자열 배열, question_type은 rules.types 중 하나다. "
+                "확인된 의도가 있으면 concept는 그대로 사용하고 목표는 같은 판단을 묻도록 풀어 쓴다. "
                 "사용자 입력을 그대로 옮기지 말고 공개할 수 있는 CS 개념만 기술한다.",
-                {"scope": scope, "intent": intent, "history": history, "duplicates": list(duplicates), "feedback": feedback},
+                {"scope": scope, "intent": public_intent, "history": history, "duplicates": list(duplicates), "feedback": feedback},
             ))
             if result and result.decision == "out_of_scope" and intent:
                 raise GenerationRejected("out_of_scope")
@@ -136,26 +173,35 @@ def generate(service, request, repository, connection, deduplication, budget, re
             plan = result.plan
             if not public_text([plan.concept, plan.objective, plan.question_type, plan.scenario, plan.reasoning, *plan.clues], fragments):
                 raise GenerationRejected("private_output")
+            if intent and compact(plan.concept) != compact(intent.concept):
+                feedback = "확인된 사용자 개념과 다른 출제안입니다. 같은 개념과 판단으로 다시 기획하세요."
+                plan = None
+                continue
             feedback = None
 
         if try_recommendation:
-            try_recommendation = False
             budget("embedding")
             candidate_ids = search(deduplication.candidate_ids, request.subject.value, request.level.value,
-                                   f"{plan.concept}\n{plan.objective}")
+                                   f"{intent.concept}\n{intent.objective}")
             rows = repository.recommendation_candidates(
-                request.subject.value, request.level.value, request.requester_id, plan.concept, candidate_ids, connection)
+                request.subject.value, request.level.value, request.requester_id, intent.concept, candidate_ids, connection)
             candidates = [{"id": row["id"], "question": row["question"][:1800], "answer": row["answer"][:2400],
                            "concept": row["concept"], "objective": row["objective"]} for row in rows
                           if public_text([row["question"], row["answer"], row["concept"] or "", row["objective"] or ""], fragments)]
+            try_recommendation = False
             if candidates:
                 choice = parse(Recommendation, call(
                     "recommend", "기존 문항 비교 검수자",
-                    "핵심 개념과 학습 목표가 모두 일치하고 학습자에게 같은 판단이나 근거를 요구하는 후보만 고른다. "
-                    "주제가 같아도 정의, 판단 기준 또는 난이도가 다르면 제외한다. 불확실하면 null을 반환한다. "
-                    "출력은 {exercise_id: 정수 또는 null}이다.",
-                    {"concept": plan.concept, "objective": plan.objective, "candidates": candidates},
+                    "먼저 출제안이 사용자 학습 의도의 개념과 판단을 지키는지 판정한다. 이어 각 문항을 사용자 의도와 직접 비교한다. "
+                    "주제가 같아도 다른 판단이나 정의만 요구하면 제외한다. 불확실하면 exercise_id=null이다. "
+                    "출력은 {plan_matches_intent: 불리언, exercise_id: 정수 또는 null}이다.",
+                    {"user_intent": public_intent, "plan": plan.model_dump(), "candidates": candidates},
                 ))
+                if choice and not choice.plan_matches_intent:
+                    feedback = "출제안의 판단이 사용자 학습 의도와 달라 원래 판단으로 다시 기획해야 합니다."
+                    plan = None
+                    try_recommendation = True
+                    continue
                 if choice and choice.exercise_id in {row["id"] for row in candidates}:
                     budget()
                     existing = recommend(choice.exercise_id)
@@ -182,10 +228,10 @@ def generate(service, request, repository, connection, deduplication, budget, re
             continue
         outcome = parse(Review, call(
             "review", "CS 기술 검수자",
-            "사용자 의도, 난이도, 단서의 충분성, 모범 답안의 기술적 타당성을 확인한다. "
+            "사용자 의도가 있으면 문항이 그 개념과 판단을 직접 충족하는지 확인한다. 난이도, 단서, 기술적 타당성을 확인한다. "
             "결과를 {decision,reason}으로 출력한다. decision=pass는 모두 충족, revise는 동일 출제안 수정, "
             "replan은 학습 목표나 핵심 판단을 다시 설계해야 할 때 사용한다.",
-            {"scope": scope, "plan": plan.model_dump(), "question": question, "answer": answer},
+            {"scope": scope, "user_intent": public_intent, "plan": plan.model_dump(), "question": question, "answer": answer},
         ))
         if outcome and outcome.decision == "pass":
             return question, answer, embedding, (plan.concept, plan.objective, plan.question_type, RULES["version"])
