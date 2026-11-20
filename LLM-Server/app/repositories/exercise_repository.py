@@ -75,18 +75,72 @@ class ExerciseRepository:
             return cursor.fetchall()
 
     def recommendation_candidates(self, subject, level, user_id, concept, candidate_ids, connection):
-        ids = candidate_ids or [0]
-        placeholders = ", ".join(["%s"] * len(ids))
+        rows = {}
         with connection.cursor() as cursor:
-            cursor.execute(f"""
+            cursor.execute("""
                 SELECT e.id, e.question, e.answer, h.concept, h.objective
-                FROM exercise e LEFT JOIN exercise_generation_history h ON h.exercise_id = e.id
-                WHERE e.subject = %s AND e.level = %s
-                  AND (e.id IN ({placeholders}) OR LOCATE(LOWER(%s), LOWER(e.question)) > 0)
+                FROM exercise_generation_history h FORCE INDEX (idx_generation_history_concept)
+                STRAIGHT_JOIN exercise e ON e.id = h.exercise_id
+                WHERE h.subject = %s AND h.level = %s AND h.concept = %s
+                  AND e.subject = h.subject AND e.level = h.level
                   AND NOT EXISTS (SELECT 1 FROM banned_exercise b WHERE b.user_id = %s AND b.exercise_id = e.id)
-                ORDER BY e.id NOT IN ({placeholders}), e.id DESC LIMIT 3
-            """, (subject, level, *ids, concept, user_id, *ids))
-            return cursor.fetchall()
+                ORDER BY h.exercise_id DESC LIMIT 3
+            """, (subject, level, concept, user_id))
+            rows.update((row["id"], row) for row in cursor.fetchall())
+
+            if len(rows) < 3:
+                cursor.execute("""
+                    SELECT 1 FROM information_schema.COLUMNS c JOIN schema_migration m ON m.version = 6
+                    WHERE c.TABLE_SCHEMA = DATABASE() AND c.TABLE_NAME = 'exercise'
+                      AND c.COLUMN_NAME = 'question' AND c.COLLATION_NAME = 'utf8mb4_general_ci'
+                      AND EXISTS (SELECT 1 FROM information_schema.TABLES t
+                          WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_NAME = 'exercise_search_gram')
+                """)
+                indexed = bool(cursor.fetchone()) and len(concept) >= 3
+                # shortcut: scan up to 128 keyword candidates, widen or scope the gram index if older matches are missed.
+                if indexed:
+                    cursor.execute("""
+                        SELECT e.id, e.question, e.answer, h.concept, h.objective
+                        FROM (
+                            SELECT exercise_id FROM exercise_search_gram
+                            WHERE gram = LOWER(LEFT(CONVERT(%s USING utf8mb4), 3)) COLLATE utf8mb4_general_ci
+                            ORDER BY exercise_id DESC LIMIT 128
+                        ) prefix
+                        STRAIGHT_JOIN exercise_search_gram tail ON tail.exercise_id = prefix.exercise_id
+                            AND tail.gram = LOWER(RIGHT(CONVERT(%s USING utf8mb4), 3)) COLLATE utf8mb4_general_ci
+                        STRAIGHT_JOIN exercise e ON e.id = prefix.exercise_id
+                        LEFT JOIN exercise_generation_history h ON h.exercise_id = e.id
+                        WHERE e.subject = %s AND e.level = %s AND LOCATE(LOWER(%s), LOWER(e.question)) > 0
+                          AND NOT EXISTS (SELECT 1 FROM banned_exercise b WHERE b.user_id = %s AND b.exercise_id = e.id)
+                        ORDER BY prefix.exercise_id DESC LIMIT 3
+                    """, (concept, concept, subject, level, concept, user_id))
+                else:
+                    cursor.execute("""
+                        SELECT e.id, e.question, e.answer, h.concept, h.objective
+                        FROM (
+                            SELECT id, question, answer FROM exercise FORCE INDEX (idx_exercise_subject_level)
+                            WHERE subject = %s AND level = %s ORDER BY id DESC LIMIT 128
+                        ) e LEFT JOIN exercise_generation_history h ON h.exercise_id = e.id
+                        WHERE LOCATE(LOWER(%s), LOWER(e.question)) > 0
+                          AND NOT EXISTS (SELECT 1 FROM banned_exercise b WHERE b.user_id = %s AND b.exercise_id = e.id)
+                        ORDER BY e.id DESC LIMIT 3
+                    """, (subject, level, concept, user_id))
+                for row in cursor.fetchall():
+                    rows.setdefault(row["id"], row)
+
+            vector_ids = [value for value in candidate_ids[:3] if value not in rows]
+            if len(rows) < 3 and vector_ids:
+                placeholders = ", ".join(["%s"] * len(vector_ids))
+                cursor.execute(f"""
+                    SELECT e.id, e.question, e.answer, h.concept, h.objective
+                    FROM exercise e FORCE INDEX (PRIMARY)
+                    LEFT JOIN exercise_generation_history h ON h.exercise_id = e.id
+                    WHERE e.id IN ({placeholders}) AND e.subject = %s AND e.level = %s
+                      AND NOT EXISTS (SELECT 1 FROM banned_exercise b WHERE b.user_id = %s AND b.exercise_id = e.id)
+                """, (*vector_ids, subject, level, user_id))
+                by_id = {row["id"]: row for row in cursor.fetchall()}
+                rows.update((value, by_id[value]) for value in vector_ids if value in by_id)
+        return list(rows.values())[:3]
 
     def save_recommendation(self, task_id, user_id, exercise_id, subject, level, connection):
         connection.begin()
