@@ -5,8 +5,10 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from prometheus_client import Histogram
+from openai import APIStatusError
 
 from app.models.exercise import LEVEL_LABELS, SUBJECT_LABELS
+from app.services.generation_privacy import public_text
 
 RULES = json.loads((Path(__file__).resolve().parents[2] / "instructions/generation_rules.json").read_text(encoding="utf-8"))
 HISTORY_TIME = Histogram("dcba_generation_history_seconds", "Time to fetch scoped generation history")
@@ -20,6 +22,23 @@ class GenerationRejected(ValueError):
     def __init__(self, code):
         self.code = code
         super().__init__(code)
+
+
+class SearchUnavailable(RuntimeError):
+    pass
+
+
+def search(operation, *args, **kwargs):
+    try:
+        return operation(*args, **kwargs)
+    except GenerationRejected:
+        raise
+    except APIStatusError as error:
+        if error.status_code in (401, 403, 404):
+            raise GenerationRejected("search_configuration") from None
+        raise SearchUnavailable("search_unavailable") from None
+    except Exception:
+        raise SearchUnavailable("search_unavailable") from None
 
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=600)]
@@ -63,7 +82,8 @@ def generate(service, request, repository, connection, deduplication, budget):
     from app.services.exercise_service import unique_object
 
     with HISTORY_TIME.time():
-        history = summarize_history(repository.recent_history(request.subject.value, request.level.value, connection))
+        rows = repository.recent_history(request.subject.value, request.level.value, connection)
+        history = summarize_history([row for row in rows if public_text(row.values())])
     HISTORY_INPUT.observe(len(json.dumps(history, ensure_ascii=False).encode()))
     rules = RULES["levels"][request.level.value]
     scope = {"subject": SUBJECT_LABELS[request.subject.value], "level": LEVEL_LABELS[request.level.value],
@@ -103,6 +123,8 @@ def generate(service, request, repository, connection, deduplication, budget):
             if not result or result.decision != "plan" or not result.plan or result.plan.question_type not in rules["types"]:
                 continue
             plan = result.plan
+            if not public_text([plan.concept, plan.objective, plan.question_type, plan.scenario, plan.reasoning, *plan.clues], intent):
+                raise GenerationRejected("private_output")
             feedback = None
 
         content = call("write", service.system_prompt, service.prompt_template.format(
@@ -113,29 +135,26 @@ def generate(service, request, repository, connection, deduplication, budget):
         if written is None:
             continue
         question, answer = written.question, service.format_answer(written)
-        # Short intent such as a concept name can also be valid public CS terminology.
-        if intent and len(intent) >= 16 and any(intent in value for value in (question, answer, plan.objective, plan.concept)):
-            feedback = "개인 입력의 문장을 공개 문항이나 출제 이력에 그대로 옮기지 마세요."
+        if not public_text((question, answer), intent):
+            raise GenerationRejected("private_output")
+        budget("embedding")
+        duplicate, embedding = search(deduplication.check_duplicate, request.subject.value,
+                                      request.level.value, f"Q: {question}\nA: {answer}")
+        if duplicate is not None:
+            duplicates.append({"rejected_question": question[:500], "existing_exercise_excerpt":
+                               duplicate[:500] if public_text([duplicate], intent) else ""})
             plan = None
             continue
-        embedding = None
-        if deduplication is not None:
-            budget("embedding")
-            duplicate, embedding = deduplication.check_duplicate(
-                request.subject.value, request.level.value, f"Q: {question}\nA: {answer}")
-            if duplicate is not None:
-                duplicates.append({"rejected_question": question[:500], "existing_exercise_excerpt": duplicate[:500]})
-                plan = None
-                continue
         outcome = parse(Review, call(
             "review", "CS 기술 검수자",
             "사용자 의도, 난이도, 단서의 충분성, 모범 답안의 기술적 타당성을 확인한다. "
             "결과를 {decision,reason}으로 출력한다. decision=pass는 모두 충족, revise는 동일 출제안 수정, "
             "replan은 학습 목표나 핵심 판단을 다시 설계해야 할 때 사용한다.",
-            {"scope": scope, "intent": intent, "plan": plan.model_dump(), "question": question, "answer": answer},
+            {"scope": scope, "plan": plan.model_dump(), "question": question, "answer": answer},
         ))
         if outcome and outcome.decision == "pass":
             return question, answer, embedding, (plan.concept, plan.objective, plan.question_type, RULES["version"])
-        feedback = outcome.reason if outcome else "검수 형식을 확인할 수 없었습니다. 같은 목표에서 답과 단서를 명확히 작성하세요."
+        feedback = (outcome.reason if outcome and public_text([outcome.reason], intent) else
+                    "같은 목표에서 답과 단서를 명확히 작성하세요.")
         if outcome and outcome.decision == "replan":
             plan = None

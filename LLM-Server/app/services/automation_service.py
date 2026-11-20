@@ -15,7 +15,7 @@ WORK_TIME = Histogram("dcba_generation_work_seconds", "Time handling a generatio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.exercise_service import exercise_service
 from app.models.exercise import QueuedExerciseRequest, Level, SUBJECT_LABELS
-from app.services.generation_workflow import GenerationRejected
+from app.services.generation_workflow import GenerationRejected, SearchUnavailable
 
 class RedisQueue:
     AUTO_GENERATION_PAUSE_KEY = "exercise:auto_generation_paused"
@@ -159,6 +159,7 @@ class RedisQueue:
                                and error.status_code < 500 and error.status_code not in (408, 409, 429))
         if isinstance(error, ValueError) or permanent_api_error or task["_attempt"] >= 5:
             self.reject(task, error.code if isinstance(error, GenerationRejected) else
+                        "search_unavailable" if isinstance(error, SearchUnavailable) else
                         "invalid_request" if isinstance(error, ValueError) else "temporary_failure")
 
     def failed_size(self):

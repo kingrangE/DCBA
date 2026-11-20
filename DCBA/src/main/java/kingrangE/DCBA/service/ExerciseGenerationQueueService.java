@@ -86,6 +86,8 @@ public class ExerciseGenerationQueueService {
                     case "out_of_scope" -> new Status("failed", null, reason, "선택한 분야와 학습하고 싶은 내용이 맞지 않아요. 분야나 내용을 바꿔 다시 요청해 주세요.");
                     case "generation_limit", "time_limit" -> new Status("failed", null, reason, "설정된 생성 한도 안에 문제를 완성하지 못했어요. 배우고 싶은 내용을 좁혀 다시 요청해 주세요.");
                     case "invalid_request" -> new Status("failed", null, reason, "요청 내용을 확인하지 못했어요. 입력을 확인하고 다시 요청해 주세요.");
+                    case "private_input", "private_output" -> new Status("failed", null, reason, "개인이나 조직을 식별할 수 있는 내용이 감지됐어요. 공개 가능한 CS 개념과 학습 목표로 다시 요청해 주세요.");
+                    case "search_unavailable", "search_configuration" -> new Status("failed", null, reason, "문제 검색을 사용할 수 없어 요청을 완료하지 못했어요. 잠시 후 다시 요청해 주세요.");
                     default -> new Status("failed", null, "temporary_failure", "일시적인 문제로 생성을 완료하지 못했어요. 잠시 후 다시 요청해 주세요.");
                 };
             }

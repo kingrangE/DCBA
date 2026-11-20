@@ -117,7 +117,7 @@ export default function GenerationPanel({ options, optionsLoading, optionsError,
             <textarea name="learningIntent" rows={3} value={learningIntent} disabled={submitting}
               aria-invalid={intentError || undefined} aria-describedby={intentError ? 'generation-intent-error' : 'generation-intent-help'}
               onChange={(event) => setLearningIntent(event.target.value)} />
-            <span id="generation-intent-help" className="muted">배우고 싶은 개념이나 판단을 한 문장으로 적어 주세요.</span>
+            <span id="generation-intent-help" className="muted">공개 가능한 CS 개념이나 학습 목표를 한 문장으로 적어 주세요. 계정이나 이메일 등 개인·조직 정보는 제외해 주세요.</span>
           </label>
           {intentError && <p id="generation-intent-error" role="alert" className="form-status form-status--error">양끝 공백을 제외해 200자 이하로 줄여 주세요.</p>}
           <button className="button button--primary" type="submit" disabled={submitting}>

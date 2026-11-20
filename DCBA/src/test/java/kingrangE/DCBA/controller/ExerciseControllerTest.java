@@ -84,4 +84,17 @@ class ExerciseControllerTest {
                 .isInstanceOf(IllegalArgumentException.class);
         verify(queueService).enqueue(Subject.DATABASE, Level.HARD, 15L, boundary);
     }
+
+    @Test
+    void rejectsIdentifyingInputBeforeEnqueueing() {
+        var session = new MockHttpSession();
+        session.setAttribute("loginUser", new User(15L, "tester", "password", null, null));
+        for (String intent : new String[]{"qa · ７", "개인 @ example . invalid", "계정 ID: acme-west"}) {
+            assertThatThrownBy(() -> controller.requestGeneration(
+                    new GenerationRequest(Subject.DATABASE, Level.HARD, intent), session))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("공개 가능한 CS 개념");
+        }
+        org.mockito.Mockito.verifyNoInteractions(queueService);
+    }
 }

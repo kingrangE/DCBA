@@ -62,4 +62,4 @@ class DeduplicationService:
 
 
 deduplication_service = (DeduplicationService() if os.getenv("DEDUPLICATION_ENABLED", "false").lower()
-                         in {"1", "true", "yes", "on"} else None)
+                         in {"1", "true", "yes", "on"} and os.getenv("OPENAI_API_KEY", "").strip() else None)

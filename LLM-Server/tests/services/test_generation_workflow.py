@@ -34,8 +34,9 @@ def run(responses, *, kind="manual", intent=None, duplicate_results=None):
                                     requester_id=1 if kind == "manual" else None, learning_intent=intent)
     reservations = []
 
-    def budget(stage):
-        reservations.append(stage)
+    def budget(stage=None):
+        if stage is not None:
+            reservations.append(stage)
         if reservations.count("model") > 6:
             raise GenerationRejected("generation_limit")
         return 30
@@ -54,7 +55,7 @@ def test_each_queue_source_runs_the_same_roles_and_bounded_history(kind, intent)
     plan_input, writing_input, review_input = [
         json.loads(call.kwargs["messages"][1]["content"]) for call in service.client.generate.call_args_list
     ]
-    assert plan_input["intent"] == review_input["intent"] == intent
+    assert plan_input["intent"] == intent and "intent" not in review_input
     assert len(plan_input["history"]["recent_goals"]) == 5
     assert set(writing_input) == {"plan", "feedback"}
 
@@ -100,3 +101,43 @@ def test_intent_uses_browser_whitespace_and_unicode_code_points():
         QueuedExerciseRequest(**values, learning_intent="🚀" * 201)
     rows = [{"concept": "락", "objective": "값" * 200, "question_type": "원인 진단"}] * 20
     assert summarize_history(rows) == {"concept_frequency": [("락", 20)], "recent_goals": [("값" * 120, "원인 진단")]}
+
+
+@pytest.mark.parametrize("private_text", [
+    "qa-7", "**qa** — 7", "ｑ\u200bａ · ７", "tester @ example . invalid", "조직 ID: acme-west",
+])
+def test_generated_identifiers_stop_before_embeddings_or_review(private_text):
+    written = json.dumps(json.loads(WRITTEN) | {"concepts": [{"term":"격리 수준", "explanation":private_text}]})
+    service, repo, request, dedup, budget, _ = run([PLAN, written], intent="팬텀 리드")
+    with pytest.raises(GenerationRejected, match="private_output"):
+        generate(service, request, repo, None, dedup, budget)
+    dedup.check_duplicate.assert_not_called()
+    assert service.client.generate.call_count == 2
+
+
+def test_normalized_excerpt_from_a_long_intent_cannot_reach_later_models():
+    intent = "고객사 내부용특별환경 이관작업전용문서 단계별처리규칙 상황에서 반복 조회를 판단하고 싶어요"
+    leaking = json.loads(PLAN)
+    leaking["plan"]["scenario"] = "내부용특별환경-이관작업전용문서 단계별 처리규칙"
+    service, repo, request, dedup, budget, _ = run([json.dumps(leaking)], intent=intent)
+    with pytest.raises(GenerationRejected, match="private_output"):
+        generate(service, request, repo, None, dedup, budget)
+    assert service.client.generate.call_count == 1
+    dedup.candidate_ids.assert_not_called()
+
+
+def test_private_input_and_missing_search_stop_before_provider_calls(mocker, monkeypatch):
+
+    service = ExerciseService()
+    service.client = Mock()
+    repo = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    repo.find_task.return_value = None
+    monkeypatch.setattr(service, "deduplication_enabled", False)
+    reserve = Mock()
+    data = {"subject":"DATABASE", "level":"HARD", "request_type":"manual", "requester_id":1}
+    for intent, code in [("테스트 qa-7", "private_input"), ("팬텀 리드", "search_configuration")]:
+        with pytest.raises(GenerationRejected, match=code):
+            service.run_queued("request", QueuedExerciseRequest(**data, learning_intent=intent), reserve)
+    service.client.generate.assert_not_called()
+    reserve.assert_not_called()
+    repo.save_exercise.assert_not_called()

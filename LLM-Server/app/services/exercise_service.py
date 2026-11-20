@@ -5,7 +5,8 @@ from collections import deque
 from dotenv import load_dotenv
 from app.services.nvidia_generator import NvidiaGenerator
 from app.models.exercise import Exercise, ExerciseRequest, GeneratedExercise, SUBJECT_LABELS, LEVEL_LABELS
-from app.services.generation_workflow import GenerationRejected, generate
+from app.services.generation_workflow import GenerationRejected, generate, search
+from app.services.generation_privacy import contains_identifier
 
 load_dotenv()
 
@@ -68,12 +69,21 @@ class ExerciseService:
             if completed is not None:
                 return Exercise(**completed) if completed["id"] is not None else None
             budget()
-            deduplication = None
-            if self.deduplication_enabled:
+            if request.learning_intent and contains_identifier(request.learning_intent):
+                raise GenerationRejected("private_input")
+            if not self.deduplication_enabled:
+                raise GenerationRejected("search_configuration")
+
+            def get_search():
                 from app.services.deduplication_service import deduplication_service
-                deduplication = deduplication_service
-                deduplication.synchronize(exercise_repository, connection,
-                                          before_embedding=lambda: budget("embedding"))
+                return deduplication_service
+
+            deduplication = search(get_search)
+            if deduplication is None:
+                raise GenerationRejected("search_configuration")
+            search(deduplication.synchronize, exercise_repository, connection,
+                   before_embedding=lambda: budget("embedding"))
+
             question, answer, embedding, history = generate(
                 self, request, exercise_repository, connection, deduplication, budget)
             budget()
@@ -82,8 +92,7 @@ class ExerciseService:
                 connection=connection, history=history,
                 requester_id=request.requester_id if request.request_type == "manual" else None,
             )
-            if deduplication is not None:
-                deduplication.record(saved, embedding)
+            deduplication.record(saved, embedding)
             return saved
 
     def generate_and_save(self, subject: str, level: str, task_id=None):

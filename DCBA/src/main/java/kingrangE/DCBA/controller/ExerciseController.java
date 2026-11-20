@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.text.Normalizer;
+import java.util.regex.Pattern;
 
 import jakarta.servlet.http.HttpSession;
 import kingrangE.DCBA.domain.Exercise;
@@ -38,6 +40,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/exercises")
 @RequiredArgsConstructor
 public class ExerciseController {
+    private static final Pattern PRIVATE_INTENT = Pattern.compile(
+            "(?iuU)[\\w.+-]+\\s*@\\s*[\\w-]+(?:\\s*\\.\\s*[\\w-]+)+"
+            + "|(?<![0-9])(?:\\+?82[\\s.-]*)?0?1[016789][\\s.()‐‑–—-]*[0-9]{3,4}[\\s.()‐‑–—-]*[0-9]{4}(?![0-9])"
+            + "|\\b(?:qa|test|demo|acct|account|user|tenant|org|employee|customer|cust|private|corp|staff|id)[\\W_]{0,8}[0-9]{1,12}\\b"
+            + "|(?:계정|사용자|사번|식별자|조직|고객|user|account|employee|tenant|org)\\s*(?:id|번호|코드)?\\s*[:=]\\s*[a-z0-9][a-z0-9_.@+/-]+"
+            + "|\\b[0-9a-f]{8}(?:[\\s‐‑–—-][0-9a-f]{4}){3}[\\s‐‑–—-][0-9a-f]{12}\\b"
+            + "|\\b[\\w-]+(?:\\.[\\w-]+)*\\.(?:internal|corp|local)\\b");
 
     private final ExerciseService exerciseService;
     private final ExerciseGenerationQueueService exerciseGenerationQueueService;
@@ -138,6 +147,10 @@ public class ExerciseController {
         String intent = request.learningIntent() == null ? "" : trimSearchKeyword(request.learningIntent());
         if (intent.codePointCount(0, intent.length()) > 200) {
             throw new IllegalArgumentException("학습하고 싶은 내용은 200자 이하로 입력해 주세요.");
+        }
+        String normalizedIntent = Normalizer.normalize(intent, Normalizer.Form.NFKC).replaceAll("\\p{Cf}", "");
+        if (PRIVATE_INTENT.matcher(normalizedIntent).find()) {
+            throw new IllegalArgumentException("계정, 이메일, 조직 식별정보를 빼고 공개 가능한 CS 개념이나 학습 목표를 적어 주세요.");
         }
 
         try {
