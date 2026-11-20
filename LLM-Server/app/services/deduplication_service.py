@@ -37,16 +37,18 @@ class DeduplicationService:
             self.collection.delete(ids=[str(exercise_id) for exercise_id in deleted_ids])
             repository.clear_deleted_ids(deleted_ids, connection)
 
-    def check_duplicate(self, subject: str, level: str, text: str) -> tuple[bool, list[float]]:
+    def check_duplicate(self, subject: str, level: str, text: str) -> tuple[str | None, list[float]]:
         request = ExerciseRequest(subject=subject, level=level)
         embedding = self.embeddings.embed_query(text)
         results = self.collection.query(
             query_embeddings=[embedding], n_results=1,
             where={"$and": [{"subject": request.subject.value}, {"level": request.level.value}]},
-            include=["distances"],
+            include=["distances", "documents"],
         )
         distances = results["distances"][0]
-        return bool(distances and 1 - distances[0] >= self.similarity_threshold), embedding
+        if distances and 1 - distances[0] >= self.similarity_threshold:
+            return results["documents"][0][0] or "", embedding
+        return None, embedding
 
     def record(self, exercise, embedding):
         self.collection.upsert(

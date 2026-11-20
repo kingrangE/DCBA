@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 import pytest
 from app.models.exercise import Exercise
@@ -16,6 +17,39 @@ def test_duplicate_check_failure_stops_without_repeated_paid_generation(mocker):
     with pytest.raises(RuntimeError, match="embedding unavailable"):
         exercise_service.generate_exercise("ALGORITHM", "EASY")
     assert completion.call_count == 1
+
+
+def test_duplicate_retries_use_recent_conflicts_only_for_the_current_request(mocker):
+    rejected = [f"중복 후보 {number}" for number in range(4)]
+    accepted_embedding = [0.0, 1.0]
+    completion = mocker.patch.object(exercise_service.client, "generate", side_effect=[
+        *(json.dumps(json.loads(MODEL_OUTPUT) | {"question": question}) for question in rejected),
+        "invalid output",
+        MODEL_OUTPUT,
+        MODEL_OUTPUT,
+    ])
+    dedup = mocker.patch("app.services.deduplication_service.deduplication_service")
+    dedup.check_duplicate.side_effect = [
+        *((f"기존 문항 {number} " + "x" * 500, [1.0, 0.0]) for number in range(4)),
+        (None, accepted_embedding),
+        (None, accepted_embedding),
+    ]
+
+    assert exercise_service.generate_exercise("ALGORITHM", "EASY") == ("Question", STORED_ANSWER, accepted_embedding)
+    assert exercise_service.generate_exercise("ALGORITHM", "EASY") == ("Question", STORED_ANSWER, accepted_embedding)
+
+    prompts = [call.kwargs["messages"][1]["content"] for call in completion.call_args_list]
+    assert "# 재생성 사유" not in prompts[0]
+    first_retry = json.loads(prompts[1].splitlines()[-1])
+    assert first_retry == [{
+        "rejected_question": rejected[0],
+        "existing_exercise_excerpt": ("기존 문항 0 " + "x" * 500)[:500],
+    }]
+    history = json.loads(prompts[4].splitlines()[-1])
+    assert [item["rejected_question"] for item in history] == rejected[1:]
+    assert prompts[5] == prompts[4]
+    assert prompts[6] == prompts[0]
+    assert dedup.check_duplicate.call_count == 6
 
 
 def test_index_failure_prevents_generation_and_save(mocker):
@@ -50,8 +84,8 @@ def test_index_rebuild_resumes_after_committed_batch(tmp_path, monkeypatch, mock
     repository.find_after.side_effect = [[{"id": 7, "subject": "ALGORITHM", "level": "EASY", "question": "Question", "answer": "Answer"}], []]
     store = DeduplicationService()
     store.synchronize(repository, None)
-    assert store.check_duplicate("ALGORITHM", "EASY", "Question")[0]
-    assert not store.check_duplicate("DATABASE", "EASY", "Question")[0]
+    assert store.check_duplicate("ALGORITHM", "EASY", "Question") == ("Q: Question\nA: Answer", [1.0, 0.0])
+    assert store.check_duplicate("DATABASE", "EASY", "Question") == (None, [1.0, 0.0])
     reopened = DeduplicationService()
     repository.find_after.side_effect = [[]]
     reopened.synchronize(repository, None)
