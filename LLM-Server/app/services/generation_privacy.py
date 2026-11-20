@@ -10,6 +10,11 @@ HANDLE = re.compile(r"(?i)\b(?:qa|test|demo|acct|account|user|tenant|org|employe
 LOCAL_HOST = re.compile(r"(?i)\b[\w-]+(?:\.[\w-]+)*\.(?:internal|corp|local)\b")
 SERIAL = re.compile(r"(?i)(?<![a-z0-9])([a-z]{2,24})([\s._·‐‑–—*-]{0,8})([0-9]{3,12})(?![a-z0-9])")
 TECHNICAL_PREFIXES = {"aes", "ascii", "http", "ieee", "iso", "md", "rfc", "sha", "tls", "utf"}
+PORT_SEPARATOR = r"[\s._·‐‑–—*-]{1,8}"
+DEFAULT_PORT = re.compile(
+    rf"(?<![a-z0-9])(?:postgresql{PORT_SEPARATOR}5432|redis{PORT_SEPARATOR}6379"
+    rf"|mariadb{PORT_SEPARATOR}3306)(?![a-z0-9])"
+)
 
 
 def normalize(text):
@@ -23,7 +28,8 @@ def identifier_fragments(text):
         match.group(1) for match in LABEL.finditer(text)
     } | {
         match.group(0) for match in SERIAL.finditer(text)
-        if match.group(1) not in TECHNICAL_PREFIXES and (not match.group(2).isspace() or len(match.group(3)) >= 5)
+        if match.group(1) not in TECHNICAL_PREFIXES and not DEFAULT_PORT.fullmatch(match.group(0))
+        and (not match.group(2).isspace() or len(match.group(3)) >= 5)
     }
 
 
@@ -36,7 +42,7 @@ def compact(text):
 
 
 def private_fragments(intent):
-    words = re.findall(r"[^\W_]+", normalize(intent))
+    words = re.findall(r"[^\W_]+", DEFAULT_PORT.sub(" ", normalize(intent)))
     excerpts = {"".join(words[i:i + 3]) for i in range(len(words) - 2)}
     identifiers = identifier_fragments(intent)
     parts = {part for identifier in identifiers
@@ -48,5 +54,5 @@ def public_text(values, fragments=()):
     text = "\n".join(values)
     if contains_identifier(text):
         return False
-    normalized = compact(text)
+    normalized = compact(DEFAULT_PORT.sub(" ", normalize(text)))
     return not any(fragment in normalized for fragment in fragments)

@@ -86,10 +86,31 @@ class ExerciseControllerTest {
     }
 
     @Test
+    void acceptsDefaultPortExpressionsInLearningIntent() {
+        var session = new MockHttpSession();
+        session.setAttribute("loginUser", new User(15L, "tester", "password", null, null));
+        for (String port : new String[]{"PostgreSQL 5432", "Redis 6379", "MariaDB 3306",
+                "PostgreSQL-5432", "Redis_6379", "MariaDB · 3306"}) {
+            for (String intent : new String[]{port, port + " 기본 포트 확인 방법을 공부합니다."}) {
+                when(queueService.enqueue(Subject.DATABASE, Level.HARD, 15L, intent))
+                        .thenReturn(new ExerciseGenerationQueueService.Accepted("request-id", 1L));
+                var response = controller.requestGeneration(
+                        new GenerationRequest(Subject.DATABASE, Level.HARD, intent), session);
+                assertThat(response.getStatusCode().value()).isEqualTo(202);
+                verify(queueService).enqueue(Subject.DATABASE, Level.HARD, 15L, intent);
+            }
+        }
+    }
+
+    @Test
     void rejectsIdentifyingInputBeforeEnqueueing() {
         var session = new MockHttpSession();
         session.setAttribute("loginUser", new User(15L, "tester", "password", null, null));
-        for (String intent : new String[]{"qa · ７", "개인 @ example . invalid", "계정 ID: acme-west", "dummy-12345", "격리 수준과 관련해 dummy-12345 예시", "ＤＵＭＭＹ — １２３４５"}) {
+        for (String intent : new String[]{"qa · ７", "개인 @ example . invalid", "계정 ID: acme-west",
+                "dummy-12345", "격리 수준과 관련해 dummy-12345 예시", "ＤＵＭＭＹ — １２３４５",
+                "PostgreSQL 5432 기본 포트와 dummy-12345", "Redis_6379 기본 포트와 개인 @ example . invalid",
+                "MariaDB · 3306 기본 포트와 계정 ID: acme-west", "Redis 6379 기본 포트와 조직 ID: qa · ７",
+                "PostgreSQL-5432 기본 포트와 ＤＵＭＭＹ — １２３４５", "조직 ID: Redis 6379", "Redis-12345", "Redis6379"}) {
             assertThatThrownBy(() -> controller.requestGeneration(
                     new GenerationRequest(Subject.DATABASE, Level.HARD, intent), session))
                     .isInstanceOf(IllegalArgumentException.class)

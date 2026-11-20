@@ -190,7 +190,12 @@ def test_empty_search_can_continue_but_search_error_cannot_reach_review():
     assert service.client.generate.call_count == 2
 
 
-@pytest.mark.parametrize("intent", ["dummy-12345", "격리 수준과 관련해 dummy-12345 예시를 배우고 싶어요", "DUMMY 12345", "ＤＵＭＭＹ — １２３４５"])
+@pytest.mark.parametrize("intent", [
+    "dummy-12345", "격리 수준과 관련해 dummy-12345 예시를 배우고 싶어요", "DUMMY 12345", "ＤＵＭＭＹ — １２３４５",
+    "PostgreSQL 5432 기본 포트와 dummy-12345", "Redis_6379 기본 포트와 개인 @ example . invalid",
+    "MariaDB · 3306 기본 포트와 계정 ID: acme-west", "Redis 6379 기본 포트와 조직 ID: qa · ７",
+    "PostgreSQL-5432 기본 포트와 ＤＵＭＭＹ — １２３４５",
+])
 def test_new_identifier_formats_are_blocked_before_even_planning(intent):
     service, repo, request, dedup, budget, _ = run([PLAN, WRITTEN, PASS], intent=intent)
     with pytest.raises(GenerationRejected, match="private_input"):
@@ -251,3 +256,39 @@ def test_concept_only_request_generates_without_recommendation():
     assert generate(service, request, repo, None, dedup, budget, recommend)[0] == json.loads(WRITTEN)["question"]
     dedup.candidate_ids.assert_not_called()
     recommend.assert_not_called()
+
+
+@pytest.mark.parametrize(("port", "formatted"), [
+    ("PostgreSQL 5432", "PostgreSQL-5432"),
+    ("Redis 6379", "Redis_6379"),
+    ("MariaDB 3306", "MariaDB · 3306"),
+])
+def test_default_ports_pass_request_and_publication_checks(port, formatted):
+    from app.services.generation_privacy import contains_identifier, private_fragments, public_text
+
+    for expression in (port, formatted):
+        intent = f"{expression} 기본 포트 확인 방법을 공부합니다."
+        assert not contains_identifier(expression)
+        assert not contains_identifier(intent)
+        assert public_text([f"{formatted} 기본 포트에 연결하는 방법은?", f"{port} 기본 포트를 확인합니다."],
+                           private_fragments(intent))
+        for private_text in ("dummy-12345", "개인 @ example . invalid", "계정 ID: acme-west",
+                             "조직 ID: qa · ７", "ＤＵＭＭＹ — １２３４５"):
+            combined = f"{expression} 기본 포트와 {private_text}"
+            assert contains_identifier(combined)
+            assert not public_text([combined])
+    assert contains_identifier(f"{port.split()[0]}-12345")
+    assert contains_identifier(port.replace(" ", ""))
+    assert contains_identifier(f"조직 ID: {port}")
+    confidential = f"내부용특별환경 {port} 이관작업전용문서 단계별처리규칙"
+    assert not public_text([confidential], private_fragments(confidential))
+
+    extracted = json.dumps({"decision": "intent", "intent": {"concept": port, "objective": None}})
+    plan = json.loads(PLAN)
+    plan["plan"]["concept"] = port
+    written = json.loads(WRITTEN)
+    written.update(question=f"{formatted} 기본 포트에 어떻게 연결하나요?", answer=f"{port} 기본 포트를 확인합니다.")
+    service, repo, request, dedup, budget, _ = run(
+        [extracted, json.dumps(plan), json.dumps(written), PASS], intent=f"{port} 기본 포트 확인 방법을 공부합니다.")
+    question, answer, _, _ = generate(service, request, repo, None, dedup, budget)
+    assert formatted in question and port in answer
