@@ -97,31 +97,43 @@ class ExerciseRepository:
                           WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_NAME = 'exercise_search_gram')
                 """)
                 indexed = bool(cursor.fetchone()) and len(concept) >= 3
-                # shortcut: scan up to 128 keyword candidates, widen or scope the gram index if older matches are missed.
                 if indexed:
-                    cursor.execute("""
-                        SELECT e.id, e.question, e.answer, h.concept, h.objective
-                        FROM (
+                    # Compare bounded samples to choose a selective index key without counting entire posting lists.
+                    middle = (len(concept) - 3) // 2
+                    grams = tuple(dict.fromkeys((concept[:3], concept[middle:middle + 3], concept[-3:])))
+                    probe = """
+                        SELECT %s AS gram_index, COUNT(*) AS hits FROM (
                             SELECT exercise_id FROM exercise_search_gram
-                            WHERE gram = LOWER(LEFT(CONVERT(%s USING utf8mb4), 3)) COLLATE utf8mb4_general_ci
-                            ORDER BY exercise_id DESC LIMIT 128
-                        ) prefix
-                        STRAIGHT_JOIN exercise_search_gram tail ON tail.exercise_id = prefix.exercise_id
-                            AND tail.gram = LOWER(RIGHT(CONVERT(%s USING utf8mb4), 3)) COLLATE utf8mb4_general_ci
-                        STRAIGHT_JOIN exercise e ON e.id = prefix.exercise_id
+                            WHERE gram = LOWER(CONVERT(%s USING utf8mb4)) COLLATE utf8mb4_general_ci
+                            LIMIT 32
+                        ) sample
+                    """
+                    arguments = tuple(value for pair in enumerate(grams) for value in pair)
+                    cursor.execute(" UNION ALL ".join([probe] * len(grams)), arguments)
+                    probes = sorted(cursor.fetchall(), key=lambda result: (result["hits"], result["gram_index"]))
+                    driver, *filters = (grams[result["gram_index"]] for result in probes)
+                    gram_checks = """
+                        STRAIGHT_JOIN exercise_search_gram AS {alias}
+                            ON {alias}.exercise_id = g.exercise_id
+                            AND {alias}.gram = LOWER(CONVERT(%s USING utf8mb4)) COLLATE utf8mb4_general_ci
+                    """
+                    gram_joins = "".join(gram_checks.format(alias=f"g{index}") for index in range(len(filters)))
+                    cursor.execute(f"""
+                        SELECT e.id, e.question, e.answer, h.concept, h.objective
+                        FROM exercise_search_gram g {gram_joins}
+                        STRAIGHT_JOIN exercise e ON e.id = g.exercise_id
                         LEFT JOIN exercise_generation_history h ON h.exercise_id = e.id
-                        WHERE e.subject = %s AND e.level = %s AND LOCATE(LOWER(%s), LOWER(e.question)) > 0
+                        WHERE g.gram = LOWER(CONVERT(%s USING utf8mb4)) COLLATE utf8mb4_general_ci
+                          AND e.subject = %s AND e.level = %s AND LOCATE(LOWER(%s), LOWER(e.question)) > 0
                           AND NOT EXISTS (SELECT 1 FROM banned_exercise b WHERE b.user_id = %s AND b.exercise_id = e.id)
-                        ORDER BY prefix.exercise_id DESC LIMIT 3
-                    """, (concept, concept, subject, level, concept, user_id))
+                        ORDER BY g.exercise_id DESC LIMIT 3
+                    """, (*filters, driver, subject, level, concept, user_id))
                 else:
                     cursor.execute("""
                         SELECT e.id, e.question, e.answer, h.concept, h.objective
-                        FROM (
-                            SELECT id, question, answer FROM exercise FORCE INDEX (idx_exercise_subject_level)
-                            WHERE subject = %s AND level = %s ORDER BY id DESC LIMIT 128
-                        ) e LEFT JOIN exercise_generation_history h ON h.exercise_id = e.id
-                        WHERE LOCATE(LOWER(%s), LOWER(e.question)) > 0
+                        FROM exercise e FORCE INDEX (idx_exercise_subject_level)
+                        LEFT JOIN exercise_generation_history h ON h.exercise_id = e.id
+                        WHERE e.subject = %s AND e.level = %s AND LOCATE(LOWER(%s), LOWER(e.question)) > 0
                           AND NOT EXISTS (SELECT 1 FROM banned_exercise b WHERE b.user_id = %s AND b.exercise_id = e.id)
                         ORDER BY e.id DESC LIMIT 3
                     """, (subject, level, concept, user_id))
