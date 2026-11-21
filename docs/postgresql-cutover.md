@@ -23,6 +23,8 @@ DCBA의 문항 목록과 검색은 읽기 비중이 높다. MariaDB는 한글 �
 
 ## 운영 전환
 
+운영 자동화는 GitHub Actions의 **DCBA Production PostgreSQL Cutover**에서 실행한다. preflight는 현재 릴리스와 서비스 상태를 확인한다. cutover는 같은 EC2 배포 잠금을 잡고, 대상이 비어 있으면 쓰기를 멈춘다. MariaDB 덤프, Redis RDB와 사용 중인 Chroma 볼륨 백업은 호스트의 /opt/dcba/backups 아래에 기록한다. 이관과 내부 API 확인이 끝나면 PostgreSQL을 선택하고 공개 API를 점검한다. PostgreSQL 암호를 사전에 두지 않았으면 호스트에 권한 0600인 환경 파일을 생성한다. 공개 쓰기 재개 전 실패는 기존 MariaDB 재시작으로 처리한다. 이후 장애는 PostgreSQL을 기준으로 복구한다.
+
 운영 EC2의 `/opt/dcba/.env`에 PostgreSQL 데이터베이스명과 권한이 분리된 관리자·서비스 암호를 설정한다. 변수 이름은 `.env.example`을 사용한다. 먼저 운영 사본으로 리허설하고, 원본 데이터와 Redis AOF 및 Chroma 볼륨의 복구본을 확인한다. 대상 저장소에는 배포 이미지의 릴리스 SHA가 체크아웃되어 있어야 한다.
 
 1. 배포와 같은 `/opt/dcba/deploy.lock`을 잡고 데이터베이스에 접근하는 모든 쓰기 경로를 멈춘다. EC2에서는 프론트엔드, Java API와 LLM 워커를 중단한다. Redis 큐와 Chroma 볼륨은 유지한다. 이 상태에서 MariaDB와 Redis·Chroma를 백업한다.

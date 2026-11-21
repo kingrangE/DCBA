@@ -24,6 +24,9 @@ export DCBA_RELEASE="$release"
 compose=(docker compose -p dcba --env-file ../.env -f docker-compose.yml -f docker-compose.ec2.yml)
 if [[ -f ../postgres.enabled ]]; then
   export DCBA_REQUIRE_POSTGRES_IMPORT=1
+  if [[ -s ../postgres.env ]]; then
+    compose+=(--env-file ../postgres.env)
+  fi
   compose+=(-f docker-compose.postgres.yml)
 fi
 "${compose[@]}" pull
