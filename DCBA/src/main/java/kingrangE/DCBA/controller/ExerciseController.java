@@ -5,6 +5,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.text.Normalizer;
+import java.util.regex.Pattern;
 
 import jakarta.servlet.http.HttpSession;
 import kingrangE.DCBA.domain.Exercise;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,6 +40,18 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/exercises")
 @RequiredArgsConstructor
 public class ExerciseController {
+    private static final Pattern PRIVATE_INTENT = Pattern.compile(
+            "(?iuU)[\\w.+-]+\\s*@\\s*[\\w-]+(?:\\s*\\.\\s*[\\w-]+)+"
+            + "|(?<![0-9])(?:\\+?82[\\s.-]*)?0?1[016789][\\s.()‐‑–—-]*[0-9]{3,4}[\\s.()‐‑–—-]*[0-9]{4}(?![0-9])"
+            + "|\\b(?:qa|test|demo|acct|account|user|tenant|org|employee|customer|cust|private|corp|staff|id)[\\W_]{0,8}[0-9]{1,12}\\b"
+            + "|(?:계정|사용자|사번|식별자|조직|고객|user|account|employee|tenant|org)\\s*(?:id|번호|코드)?\\s*[:=]\\s*[a-z0-9][a-z0-9_.@+/-]+"
+            + "|\\b[0-9a-f]{8}(?:[\\s‐‑–—-][0-9a-f]{4}){3}[\\s‐‑–—-][0-9a-f]{12}\\b"
+            + "|\\b[\\w-]+(?:\\.[\\w-]+)*\\.(?:internal|corp|local)\\b"
+            + "|(?<![a-z0-9])(?!(?:aes|ascii|http|ieee|iso|md|rfc|sha|tls|utf)[\\W_]{0,8}[0-9])"
+            + "(?!(?:postgresql[\\s._·‐‑–—*-]{1,8}5432|redis[\\s._·‐‑–—*-]{1,8}6379"
+            + "|mariadb[\\s._·‐‑–—*-]{1,8}3306)(?![a-z0-9]))"
+            + "[a-z]{2,24}(?:[0-9]{3,12}|\\s{1,8}[0-9]{5,12}"
+            + "|[\\s._·‐‑–—*-]{0,7}[._·‐‑–—*-][\\s._·‐‑–—*-]{0,7}[0-9]{3,12})(?![a-z0-9])");
 
     private final ExerciseService exerciseService;
     private final ExerciseGenerationQueueService exerciseGenerationQueueService;
@@ -129,24 +145,65 @@ public class ExerciseController {
     public ResponseEntity<GenerationResponse> requestGeneration(
             @RequestBody GenerationRequest request,
             HttpSession session) {
-        requireUser(session);
+        User user = requireUser(session);
         if (request.subject() == null || request.level() == null) {
             throw new IllegalArgumentException("분야와 난이도를 모두 선택해 주세요.");
         }
+        String intent = request.learningIntent() == null ? "" : trimSearchKeyword(request.learningIntent());
+        if (intent.codePointCount(0, intent.length()) > 200) {
+            throw new IllegalArgumentException("학습하고 싶은 내용은 200자 이하로 입력해 주세요.");
+        }
+        String normalizedIntent = Normalizer.normalize(intent, Normalizer.Form.NFKC).replaceAll("\\p{Cf}", "");
+        if (PRIVATE_INTENT.matcher(normalizedIntent).find()) {
+            throw new IllegalArgumentException("계정, 이메일, 조직 식별정보를 빼고 공개 가능한 CS 개념이나 학습 목표를 적어 주세요.");
+        }
 
         try {
-            Long queueSize = exerciseGenerationQueueService.enqueue(request.subject(), request.level());
-            long safeQueueSize = queueSize == null ? 0 : queueSize;
+            var accepted = exerciseGenerationQueueService.enqueue(request.subject(), request.level(), user.getId(),
+                    intent.isEmpty() ? null : intent);
             String message = "%s · Level %d 문제 생성 요청이 등록되었습니다."
                     .formatted(request.subject().getSubjectName(), request.level().getLevel());
             return ResponseEntity.status(HttpStatus.ACCEPTED)
-                    .body(new GenerationResponse(message, safeQueueSize));
+                    .body(new GenerationResponse(message, accepted.queueSize(), accepted.requestId()));
         } catch (RuntimeException exception) {
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "문제 생성 요청을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.",
                     exception);
         }
+    }
+
+    @GetMapping("/generation-requests/{requestId}")
+    public ExerciseGenerationQueueService.Status generationStatus(@PathVariable UUID requestId, HttpSession session) {
+        return exerciseGenerationQueueService.status(requestId, requireUser(session).getId());
+    }
+
+    @GetMapping("/generation-requests/notifications")
+    public ExerciseGenerationQueueService.Notifications generationNotifications(
+            @RequestParam(defaultValue = "0") int page, HttpSession session) {
+        return exerciseGenerationQueueService.notifications(requireUser(session).getId(), page);
+    }
+
+    @GetMapping("/generation-requests/recent")
+    public List<ExerciseGenerationQueueService.RecentRequest> recentGenerationRequests(HttpSession session) {
+        return exerciseGenerationQueueService.recent(requireUser(session).getId());
+    }
+
+    @PutMapping("/generation-requests/{requestId}/read")
+    public ResponseEntity<Void> markGenerationRead(@PathVariable UUID requestId, HttpSession session) {
+        exerciseGenerationQueueService.markRead(requestId, requireUser(session).getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/generation-requests/{requestId}/exercise")
+    public ExerciseResponse generatedExercise(@PathVariable UUID requestId, HttpSession session) {
+        Long userId = requireUser(session).getId();
+        Long exerciseId = exerciseGenerationQueueService.completedExercise(requestId, userId);
+        if (exerciseId == null || !exerciseService.getBannedExerciseIds(userId, List.of(exerciseId)).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "문제를 열 수 없어요.");
+        }
+        Exercise exercise = exerciseService.findExercise(exerciseId);
+        return ExerciseResponse.from(exercise, Set.copyOf(exerciseService.getSavedExerciseIds(userId, List.of(exerciseId))), Set.of());
     }
 
     private User requireUser(HttpSession session) {

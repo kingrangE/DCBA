@@ -82,8 +82,13 @@ export const api = {
   unsave: (id) => request(`/api/exercises/${id}/saved`, { method: 'DELETE' }),
   ban: (id) => request(`/api/exercises/${id}/banned`, { method: 'POST' }),
   unban: (id) => request(`/api/exercises/${id}/banned`, { method: 'DELETE' }),
-  generate: (subject, level) => request('/api/exercises/generation-requests', {
+  generate: (subject, level, learningIntent) => request('/api/exercises/generation-requests', {
     method: 'POST',
-    body: JSON.stringify({ subject, level }),
+    body: JSON.stringify({ subject, level, learningIntent: learningIntent || undefined }),
   }),
+  generationStatus: (id) => request(`/api/exercises/generation-requests/${encodeURIComponent(id)}`),
+  recentGenerationRequests: () => request('/api/exercises/generation-requests/recent'),
+  generationNotifications: (page) => request(`/api/exercises/generation-requests/notifications?page=${page}`),
+  markGenerationRead: (id) => request(`/api/exercises/generation-requests/${encodeURIComponent(id)}/read`, { method: 'PUT' }),
+  generatedExercise: (id) => request(`/api/exercises/generation-requests/${encodeURIComponent(id)}/exercise`),
 }

@@ -20,12 +20,14 @@ class DeduplicationService:
             embedding_function=None,
         )
 
-    def synchronize(self, repository, connection):
+    def synchronize(self, repository, connection, before_embedding=None):
         self.collection = self.client.get_collection(self.collection_name, embedding_function=None)
         after_id = int((self.collection.metadata or {}).get("last_exercise_id", 0))
         while rows := repository.find_after(after_id, connection):
             requests = [ExerciseRequest(subject=row["subject"], level=row["level"]) for row in rows]
             documents = [f"Q: {row['question']}\nA: {row['answer']}" for row in rows]
+            if before_embedding is not None:
+                before_embedding()
             self.collection.upsert(
                 ids=[str(row["id"]) for row in rows], documents=documents,
                 embeddings=self.embeddings.embed_documents(documents),
@@ -50,6 +52,13 @@ class DeduplicationService:
             return results["documents"][0][0] or "", embedding
         return None, embedding
 
+    def candidate_ids(self, subject, level, text):
+        results = self.collection.query(
+            query_embeddings=[self.embeddings.embed_query(text)], n_results=3,
+            where={"$and": [{"subject": subject}, {"level": level}]}, include=[],
+        )
+        return [int(value) for value in results["ids"][0]]
+
     def record(self, exercise, embedding):
         self.collection.upsert(
             ids=[str(exercise.id)], documents=[f"Q: {exercise.question}\nA: {exercise.answer}"],
@@ -60,4 +69,4 @@ class DeduplicationService:
 
 
 deduplication_service = (DeduplicationService() if os.getenv("DEDUPLICATION_ENABLED", "false").lower()
-                         in {"1", "true", "yes", "on"} else None)
+                         in {"1", "true", "yes", "on"} and os.getenv("OPENAI_API_KEY", "").strip() else None)

@@ -16,7 +16,8 @@ TABLES = {
     "exercise": ("id", "subject", "level", "question", "answer", "created_at"),
     "selected_exercise": ("id", "user_id", "exercise_id", "custom_answer", "review_again"),
     "banned_exercise": ("id", "user_id", "exercise_id"),
-    "generation_task": ("task_id", "exercise_id"),
+    "generation_task": ("task_id", "exercise_id", "requester_id", "completed_at", "read_at", "completion_type"),
+    "exercise_generation_history": ("exercise_id", "subject", "level", "concept", "objective", "question_type", "rules_version"),
     "deleted_exercise": ("exercise_id",),
     "exercise_feedback_rubric": ("exercise_id", "criteria_json"),
 }
