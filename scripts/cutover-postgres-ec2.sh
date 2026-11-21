@@ -74,6 +74,8 @@ recover() {
   return "$result"
 }
 trap recover EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 "${pg[@]}" pull postgres schema-migrate
 "${pg[@]}" up -d --wait --wait-timeout 120 postgres
