@@ -1,0 +1,1013 @@
+{
+  "first:{}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.644087025
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 0.412669243,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "index",
+            "key": "PRIMARY",
+            "key_length": "8",
+            "used_key_parts": [
+              "id"
+            ],
+            "r_loops": 1,
+            "rows": 44456,
+            "r_rows": 10,
+            "r_table_time_ms": 0.039538927,
+            "r_other_time_ms": 0.136064116,
+            "r_engine_stats": {
+              "pages_accessed": 4
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "!<in_optimizer>(e.`id`,e.`id` in (subquery#2))"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "materialization": {
+            "r_strategy": "index_lookup",
+            "r_loops": 10,
+            "query_block": {
+              "select_id": 2,
+              "r_loops": 1,
+              "r_total_time_ms": 0.1933851,
+              "nested_loop": [
+                {
+                  "table": {
+                    "table_name": "b",
+                    "access_type": "range",
+                    "possible_keys": [
+                      "uk_banned_user_exercise",
+                      "fk_banned_exercise"
+                    ],
+                    "key": "uk_banned_user_exercise",
+                    "key_length": "18",
+                    "used_key_parts": [
+                      "user_id",
+                      "exercise_id"
+                    ],
+                    "r_loops": 1,
+                    "rows": 500,
+                    "r_rows": 500,
+                    "r_table_time_ms": 0.044936304,
+                    "r_other_time_ms": 0.120708787,
+                    "r_engine_stats": {
+                      "pages_accessed": 1
+                    },
+                    "filtered": 100,
+                    "r_filtered": 100,
+                    "attached_condition": "b.user_id = 1 and b.exercise_id is not null",
+                    "using_index": true
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "next:{\"before\": 49992}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.116775814
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 0.158699629,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "range",
+            "possible_keys": [
+              "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "key_length": "8",
+            "used_key_parts": [
+              "id"
+            ],
+            "r_loops": 1,
+            "rows": 22228,
+            "r_rows": 10,
+            "r_table_time_ms": 0.010250833,
+            "r_other_time_ms": 0.016652373,
+            "r_engine_stats": {
+              "pages_accessed": 4
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "!<in_optimizer>(e.`id`,e.`id` in (subquery#2)) and e.`id` < 49992"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "materialization": {
+            "r_strategy": "index_lookup",
+            "r_loops": 10,
+            "query_block": {
+              "select_id": 2,
+              "r_loops": 1,
+              "r_total_time_ms": 0.122968154,
+              "nested_loop": [
+                {
+                  "table": {
+                    "table_name": "b",
+                    "access_type": "range",
+                    "possible_keys": [
+                      "uk_banned_user_exercise",
+                      "fk_banned_exercise"
+                    ],
+                    "key": "uk_banned_user_exercise",
+                    "key_length": "18",
+                    "used_key_parts": [
+                      "user_id",
+                      "exercise_id"
+                    ],
+                    "r_loops": 1,
+                    "rows": 500,
+                    "r_rows": 500,
+                    "r_table_time_ms": 0.041254372,
+                    "r_other_time_ms": 0.080751459,
+                    "r_engine_stats": {
+                      "pages_accessed": 1
+                    },
+                    "filtered": 100,
+                    "r_filtered": 100,
+                    "attached_condition": "b.user_id = 1 and b.exercise_id is not null",
+                    "using_index": true
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "prev:{\"after\": 49983}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.054099293
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 0.052760409,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "range",
+            "possible_keys": [
+              "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "key_length": "8",
+            "used_key_parts": [
+              "id"
+            ],
+            "r_loops": 1,
+            "rows": 17,
+            "r_rows": 10,
+            "r_table_time_ms": 0.006861782,
+            "r_other_time_ms": 0.019706703,
+            "r_engine_stats": {
+              "pages_accessed": 4
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "!<in_optimizer>(e.`id`,<exists>(subquery#2)) and e.`id` > 49983"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "query_block": {
+            "select_id": 2,
+            "r_loops": 10,
+            "r_total_time_ms": 0.008619068,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "b",
+                  "access_type": "eq_ref",
+                  "possible_keys": [
+                    "uk_banned_user_exercise",
+                    "fk_banned_exercise"
+                  ],
+                  "key": "uk_banned_user_exercise",
+                  "key_length": "18",
+                  "used_key_parts": [
+                    "user_id",
+                    "exercise_id"
+                  ],
+                  "ref": [
+                    "const",
+                    "func"
+                  ],
+                  "r_loops": 10,
+                  "rows": 1,
+                  "r_rows": 0,
+                  "r_table_time_ms": 0.005439217,
+                  "r_other_time_ms": 0.0007531224,
+                  "r_engine_stats": {
+                    "pages_accessed": 10
+                  },
+                  "filtered": 100,
+                  "r_filtered": 100,
+                  "attached_condition": "b.exercise_id is not null",
+                  "using_index": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "search:{\"level\": \"MEDIUM\", \"q\": \"교착 상태\", \"subject\": \"OPERATING_SYSTEM\"}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.195058705
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 1.164452773,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "ref",
+            "possible_keys": [
+              "idx_exercise_subject_level",
+              "idx_exercise_level"
+            ],
+            "key": "idx_exercise_subject_level",
+            "key_length": "156",
+            "used_key_parts": [
+              "subject",
+              "level"
+            ],
+            "ref": [
+              "const",
+              "const"
+            ],
+            "r_loops": 1,
+            "rows": 2835,
+            "r_rows": 42,
+            "r_table_time_ms": 0.350452963,
+            "r_other_time_ms": 0.266270614,
+            "r_engine_stats": {
+              "pages_accessed": 128
+            },
+            "filtered": 100,
+            "r_filtered": 23.80952381,
+            "attached_condition": "e.`subject` <=> 'OPERATING_SYSTEM' and e.`level` <=> 'MEDIUM' and !<in_optimizer>(e.`id`,e.`id` in (subquery#2)) and e.`subject` = 'OPERATING_SYSTEM' and e.`level` = 'MEDIUM' and locate('교착 상태',lcase(e.question)) > 0"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "materialization": {
+            "r_strategy": "index_lookup",
+            "r_loops": 42,
+            "query_block": {
+              "select_id": 2,
+              "r_loops": 1,
+              "r_total_time_ms": 0.147193592,
+              "nested_loop": [
+                {
+                  "table": {
+                    "table_name": "b",
+                    "access_type": "range",
+                    "possible_keys": [
+                      "uk_banned_user_exercise",
+                      "fk_banned_exercise"
+                    ],
+                    "key": "uk_banned_user_exercise",
+                    "key_length": "18",
+                    "used_key_parts": [
+                      "user_id",
+                      "exercise_id"
+                    ],
+                    "r_loops": 1,
+                    "rows": 500,
+                    "r_rows": 500,
+                    "r_table_time_ms": 0.03736324,
+                    "r_other_time_ms": 0.108993549,
+                    "r_engine_stats": {
+                      "pages_accessed": 1
+                    },
+                    "filtered": 100,
+                    "r_filtered": 100,
+                    "attached_condition": "b.user_id = 1 and b.exercise_id is not null",
+                    "using_index": true
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "search:{\"level\": \"MEDIUM\", \"q\": \"rareDCBA49\", \"subject\": \"OPERATING_SYSTEM\"}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.080165697
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 24.84274699,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "ref",
+            "possible_keys": [
+              "idx_exercise_subject_level",
+              "idx_exercise_level"
+            ],
+            "key": "idx_exercise_subject_level",
+            "key_length": "156",
+            "used_key_parts": [
+              "subject",
+              "level"
+            ],
+            "ref": [
+              "const",
+              "const"
+            ],
+            "r_loops": 1,
+            "rows": 2835,
+            "r_rows": 2835,
+            "r_table_time_ms": 6.664882324,
+            "r_other_time_ms": 18.06050309,
+            "r_engine_stats": {
+              "pages_accessed": 8517
+            },
+            "filtered": 100,
+            "r_filtered": 0.035273369,
+            "attached_condition": "e.`subject` <=> 'OPERATING_SYSTEM' and e.`level` <=> 'MEDIUM' and !<in_optimizer>(e.`id`,e.`id` in (subquery#2)) and e.`subject` = 'OPERATING_SYSTEM' and e.`level` = 'MEDIUM' and locate('raredcba49',lcase(e.question)) > 0"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "materialization": {
+            "r_strategy": "index_lookup",
+            "r_loops": 2835,
+            "query_block": {
+              "select_id": 2,
+              "r_loops": 1,
+              "r_total_time_ms": 0.107989386,
+              "nested_loop": [
+                {
+                  "table": {
+                    "table_name": "b",
+                    "access_type": "range",
+                    "possible_keys": [
+                      "uk_banned_user_exercise",
+                      "fk_banned_exercise"
+                    ],
+                    "key": "uk_banned_user_exercise",
+                    "key_length": "18",
+                    "used_key_parts": [
+                      "user_id",
+                      "exercise_id"
+                    ],
+                    "r_loops": 1,
+                    "rows": 500,
+                    "r_rows": 500,
+                    "r_table_time_ms": 0.037614281,
+                    "r_other_time_ms": 0.069496463,
+                    "r_engine_stats": {
+                      "pages_accessed": 1
+                    },
+                    "filtered": 100,
+                    "r_filtered": 100,
+                    "attached_condition": "b.user_id = 1 and b.exercise_id is not null",
+                    "using_index": true
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "search:{\"level\": \"MEDIUM\", \"q\": \"없는문항qZ6\", \"subject\": \"OPERATING_SYSTEM\"}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.200539763
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 25.62022037,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "ref",
+            "possible_keys": [
+              "idx_exercise_subject_level",
+              "idx_exercise_level"
+            ],
+            "key": "idx_exercise_subject_level",
+            "key_length": "156",
+            "used_key_parts": [
+              "subject",
+              "level"
+            ],
+            "ref": [
+              "const",
+              "const"
+            ],
+            "r_loops": 1,
+            "rows": 2835,
+            "r_rows": 2835,
+            "r_table_time_ms": 10.77057101,
+            "r_other_time_ms": 14.71751822,
+            "r_engine_stats": {
+              "pages_accessed": 8517
+            },
+            "filtered": 100,
+            "r_filtered": 0,
+            "attached_condition": "e.`subject` <=> 'OPERATING_SYSTEM' and e.`level` <=> 'MEDIUM' and !<in_optimizer>(e.`id`,e.`id` in (subquery#2)) and e.`subject` = 'OPERATING_SYSTEM' and e.`level` = 'MEDIUM' and locate('없는문항qz6',lcase(e.question)) > 0"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "materialization": {
+            "r_strategy": "index_lookup",
+            "r_loops": 2835,
+            "query_block": {
+              "select_id": 2,
+              "r_loops": 1,
+              "r_total_time_ms": 0.121503749,
+              "nested_loop": [
+                {
+                  "table": {
+                    "table_name": "b",
+                    "access_type": "range",
+                    "possible_keys": [
+                      "uk_banned_user_exercise",
+                      "fk_banned_exercise"
+                    ],
+                    "key": "uk_banned_user_exercise",
+                    "key_length": "18",
+                    "used_key_parts": [
+                      "user_id",
+                      "exercise_id"
+                    ],
+                    "r_loops": 1,
+                    "rows": 500,
+                    "r_rows": 500,
+                    "r_table_time_ms": 0.047697753,
+                    "r_other_time_ms": 0.071295589,
+                    "r_engine_stats": {
+                      "pages_accessed": 1
+                    },
+                    "filtered": 100,
+                    "r_filtered": 100,
+                    "attached_condition": "b.user_id = 1 and b.exercise_id is not null",
+                    "using_index": true
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "search:{\"level\": \"MEDIUM\", \"q\": \"상태\", \"subject\": \"OPERATING_SYSTEM\"}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.114558287
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 0.165979812,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "ref",
+            "possible_keys": [
+              "idx_exercise_subject_level",
+              "idx_exercise_level"
+            ],
+            "key": "idx_exercise_subject_level",
+            "key_length": "156",
+            "used_key_parts": [
+              "subject",
+              "level"
+            ],
+            "ref": [
+              "const",
+              "const"
+            ],
+            "r_loops": 1,
+            "rows": 2835,
+            "r_rows": 10,
+            "r_table_time_ms": 0.016526853,
+            "r_other_time_ms": 0.030292257,
+            "r_engine_stats": {
+              "pages_accessed": 32
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "e.`subject` <=> 'OPERATING_SYSTEM' and e.`level` <=> 'MEDIUM' and !<in_optimizer>(e.`id`,e.`id` in (subquery#2)) and e.`subject` = 'OPERATING_SYSTEM' and e.`level` = 'MEDIUM' and locate('상태',lcase(e.question)) > 0"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "materialization": {
+            "r_strategy": "index_lookup",
+            "r_loops": 10,
+            "query_block": {
+              "select_id": 2,
+              "r_loops": 1,
+              "r_total_time_ms": 0.109704832,
+              "nested_loop": [
+                {
+                  "table": {
+                    "table_name": "b",
+                    "access_type": "range",
+                    "possible_keys": [
+                      "uk_banned_user_exercise",
+                      "fk_banned_exercise"
+                    ],
+                    "key": "uk_banned_user_exercise",
+                    "key_length": "18",
+                    "used_key_parts": [
+                      "user_id",
+                      "exercise_id"
+                    ],
+                    "r_loops": 1,
+                    "rows": 500,
+                    "r_rows": 500,
+                    "r_table_time_ms": 0.038032682,
+                    "r_other_time_ms": 0.069914864,
+                    "r_engine_stats": {
+                      "pages_accessed": 1
+                    },
+                    "filtered": 100,
+                    "r_filtered": 100,
+                    "attached_condition": "b.user_id = 1 and b.exercise_id is not null",
+                    "using_index": true
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "indexed:{\"q\": \"교착 상태\"}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.126440885
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 0.221125109,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "g",
+            "access_type": "ref",
+            "possible_keys": [
+              "PRIMARY",
+              "idx_search_gram_exercise"
+            ],
+            "key": "PRIMARY",
+            "key_length": "14",
+            "used_key_parts": [
+              "gram"
+            ],
+            "ref": [
+              "const"
+            ],
+            "r_loops": 1,
+            "rows": 18414,
+            "r_rows": 10,
+            "r_table_time_ms": 0.005020816,
+            "r_other_time_ms": 0.018535179,
+            "r_engine_stats": {
+              "pages_accessed": 3
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "g.gram <=> '교착 ' and !<in_optimizer>(g.exercise_id,g.exercise_id in (subquery#2)) and g.gram = '교착 '",
+            "using_index": true
+          }
+        },
+        {
+          "table": {
+            "table_name": "t",
+            "access_type": "eq_ref",
+            "possible_keys": [
+              "PRIMARY",
+              "idx_search_gram_exercise"
+            ],
+            "key": "PRIMARY",
+            "key_length": "22",
+            "used_key_parts": [
+              "gram",
+              "exercise_id"
+            ],
+            "ref": [
+              "const",
+              "dcba49.g.exercise_id"
+            ],
+            "r_loops": 10,
+            "rows": 1,
+            "r_rows": 1,
+            "r_table_time_ms": 0.013932765,
+            "r_other_time_ms": 0.001464405,
+            "r_engine_stats": {
+              "pages_accessed": 30
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "t.gram = ' 상태'",
+            "using_index": true
+          }
+        },
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "eq_ref",
+            "possible_keys": [
+              "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "key_length": "8",
+            "used_key_parts": [
+              "id"
+            ],
+            "ref": [
+              "dcba49.g.exercise_id"
+            ],
+            "r_loops": 10,
+            "rows": 1,
+            "r_rows": 1,
+            "r_table_time_ms": 0.020501666,
+            "r_other_time_ms": 0.018074938,
+            "r_engine_stats": {
+              "pages_accessed": 33
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "locate('교착 상태',lcase(e.question)) > 0"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "materialization": {
+            "r_strategy": "index_lookup",
+            "r_loops": 10,
+            "query_block": {
+              "select_id": 2,
+              "r_loops": 1,
+              "r_total_time_ms": 0.130457538,
+              "nested_loop": [
+                {
+                  "table": {
+                    "table_name": "b",
+                    "access_type": "range",
+                    "possible_keys": [
+                      "uk_banned_user_exercise",
+                      "fk_banned_exercise"
+                    ],
+                    "key": "uk_banned_user_exercise",
+                    "key_length": "18",
+                    "used_key_parts": [
+                      "user_id",
+                      "exercise_id"
+                    ],
+                    "r_loops": 1,
+                    "rows": 500,
+                    "r_rows": 500,
+                    "r_table_time_ms": 0.036484597,
+                    "r_other_time_ms": 0.093094298,
+                    "r_engine_stats": {
+                      "pages_accessed": 1
+                    },
+                    "filtered": 100,
+                    "r_filtered": 100,
+                    "attached_condition": "b.user_id = 1 and b.exercise_id is not null",
+                    "using_index": true
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "indexed:{\"q\": \"rareDCBA49\"}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.099035597
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 0.029162573,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "g",
+            "access_type": "ref",
+            "possible_keys": [
+              "PRIMARY",
+              "idx_search_gram_exercise"
+            ],
+            "key": "PRIMARY",
+            "key_length": "14",
+            "used_key_parts": [
+              "gram"
+            ],
+            "ref": [
+              "const"
+            ],
+            "r_loops": 1,
+            "rows": 1,
+            "r_rows": 1,
+            "r_table_time_ms": 0.002719609,
+            "r_other_time_ms": 0.008033306,
+            "r_engine_stats": {
+              "pages_accessed": 3
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "g.gram <=> 'rar' and !<in_optimizer>(g.exercise_id,<exists>(subquery#2)) and g.gram = 'rar'",
+            "using_index": true
+          }
+        },
+        {
+          "table": {
+            "table_name": "t",
+            "access_type": "eq_ref",
+            "possible_keys": [
+              "PRIMARY",
+              "idx_search_gram_exercise"
+            ],
+            "key": "PRIMARY",
+            "key_length": "22",
+            "used_key_parts": [
+              "gram",
+              "exercise_id"
+            ],
+            "ref": [
+              "const",
+              "dcba49.g.exercise_id"
+            ],
+            "r_loops": 1,
+            "rows": 1,
+            "r_rows": 1,
+            "r_table_time_ms": 0.001799126,
+            "r_other_time_ms": 0.0005857619,
+            "r_engine_stats": {
+              "pages_accessed": 3
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "t.gram = 'a49'",
+            "using_index": true
+          }
+        },
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "eq_ref",
+            "possible_keys": [
+              "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "key_length": "8",
+            "used_key_parts": [
+              "id"
+            ],
+            "ref": [
+              "dcba49.g.exercise_id"
+            ],
+            "r_loops": 1,
+            "rows": 1,
+            "r_rows": 1,
+            "r_table_time_ms": 0.00949771,
+            "r_other_time_ms": 0.002384888,
+            "r_engine_stats": {
+              "pages_accessed": 3
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "locate('raredcba49',lcase(e.question)) > 0"
+          }
+        }
+      ],
+      "subqueries": [
+        {
+          "query_block": {
+            "select_id": 2,
+            "r_loops": 1,
+            "r_total_time_ms": 0.001715445,
+            "nested_loop": [
+              {
+                "table": {
+                  "table_name": "b",
+                  "access_type": "eq_ref",
+                  "possible_keys": [
+                    "uk_banned_user_exercise",
+                    "fk_banned_exercise"
+                  ],
+                  "key": "uk_banned_user_exercise",
+                  "key_length": "18",
+                  "used_key_parts": [
+                    "user_id",
+                    "exercise_id"
+                  ],
+                  "ref": [
+                    "const",
+                    "func"
+                  ],
+                  "r_loops": 1,
+                  "rows": 1,
+                  "r_rows": 0,
+                  "r_table_time_ms": 0.000920483,
+                  "r_other_time_ms": 0.0002928809,
+                  "r_engine_stats": {
+                    "pages_accessed": 1
+                  },
+                  "filtered": 100,
+                  "r_filtered": 100,
+                  "attached_condition": "b.exercise_id is not null",
+                  "using_index": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "saved_read:{\"q\": \"교착 상태\", \"view\": \"selected\"}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.054099293
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 0.394510625,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "s",
+            "access_type": "ref",
+            "possible_keys": [
+              "uk_selected_user_exercise",
+              "fk_selected_exercise"
+            ],
+            "key": "uk_selected_user_exercise",
+            "key_length": "9",
+            "used_key_parts": [
+              "user_id"
+            ],
+            "ref": [
+              "const"
+            ],
+            "r_loops": 1,
+            "rows": 5000,
+            "r_rows": 48,
+            "r_table_time_ms": 0.011338676,
+            "r_other_time_ms": 0.007573064,
+            "r_engine_stats": {
+              "pages_accessed": 2
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "s.user_id <=> 1 and s.exercise_id is not null",
+            "using_index": true
+          }
+        },
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "eq_ref",
+            "possible_keys": [
+              "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "key_length": "8",
+            "used_key_parts": [
+              "id"
+            ],
+            "ref": [
+              "dcba49.s.exercise_id"
+            ],
+            "r_loops": 48,
+            "rows": 1,
+            "r_rows": 1,
+            "r_table_time_ms": 0.1558545,
+            "r_other_time_ms": 0.21844734,
+            "r_engine_stats": {
+              "pages_accessed": 148
+            },
+            "filtered": 100,
+            "r_filtered": 20.83333333,
+            "attached_condition": "locate('교착 상태',lcase(e.question)) > 0"
+          }
+        }
+      ]
+    }
+  },
+  "saved_read:{\"q\": \"없는문항qZ6\", \"view\": \"selected\"}": {
+    "query_optimization": {
+      "r_total_time_ms": 0.044936304
+    },
+    "query_block": {
+      "select_id": 1,
+      "r_loops": 1,
+      "r_total_time_ms": 43.71415373,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "s",
+            "access_type": "ref",
+            "possible_keys": [
+              "uk_selected_user_exercise",
+              "fk_selected_exercise"
+            ],
+            "key": "uk_selected_user_exercise",
+            "key_length": "9",
+            "used_key_parts": [
+              "user_id"
+            ],
+            "ref": [
+              "const"
+            ],
+            "r_loops": 1,
+            "rows": 5000,
+            "r_rows": 5000,
+            "r_table_time_ms": 1.326918013,
+            "r_other_time_ms": 1.316750861,
+            "r_engine_stats": {
+              "pages_accessed": 11
+            },
+            "filtered": 100,
+            "r_filtered": 100,
+            "attached_condition": "s.user_id <=> 1 and s.exercise_id is not null",
+            "using_index": true
+          }
+        },
+        {
+          "table": {
+            "table_name": "e",
+            "access_type": "eq_ref",
+            "possible_keys": [
+              "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "key_length": "8",
+            "used_key_parts": [
+              "id"
+            ],
+            "ref": [
+              "dcba49.s.exercise_id"
+            ],
+            "r_loops": 5000,
+            "rows": 1,
+            "r_rows": 1,
+            "r_table_time_ms": 14.93500323,
+            "r_other_time_ms": 26.13422641,
+            "r_engine_stats": {
+              "pages_accessed": 15536
+            },
+            "filtered": 100,
+            "r_filtered": 0,
+            "attached_condition": "locate('없는문항qz6',lcase(e.question)) > 0"
+          }
+        }
+      ]
+    }
+  }
+}

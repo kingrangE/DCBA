@@ -1,0 +1,2 @@
+{"engine": "maria", "original_id": 1, "upper_login_status": 200, "upper_login_id": 1, "upper_signup_status": 409, "preference_and_delete_state_matches": true}
+{"engine": "pg", "original_id": 1, "upper_login_status": 401, "upper_login_id": null, "upper_signup_status": 201, "preference_and_delete_state_matches": true}

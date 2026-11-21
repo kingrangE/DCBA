@@ -121,6 +121,10 @@ LLM의 `/health`는 프로세스 생존, `/ready`는 실제 생성 성공·큐·
 
 CI는 Java·Python·React를 검증하며 문서 변경에는 경로 제외 규칙을 적용합니다. Java는 컴파일 캐시를 사용하며 검증한 JAR을 배포 이미지에 그대로 넣습니다. Python은 운영·테스트 의존성을 나누고 uv 캐시를 사용하며, 테스트에서는 NVIDIA 응답을 모의합니다. 배포 이미지는 `main` 커밋의 lint와 테스트가 성공한 뒤 발행합니다. 검토용 누적 PR에서도 CI를 실행할 수 있도록 `review/**` 기준 브랜치를 허용합니다.
 
+### PostgreSQL 이관
+
+PostgreSQL 검색 최적화, 운영 전환과 복구 절차는 [PostgreSQL 전환 기록](docs/postgresql-cutover.md)에서 확인할 수 있습니다.
+
 ### EC2 시험 환경 자동 배포
 
 기능 브랜치의 PR에서 테스트를 통과해 `main`에 들어간 커밋은 GitHub Actions가 AMD64·ARM64 이미지를 빌드하고, 커밋 SHA에 맞는 애플리케이션·마이그레이션 이미지를 EC2에 배포합니다. 필요하면 Actions의 **DCBA EC2 Release**에서 `main`을 선택해 수동 실행할 수 있습니다.

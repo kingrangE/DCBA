@@ -6,7 +6,13 @@ on:
     branches: ["JavaApp"]
     paths:
       - "DCBA/**"
-      - "LLM-Server/app/migrate.py"
+      - "LLM-Server/app/migrate*.py"
+      - "LLM-Server/app/postgres.py"
+      - "LLM-Server/app/repositories/exercise_repository.py"
+      - "LLM-Server/app/transfer_database.py"
+      - "scripts/test*postgres*"
+      - "docker-compose.postgres.yml"
+      - "scripts/postgres-init.sql"
       - "LLM-Server/migrations/**"
       - ".github/workflows/java-ci-cd.yml"
       - "!DCBA/**/*.md"
@@ -14,7 +20,13 @@ on:
     branches: ["main", "review/**"]
     paths:
       - "DCBA/**"
-      - "LLM-Server/app/migrate.py"
+      - "LLM-Server/app/migrate*.py"
+      - "LLM-Server/app/postgres.py"
+      - "LLM-Server/app/repositories/exercise_repository.py"
+      - "LLM-Server/app/transfer_database.py"
+      - "scripts/test*postgres*"
+      - "docker-compose.postgres.yml"
+      - "scripts/postgres-init.sql"
       - "LLM-Server/migrations/**"
       - ".github/workflows/java-ci-cd.yml"
       - "!DCBA/**/*.md"
@@ -106,6 +118,13 @@ jobs:
             "$migrate_python" -m app.migrate --search-index
           )
           ./gradlew test --tests '*MigratedSearchIndexTests'
+      - name: Rehearse PostgreSQL cutover and rollback
+        working-directory: .
+        run: |
+          python3 -m venv "$RUNNER_TEMP/dcba-pg-test"
+          test_python="$RUNNER_TEMP/dcba-pg-test/bin/python"
+          "$test_python" -m pip install pymysql 'psycopg[binary]>=3.2,<4' 'pydantic>=2,<3' httpx
+          bash scripts/test-postgres-cutover.sh "$test_python"
       - name: Keep the tested application
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4

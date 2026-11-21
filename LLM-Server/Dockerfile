@@ -1,9 +1,9 @@
 # Schema migration runs without installing model inference packages.
 FROM python:3.13-slim AS migration
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
-RUN uv pip install --system pymysql
+RUN uv pip install --system pymysql "psycopg[binary]>=3.2,<4"
 WORKDIR /app
-COPY app/migrate.py ./app/migrate.py
+COPY app/migrate.py app/migrate_postgres.py app/postgres.py app/transfer_database.py ./app/
 COPY migrations ./migrations
 CMD ["python", "-m", "app.migrate"]
 

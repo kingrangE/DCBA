@@ -1,0 +1,1852 @@
+{
+  "maria": {
+    "first:{}": {
+      "rows": [
+        [
+          50000,
+          false,
+          false
+        ],
+        [
+          49999,
+          false,
+          false
+        ],
+        [
+          49998,
+          false,
+          false
+        ],
+        [
+          49997,
+          false,
+          false
+        ],
+        [
+          49996,
+          false,
+          false
+        ],
+        [
+          49995,
+          false,
+          false
+        ],
+        [
+          49994,
+          false,
+          false
+        ],
+        [
+          49993,
+          false,
+          false
+        ],
+        [
+          49992,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 50000,
+      "nextCursor": 49992
+    },
+    "next:{\"before\": 49992}": {
+      "rows": [
+        [
+          49991,
+          false,
+          false
+        ],
+        [
+          49990,
+          false,
+          false
+        ],
+        [
+          49989,
+          false,
+          false
+        ],
+        [
+          49988,
+          false,
+          false
+        ],
+        [
+          49987,
+          false,
+          false
+        ],
+        [
+          49986,
+          false,
+          false
+        ],
+        [
+          49985,
+          false,
+          false
+        ],
+        [
+          49984,
+          false,
+          false
+        ],
+        [
+          49983,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 49991,
+      "nextCursor": 49983
+    },
+    "prev:{\"after\": 49983}": {
+      "rows": [
+        [
+          49992,
+          false,
+          false
+        ],
+        [
+          49991,
+          false,
+          false
+        ],
+        [
+          49990,
+          false,
+          false
+        ],
+        [
+          49989,
+          false,
+          false
+        ],
+        [
+          49988,
+          false,
+          false
+        ],
+        [
+          49987,
+          false,
+          false
+        ],
+        [
+          49986,
+          false,
+          false
+        ],
+        [
+          49985,
+          false,
+          false
+        ],
+        [
+          49984,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 49992,
+      "nextCursor": 49984
+    },
+    "search:{\"level\": \"MEDIUM\", \"q\": \"교착 상태\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          49901,
+          false,
+          false
+        ],
+        [
+          49880,
+          false,
+          false
+        ],
+        [
+          49808,
+          false,
+          false
+        ],
+        [
+          49691,
+          false,
+          false
+        ],
+        [
+          49660,
+          false,
+          false
+        ],
+        [
+          49565,
+          false,
+          false
+        ],
+        [
+          49523,
+          false,
+          false
+        ],
+        [
+          49371,
+          false,
+          false
+        ],
+        [
+          49230,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 49901,
+      "nextCursor": 49230
+    },
+    "search:{\"level\": \"MEDIUM\", \"q\": \"rareDCBA49\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          1,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 1,
+      "nextCursor": 1
+    },
+    "search:{\"level\": \"MEDIUM\", \"q\": \"없는문항qZ6\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": null,
+      "nextCursor": null
+    },
+    "search:{\"level\": \"MEDIUM\", \"q\": \"상태\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          49999,
+          false,
+          false
+        ],
+        [
+          49992,
+          false,
+          false
+        ],
+        [
+          49980,
+          false,
+          false
+        ],
+        [
+          49954,
+          false,
+          false
+        ],
+        [
+          49952,
+          false,
+          false
+        ],
+        [
+          49947,
+          false,
+          false
+        ],
+        [
+          49938,
+          false,
+          false
+        ],
+        [
+          49926,
+          false,
+          false
+        ],
+        [
+          49917,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 49999,
+      "nextCursor": 49917
+    },
+    "indexed:{\"q\": \"교착 상태\"}": {
+      "rows": [
+        [
+          50000,
+          false,
+          false
+        ],
+        [
+          49997,
+          false,
+          false
+        ],
+        [
+          49991,
+          false,
+          false
+        ],
+        [
+          49988,
+          false,
+          false
+        ],
+        [
+          49982,
+          false,
+          false
+        ],
+        [
+          49981,
+          false,
+          false
+        ],
+        [
+          49971,
+          false,
+          false
+        ],
+        [
+          49967,
+          false,
+          false
+        ],
+        [
+          49965,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 50000,
+      "nextCursor": 49965
+    },
+    "indexed:{\"q\": \"rareDCBA49\"}": {
+      "rows": [
+        [
+          1,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 1,
+      "nextCursor": 1
+    },
+    "saved_read:{\"q\": \"교착 상태\", \"view\": \"selected\"}": {
+      "rows": [
+        [
+          48969,
+          true,
+          false
+        ],
+        [
+          48915,
+          true,
+          false
+        ],
+        [
+          48904,
+          true,
+          false
+        ],
+        [
+          48888,
+          true,
+          false
+        ],
+        [
+          48842,
+          true,
+          false
+        ],
+        [
+          48763,
+          true,
+          false
+        ],
+        [
+          48734,
+          true,
+          false
+        ],
+        [
+          48678,
+          true,
+          false
+        ],
+        [
+          48547,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 48969,
+      "nextCursor": 48547
+    },
+    "saved_read:{\"q\": \"없는문항qZ6\", \"view\": \"selected\"}": {
+      "rows": [],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": null,
+      "nextCursor": null
+    },
+    "case:{\"q\": \"snapshotisolation\"}": {
+      "rows": [
+        [
+          2,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 2,
+      "nextCursor": 2
+    },
+    "case_filtered:{\"q\": \"snapshotisolation\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          2,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 2,
+      "nextCursor": 2
+    },
+    "short:{\"q\": \"상태\"}": {
+      "rows": [
+        [
+          50000,
+          false,
+          false
+        ],
+        [
+          49999,
+          false,
+          false
+        ],
+        [
+          49998,
+          false,
+          false
+        ],
+        [
+          49997,
+          false,
+          false
+        ],
+        [
+          49996,
+          false,
+          false
+        ],
+        [
+          49995,
+          false,
+          false
+        ],
+        [
+          49994,
+          false,
+          false
+        ],
+        [
+          49993,
+          false,
+          false
+        ],
+        [
+          49992,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 50000,
+      "nextCursor": 49992
+    },
+    "saved_rare:{\"q\": \"rareDCBA49\", \"view\": \"selected\"}": {
+      "rows": [
+        [
+          1,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 1,
+      "nextCursor": 1
+    },
+    "percent:{\"q\": \"%\"}": {
+      "rows": [
+        [
+          3,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 3,
+      "nextCursor": 3
+    },
+    "underscore:{\"q\": \"_\"}": {
+      "rows": [
+        [
+          3,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 3,
+      "nextCursor": 3
+    },
+    "backslash:{\"q\": \"\\\\\"}": {
+      "rows": [
+        [
+          3,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 3,
+      "nextCursor": 3
+    },
+    "combined:{\"q\": \"_%\\\\end\"}": {
+      "rows": [
+        [
+          3,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 3,
+      "nextCursor": 3
+    },
+    "escape:{\"q\": \"A!B\"}": {
+      "rows": [
+        [
+          9,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 9,
+      "nextCursor": 9
+    },
+    "accent:{\"q\": \"cafe\"}": {
+      "rows": [
+        [
+          7,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 7,
+      "nextCursor": 7
+    },
+    "accent_filtered:{\"q\": \"cafe\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          7,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 7,
+      "nextCursor": 7
+    },
+    "accent_saved:{\"q\": \"cafe\", \"view\": \"selected\"}": {
+      "rows": [
+        [
+          7,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 7,
+      "nextCursor": 7
+    },
+    "sharp_s:{\"q\": \"strasse\"}": {
+      "rows": [
+        [
+          8,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 8,
+      "nextCursor": 8
+    },
+    "ban:{\"view\": \"banned\"}": {
+      "rows": [
+        [
+          48989,
+          false,
+          true
+        ],
+        [
+          48869,
+          false,
+          true
+        ],
+        [
+          48799,
+          false,
+          true
+        ],
+        [
+          48768,
+          false,
+          true
+        ],
+        [
+          48728,
+          false,
+          true
+        ],
+        [
+          48551,
+          false,
+          true
+        ],
+        [
+          48520,
+          true,
+          true
+        ],
+        [
+          48465,
+          false,
+          true
+        ],
+        [
+          48383,
+          false,
+          true
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 48989,
+      "nextCursor": 48383
+    },
+    "ordered_next:{\"before\": 48000, \"q\": \"교착 상태\"}": {
+      "rows": [
+        [
+          47994,
+          true,
+          false
+        ],
+        [
+          47975,
+          false,
+          false
+        ],
+        [
+          47970,
+          false,
+          false
+        ],
+        [
+          47960,
+          false,
+          false
+        ],
+        [
+          47950,
+          false,
+          false
+        ],
+        [
+          47943,
+          false,
+          false
+        ],
+        [
+          47940,
+          false,
+          false
+        ],
+        [
+          47938,
+          false,
+          false
+        ],
+        [
+          47934,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 47994,
+      "nextCursor": 47934
+    },
+    "ordered_prev:{\"after\": 48000, \"q\": \"교착 상태\"}": {
+      "rows": [
+        [
+          48044,
+          false,
+          false
+        ],
+        [
+          48043,
+          false,
+          false
+        ],
+        [
+          48041,
+          false,
+          false
+        ],
+        [
+          48028,
+          false,
+          false
+        ],
+        [
+          48026,
+          false,
+          false
+        ],
+        [
+          48020,
+          false,
+          false
+        ],
+        [
+          48018,
+          false,
+          false
+        ],
+        [
+          48012,
+          false,
+          false
+        ],
+        [
+          48003,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 48044,
+      "nextCursor": 48003
+    },
+    "ordered_saved_prev:{\"after\": 40000, \"q\": \"교착 상태\", \"view\": \"selected\"}": {
+      "rows": [
+        [
+          40583,
+          true,
+          false
+        ],
+        [
+          40500,
+          true,
+          false
+        ],
+        [
+          40415,
+          true,
+          false
+        ],
+        [
+          40243,
+          true,
+          false
+        ],
+        [
+          40210,
+          true,
+          false
+        ],
+        [
+          40166,
+          true,
+          false
+        ],
+        [
+          40155,
+          true,
+          false
+        ],
+        [
+          40089,
+          true,
+          false
+        ],
+        [
+          40077,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 40583,
+      "nextCursor": 40077
+    },
+    "ordered_filtered_next:{\"before\": 48000, \"level\": \"MEDIUM\", \"q\": \"교착 상태\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          47724,
+          false,
+          false
+        ],
+        [
+          47713,
+          true,
+          false
+        ],
+        [
+          47709,
+          true,
+          false
+        ],
+        [
+          47687,
+          false,
+          false
+        ],
+        [
+          47680,
+          false,
+          false
+        ],
+        [
+          47560,
+          false,
+          false
+        ],
+        [
+          47376,
+          false,
+          false
+        ],
+        [
+          47367,
+          false,
+          false
+        ],
+        [
+          47291,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 47724,
+      "nextCursor": 47291
+    },
+    "ordered_fallback_old:{\"before\": 48000, \"q\": \"rareDCBA49\"}": {
+      "rows": [
+        [
+          1,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": false,
+      "previousCursor": 1,
+      "nextCursor": 1
+    },
+    "owner_visibility": {
+      "rows": [],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": null,
+      "nextCursor": null
+    },
+    "guest_visibility": {
+      "rows": [
+        [
+          10,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 10,
+      "nextCursor": 10
+    },
+    "guest_admin": 403,
+    "POST_saved": 204,
+    "POST_banned": 204,
+    "DELETE_banned": 204,
+    "DELETE_saved": 204
+  },
+  "pg": {
+    "first:{}": {
+      "rows": [
+        [
+          50000,
+          false,
+          false
+        ],
+        [
+          49999,
+          false,
+          false
+        ],
+        [
+          49998,
+          false,
+          false
+        ],
+        [
+          49997,
+          false,
+          false
+        ],
+        [
+          49996,
+          false,
+          false
+        ],
+        [
+          49995,
+          false,
+          false
+        ],
+        [
+          49994,
+          false,
+          false
+        ],
+        [
+          49993,
+          false,
+          false
+        ],
+        [
+          49992,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 50000,
+      "nextCursor": 49992
+    },
+    "next:{\"before\": 49992}": {
+      "rows": [
+        [
+          49991,
+          false,
+          false
+        ],
+        [
+          49990,
+          false,
+          false
+        ],
+        [
+          49989,
+          false,
+          false
+        ],
+        [
+          49988,
+          false,
+          false
+        ],
+        [
+          49987,
+          false,
+          false
+        ],
+        [
+          49986,
+          false,
+          false
+        ],
+        [
+          49985,
+          false,
+          false
+        ],
+        [
+          49984,
+          false,
+          false
+        ],
+        [
+          49983,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 49991,
+      "nextCursor": 49983
+    },
+    "prev:{\"after\": 49983}": {
+      "rows": [
+        [
+          49992,
+          false,
+          false
+        ],
+        [
+          49991,
+          false,
+          false
+        ],
+        [
+          49990,
+          false,
+          false
+        ],
+        [
+          49989,
+          false,
+          false
+        ],
+        [
+          49988,
+          false,
+          false
+        ],
+        [
+          49987,
+          false,
+          false
+        ],
+        [
+          49986,
+          false,
+          false
+        ],
+        [
+          49985,
+          false,
+          false
+        ],
+        [
+          49984,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 49992,
+      "nextCursor": 49984
+    },
+    "search:{\"level\": \"MEDIUM\", \"q\": \"교착 상태\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          49901,
+          false,
+          false
+        ],
+        [
+          49880,
+          false,
+          false
+        ],
+        [
+          49808,
+          false,
+          false
+        ],
+        [
+          49691,
+          false,
+          false
+        ],
+        [
+          49660,
+          false,
+          false
+        ],
+        [
+          49565,
+          false,
+          false
+        ],
+        [
+          49523,
+          false,
+          false
+        ],
+        [
+          49371,
+          false,
+          false
+        ],
+        [
+          49230,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 49901,
+      "nextCursor": 49230
+    },
+    "search:{\"level\": \"MEDIUM\", \"q\": \"rareDCBA49\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          1,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 1,
+      "nextCursor": 1
+    },
+    "search:{\"level\": \"MEDIUM\", \"q\": \"없는문항qZ6\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": null,
+      "nextCursor": null
+    },
+    "search:{\"level\": \"MEDIUM\", \"q\": \"상태\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          49999,
+          false,
+          false
+        ],
+        [
+          49992,
+          false,
+          false
+        ],
+        [
+          49980,
+          false,
+          false
+        ],
+        [
+          49954,
+          false,
+          false
+        ],
+        [
+          49952,
+          false,
+          false
+        ],
+        [
+          49947,
+          false,
+          false
+        ],
+        [
+          49938,
+          false,
+          false
+        ],
+        [
+          49926,
+          false,
+          false
+        ],
+        [
+          49917,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 49999,
+      "nextCursor": 49917
+    },
+    "indexed:{\"q\": \"교착 상태\"}": {
+      "rows": [
+        [
+          50000,
+          false,
+          false
+        ],
+        [
+          49997,
+          false,
+          false
+        ],
+        [
+          49991,
+          false,
+          false
+        ],
+        [
+          49988,
+          false,
+          false
+        ],
+        [
+          49982,
+          false,
+          false
+        ],
+        [
+          49981,
+          false,
+          false
+        ],
+        [
+          49971,
+          false,
+          false
+        ],
+        [
+          49967,
+          false,
+          false
+        ],
+        [
+          49965,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 50000,
+      "nextCursor": 49965
+    },
+    "indexed:{\"q\": \"rareDCBA49\"}": {
+      "rows": [
+        [
+          1,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 1,
+      "nextCursor": 1
+    },
+    "saved_read:{\"q\": \"교착 상태\", \"view\": \"selected\"}": {
+      "rows": [
+        [
+          48969,
+          true,
+          false
+        ],
+        [
+          48915,
+          true,
+          false
+        ],
+        [
+          48904,
+          true,
+          false
+        ],
+        [
+          48888,
+          true,
+          false
+        ],
+        [
+          48842,
+          true,
+          false
+        ],
+        [
+          48763,
+          true,
+          false
+        ],
+        [
+          48734,
+          true,
+          false
+        ],
+        [
+          48678,
+          true,
+          false
+        ],
+        [
+          48547,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 48969,
+      "nextCursor": 48547
+    },
+    "saved_read:{\"q\": \"없는문항qZ6\", \"view\": \"selected\"}": {
+      "rows": [],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": null,
+      "nextCursor": null
+    },
+    "case:{\"q\": \"snapshotisolation\"}": {
+      "rows": [
+        [
+          2,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 2,
+      "nextCursor": 2
+    },
+    "case_filtered:{\"q\": \"snapshotisolation\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          2,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 2,
+      "nextCursor": 2
+    },
+    "short:{\"q\": \"상태\"}": {
+      "rows": [
+        [
+          50000,
+          false,
+          false
+        ],
+        [
+          49999,
+          false,
+          false
+        ],
+        [
+          49998,
+          false,
+          false
+        ],
+        [
+          49997,
+          false,
+          false
+        ],
+        [
+          49996,
+          false,
+          false
+        ],
+        [
+          49995,
+          false,
+          false
+        ],
+        [
+          49994,
+          false,
+          false
+        ],
+        [
+          49993,
+          false,
+          false
+        ],
+        [
+          49992,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 50000,
+      "nextCursor": 49992
+    },
+    "saved_rare:{\"q\": \"rareDCBA49\", \"view\": \"selected\"}": {
+      "rows": [
+        [
+          1,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 1,
+      "nextCursor": 1
+    },
+    "percent:{\"q\": \"%\"}": {
+      "rows": [
+        [
+          3,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 3,
+      "nextCursor": 3
+    },
+    "underscore:{\"q\": \"_\"}": {
+      "rows": [
+        [
+          3,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 3,
+      "nextCursor": 3
+    },
+    "backslash:{\"q\": \"\\\\\"}": {
+      "rows": [
+        [
+          3,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 3,
+      "nextCursor": 3
+    },
+    "combined:{\"q\": \"_%\\\\end\"}": {
+      "rows": [
+        [
+          3,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 3,
+      "nextCursor": 3
+    },
+    "escape:{\"q\": \"A!B\"}": {
+      "rows": [
+        [
+          9,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 9,
+      "nextCursor": 9
+    },
+    "accent:{\"q\": \"cafe\"}": {
+      "rows": [
+        [
+          7,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 7,
+      "nextCursor": 7
+    },
+    "accent_filtered:{\"q\": \"cafe\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          7,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 7,
+      "nextCursor": 7
+    },
+    "accent_saved:{\"q\": \"cafe\", \"view\": \"selected\"}": {
+      "rows": [
+        [
+          7,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 7,
+      "nextCursor": 7
+    },
+    "sharp_s:{\"q\": \"strasse\"}": {
+      "rows": [
+        [
+          8,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 8,
+      "nextCursor": 8
+    },
+    "ban:{\"view\": \"banned\"}": {
+      "rows": [
+        [
+          48989,
+          false,
+          true
+        ],
+        [
+          48869,
+          false,
+          true
+        ],
+        [
+          48799,
+          false,
+          true
+        ],
+        [
+          48768,
+          false,
+          true
+        ],
+        [
+          48728,
+          false,
+          true
+        ],
+        [
+          48551,
+          false,
+          true
+        ],
+        [
+          48520,
+          true,
+          true
+        ],
+        [
+          48465,
+          false,
+          true
+        ],
+        [
+          48383,
+          false,
+          true
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": true,
+      "previousCursor": 48989,
+      "nextCursor": 48383
+    },
+    "ordered_next:{\"before\": 48000, \"q\": \"교착 상태\"}": {
+      "rows": [
+        [
+          47994,
+          true,
+          false
+        ],
+        [
+          47975,
+          false,
+          false
+        ],
+        [
+          47970,
+          false,
+          false
+        ],
+        [
+          47960,
+          false,
+          false
+        ],
+        [
+          47950,
+          false,
+          false
+        ],
+        [
+          47943,
+          false,
+          false
+        ],
+        [
+          47940,
+          false,
+          false
+        ],
+        [
+          47938,
+          false,
+          false
+        ],
+        [
+          47934,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 47994,
+      "nextCursor": 47934
+    },
+    "ordered_prev:{\"after\": 48000, \"q\": \"교착 상태\"}": {
+      "rows": [
+        [
+          48044,
+          false,
+          false
+        ],
+        [
+          48043,
+          false,
+          false
+        ],
+        [
+          48041,
+          false,
+          false
+        ],
+        [
+          48028,
+          false,
+          false
+        ],
+        [
+          48026,
+          false,
+          false
+        ],
+        [
+          48020,
+          false,
+          false
+        ],
+        [
+          48018,
+          false,
+          false
+        ],
+        [
+          48012,
+          false,
+          false
+        ],
+        [
+          48003,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 48044,
+      "nextCursor": 48003
+    },
+    "ordered_saved_prev:{\"after\": 40000, \"q\": \"교착 상태\", \"view\": \"selected\"}": {
+      "rows": [
+        [
+          40583,
+          true,
+          false
+        ],
+        [
+          40500,
+          true,
+          false
+        ],
+        [
+          40415,
+          true,
+          false
+        ],
+        [
+          40243,
+          true,
+          false
+        ],
+        [
+          40210,
+          true,
+          false
+        ],
+        [
+          40166,
+          true,
+          false
+        ],
+        [
+          40155,
+          true,
+          false
+        ],
+        [
+          40089,
+          true,
+          false
+        ],
+        [
+          40077,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 40583,
+      "nextCursor": 40077
+    },
+    "ordered_filtered_next:{\"before\": 48000, \"level\": \"MEDIUM\", \"q\": \"교착 상태\", \"subject\": \"OPERATING_SYSTEM\"}": {
+      "rows": [
+        [
+          47724,
+          false,
+          false
+        ],
+        [
+          47713,
+          true,
+          false
+        ],
+        [
+          47709,
+          true,
+          false
+        ],
+        [
+          47687,
+          false,
+          false
+        ],
+        [
+          47680,
+          false,
+          false
+        ],
+        [
+          47560,
+          false,
+          false
+        ],
+        [
+          47376,
+          false,
+          false
+        ],
+        [
+          47367,
+          false,
+          false
+        ],
+        [
+          47291,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": true,
+      "previousCursor": 47724,
+      "nextCursor": 47291
+    },
+    "ordered_fallback_old:{\"before\": 48000, \"q\": \"rareDCBA49\"}": {
+      "rows": [
+        [
+          1,
+          true,
+          false
+        ]
+      ],
+      "hasPrevious": true,
+      "hasNext": false,
+      "previousCursor": 1,
+      "nextCursor": 1
+    },
+    "owner_visibility": {
+      "rows": [],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": null,
+      "nextCursor": null
+    },
+    "guest_visibility": {
+      "rows": [
+        [
+          10,
+          false,
+          false
+        ]
+      ],
+      "hasPrevious": false,
+      "hasNext": false,
+      "previousCursor": 10,
+      "nextCursor": 10
+    },
+    "guest_admin": 403,
+    "POST_saved": 204,
+    "POST_banned": 204,
+    "DELETE_banned": 204,
+    "DELETE_saved": 204
+  }
+}

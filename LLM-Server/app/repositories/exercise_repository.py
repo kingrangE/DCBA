@@ -1,10 +1,12 @@
 import os
+import time
 import pymysql
 from app.models.exercise import Exercise, ExerciseRequest
 from contextlib import contextmanager
 
 class ExerciseRepository:
     def __init__(self):
+        self.postgres = os.getenv("DB_ENGINE") == "postgres"
         self.host = os.getenv("MARIADB_HOST", "localhost")
         self.port = int(os.getenv("MARIADB_PORT", 3306))
         self.user = os.getenv("MARIADB_USER", "root")
@@ -13,6 +15,11 @@ class ExerciseRepository:
 
 
     def get_connection(self):
+        if self.postgres:
+            from psycopg.rows import dict_row
+            from app.postgres import connect
+
+            return connect(autocommit=True, row_factory=dict_row)
         return pymysql.connect(
             host=self.host,
             port=self.port,
@@ -30,15 +37,24 @@ class ExerciseRepository:
         acquired = False
         try:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT GET_LOCK('dcba:exercise-generation', 5) AS acquired")
-                acquired = cursor.fetchone()["acquired"] == 1
+                if self.postgres:
+                    deadline = time.monotonic() + 5
+                    while True:
+                        cursor.execute("SELECT pg_try_advisory_lock(hashtext('dcba:exercise-generation')) AS acquired")
+                        acquired = cursor.fetchone()["acquired"]
+                        if acquired or time.monotonic() >= deadline:
+                            break
+                        time.sleep(0.1)
+                else:
+                    cursor.execute("SELECT GET_LOCK('dcba:exercise-generation', 5) AS acquired")
+                    acquired = cursor.fetchone()["acquired"] == 1
             if not acquired:
                 raise RuntimeError("Another generation is still running")
             # shortcut: one generator writes at a time, use a shared vector server before scaling writers.
             yield connection
         finally:
             try:
-                if acquired:
+                if acquired and not self.postgres:
                     with connection.cursor() as cursor:
                         cursor.execute("SELECT RELEASE_LOCK('dcba:exercise-generation')")
             finally:
@@ -73,11 +89,14 @@ class ExerciseRepository:
             raise ValueError("Question and answer are required")
         conn = connection or self.get_connection()
         try:
-            conn.begin()
+            if self.postgres:
+                conn.execute("BEGIN")
+            else:
+                conn.begin()
             with conn.cursor() as cursor:
                 sql = "INSERT INTO exercise (subject, level, question, answer, created_at) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)"
-                cursor.execute(sql, (request.subject.value, request.level.value, question, answer))
-                exercise_id = cursor.lastrowid
+                cursor.execute(sql + (" RETURNING id" if self.postgres else ""), (request.subject.value, request.level.value, question, answer))
+                exercise_id = cursor.fetchone()["id"] if self.postgres else cursor.lastrowid
                 if task_id is not None:
                     cursor.execute("INSERT INTO generation_task (task_id, exercise_id) VALUES (%s, %s)", (task_id, exercise_id))
             conn.commit()

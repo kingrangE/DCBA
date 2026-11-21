@@ -57,6 +57,10 @@ def index_exercise_questions(cursor):
 
 
 def migrate(*, search_index=False):
+    if os.getenv("DB_ENGINE") == "postgres":
+        from app.migrate_postgres import migrate as migrate_postgres
+
+        return migrate_postgres()
     connection = pymysql.connect(
         host=os.getenv("MARIADB_HOST", "localhost"),
         port=int(os.getenv("MARIADB_PORT", "3306")),

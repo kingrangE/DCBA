@@ -39,8 +39,8 @@ public class ReviewService {
             case "marked" -> true;
             default -> throw new IllegalArgumentException("지원하지 않는 복습 방식입니다.");
         };
-        return new Sample(selected.sampleReview(userId, subject == null ? null : subject.name(),
-                level == null ? null : level.name(), marked).stream().map(row -> {
+        return new Sample(selected.sampleReview(userId, subject == null ? "" : subject.name(),
+                level == null ? "" : level.name(), marked, java.util.UUID.randomUUID().toString()).stream().map(row -> {
             var rowSubject = Subject.valueOf(row.getSubject());
             var rowLevel = Level.valueOf(row.getLevel());
             return new Item(row.getId(), row.getQuestion(), row.getAnswer(), rowSubject, rowSubject.getSubjectName(),

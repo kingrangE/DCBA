@@ -29,6 +29,15 @@ public class ExerciseService {
     private final JdbcTemplate jdbc;
     private volatile boolean searchIndexAvailable;
 
+    @org.springframework.beans.factory.annotation.Value("${dcba.database.postgres:false}")
+    private boolean postgres;
+
+    private final OrderedPostgresSearch orderedSearch;
+
+    private String literalPattern(String keyword) {
+        return keyword == null ? null : "%" + keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    }
+
     /**
      * 조건에 따라 문제 Get
      * @param userId 유저 Id
@@ -43,6 +52,11 @@ public class ExerciseService {
                                        @Nullable String keyword,
                                         Long before, Long after) {
         Pageable page = cursorPage(before, after);
+        if (postgres) {
+            String pattern = literalPattern(keyword);
+            var slice = orderedSearch.fullPage(userId, false, subject, level, pattern, before, after, page);
+            return slice != null ? slice : exerciseRepository.findVisibleExercisesPg(userId, subject, level, pattern, before, after, page);
+        }
         if (subject == null && level == null && keyword != null
                 && keyword.codePointCount(0, keyword.length()) >= 3 && hasSearchIndex()) {
             return exerciseRepository.findIndexedExercises(userId, keyword, before, after,
@@ -174,6 +188,12 @@ public class ExerciseService {
      * @return 저장한 문제와 다음 구간 존재 여부
      */
     public Slice<Exercise> getSelectedExercises(Long userId, Subject subject, Level level, String keyword, Long before, Long after) {
+        if (postgres) {
+            Pageable page = cursorPage(before, after);
+            String pattern = literalPattern(keyword);
+            var slice = orderedSearch.fullPage(userId, true, subject, level, pattern, before, after, page);
+            return slice != null ? slice : selectedExerciseRepository.findExercisesPg(userId, subject, level, pattern, before, after, page);
+        }
         return selectedExerciseRepository.findExercises(userId, subject, level, keyword, before, after, cursorPage(before, after));
     }
 

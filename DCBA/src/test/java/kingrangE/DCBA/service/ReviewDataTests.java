@@ -20,7 +20,7 @@ import static org.mockito.Mockito.*;
 @DataJpaTest(properties = "REVIEW_FEEDBACK_ENABLED=true")
 @ActiveProfiles("local")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ReviewService.class, ExerciseService.class})
+@Import({ReviewService.class, ExerciseService.class, OrderedPostgresSearch.class})
 class ReviewDataTests {
     static final String RUBRIC = """
             [{"id":"definition","label":"정의","description":"개념을 설명합니다."},
