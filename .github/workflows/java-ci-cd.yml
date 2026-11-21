@@ -123,7 +123,7 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/dcba-pg-test"
           test_python="$RUNNER_TEMP/dcba-pg-test/bin/python"
-          "$test_python" -m pip install pymysql 'psycopg[binary]>=3.2,<4' 'pydantic>=2,<3' httpx
+          "$test_python" -m pip install pymysql 'psycopg[binary]>=3.2,<4' 'pydantic>=2,<3' httpx prometheus-client
           bash scripts/test-postgres-cutover.sh "$test_python"
       - name: Keep the tested application
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

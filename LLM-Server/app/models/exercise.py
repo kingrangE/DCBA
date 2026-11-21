@@ -1,7 +1,7 @@
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 class Subject(StrEnum):
     COMPUTER_ARCHITECTURE = "COMPUTER_ARCHITECTURE"
@@ -33,6 +33,26 @@ class ExerciseBase(BaseModel):
 class ExerciseRequest(ExerciseBase):
     pass
 
+
+# The same edge whitespace as JavaScript trim, excluding Python-only control separators.
+EDGE_WHITESPACE = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+
+
+class QueuedExerciseRequest(ExerciseRequest):
+    request_type: Literal["manual", "automatic", "legacy"] = "legacy"
+    requester_id: Annotated[int, Field(gt=0)] | None = None
+    learning_intent: str | None = None
+
+    @field_validator("learning_intent")
+    @classmethod
+    def normalize_intent(cls, value):
+        if value is None:
+            return None
+        value = value.strip(EDGE_WHITESPACE)
+        if len(value) > 200:
+            raise ValueError("Learning intent exceeds the 200 code point limit")
+        return value or None
+
 NonBlankText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
@@ -55,4 +75,4 @@ class Exercise(ExerciseBase):
     id: int
     question: str
     answer: str
-    created_at : datetime = None
+    created_at: datetime | None = None

@@ -89,6 +89,11 @@ public class ExerciseService {
         return searchIndexAvailable;
     }
 
+    public Exercise findExercise(Long exerciseId) {
+        return exerciseRepository.findById(exerciseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "문제를 열 수 없어요."));
+    }
+
     public Slice<Exercise> getExercisePool(Long before, Long after) {
         return exerciseRepository.findPool(before, after, cursorPage(before, after));
     }

@@ -6,10 +6,10 @@ def test_completed_migration_does_not_change_schema(mocker, monkeypatch):
     monkeypatch.setenv("MARIADB_USER", "test")
     monkeypatch.setenv("MARIADB_PASSWORD", "test")
     cursor = mocker.patch("app.migrate.pymysql.connect").return_value.cursor.return_value.__enter__.return_value
-    cursor.fetchone.side_effect = [(1,), (1,), (2,), (3,), (4,), (5,)]
+    cursor.fetchone.side_effect = [(1,), (1,), (2,), (3,), (4,), (5,), (7,), (8,), (9,)]
     migrate()
     queries = [call.args[0] for call in cursor.execute.call_args_list]
-    assert len(queries) == 7
+    assert len(queries) == 10
     assert not any("ALTER TABLE" in query for query in queries)
     assert not any("exercise_search_gram" in query or "version = 6" in query for query in queries)
 
@@ -29,7 +29,7 @@ def test_existing_schema_receives_filter_indexes_without_repeating_first_migrati
     monkeypatch.setenv("MARIADB_USER", "test")
     monkeypatch.setenv("MARIADB_PASSWORD", "test")
     cursor = mocker.patch("app.migrate.pymysql.connect").return_value.cursor.return_value.__enter__.return_value
-    cursor.fetchone.side_effect = [(1,), (1,), None, (3,), (4,), (5,)]
+    cursor.fetchone.side_effect = [(1,), (1,), None, (3,), (4,), (5,), (7,), (8,), (9,)]
     migrate()
     queries = [call.args[0] for call in cursor.execute.call_args_list]
     assert sum("CREATE INDEX IF NOT EXISTS" in query for query in queries) == 2
@@ -41,7 +41,7 @@ def test_existing_schema_adds_index_cleanup_queue(mocker, monkeypatch):
     monkeypatch.setenv("MARIADB_USER", "test")
     monkeypatch.setenv("MARIADB_PASSWORD", "test")
     cursor = mocker.patch("app.migrate.pymysql.connect").return_value.cursor.return_value.__enter__.return_value
-    cursor.fetchone.side_effect = [(1,), (1,), (2,), (3,), None, (5,)]
+    cursor.fetchone.side_effect = [(1,), (1,), (2,), (3,), None, (5,), (7,), (8,), (9,)]
     migrate()
     queries = [call.args[0] for call in cursor.execute.call_args_list]
     assert any(query.startswith("CREATE TABLE IF NOT EXISTS deleted_exercise") for query in queries)
@@ -51,7 +51,7 @@ def test_review_migration_adds_default_mark_and_cascades_rubric_on_delete(mocker
     monkeypatch.setenv("MARIADB_USER", "test")
     monkeypatch.setenv("MARIADB_PASSWORD", "test")
     cursor = mocker.patch("app.migrate.pymysql.connect").return_value.cursor.return_value.__enter__.return_value
-    cursor.fetchone.side_effect = [(1,), (1,), (2,), (3,), (4,), None]
+    cursor.fetchone.side_effect = [(1,), (1,), (2,), (3,), (4,), None, (7,), (8,), (9,)]
     migrate()
     queries = [call.args[0] for call in cursor.execute.call_args_list]
     assert any("ADD COLUMN IF NOT EXISTS review_again BOOLEAN NOT NULL DEFAULT FALSE" in query for query in queries)
@@ -82,3 +82,14 @@ def test_search_migration_requires_base_schema(mocker, monkeypatch):
     with pytest.raises(RuntimeError, match="required schema"):
         migrate(search_index=True)
     assert cursor.execute.call_count == 2
+
+
+def test_existing_completion_defaults_to_created(mocker, monkeypatch):
+    monkeypatch.setenv("MARIADB_USER", "test")
+    monkeypatch.setenv("MARIADB_PASSWORD", "test")
+    cursor = mocker.patch("app.migrate.pymysql.connect").return_value.cursor.return_value.__enter__.return_value
+    cursor.fetchone.side_effect = [(1,), (1,), (2,), (3,), (4,), (5,), (7,), None, (9,)]
+    migrate()
+    queries = [call.args[0] for call in cursor.execute.call_args_list]
+    assert "DEFAULT 'created'" in queries[-3]
+    assert queries[-2] == "INSERT INTO schema_migration (version) VALUES (8)"

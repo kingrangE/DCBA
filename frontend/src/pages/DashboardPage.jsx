@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api } from '../api/client'
 import ExerciseCard from '../components/ExerciseCard'
 import GenerationPanel from '../components/GenerationPanel'
@@ -32,6 +33,7 @@ const preferences = {
 }
 
 export default function DashboardPage() {
+  const { hash } = useLocation()
   const { expireSession } = useAuth()
   const listHeading = useRef(null)
   const composingSearch = useRef(false)
@@ -65,6 +67,14 @@ export default function DashboardPage() {
   const canSearch = filters.view !== 'banned'
   const isFirstPage = !filters.before && !filters.after
   const showGenerationLink = !optionsLoading && !optionsError && options.generationEnabled !== false
+
+  useEffect(() => {
+    if (hash === '#generate') {
+      const panel = document.getElementById('generate')
+      panel?.scrollIntoView()
+      panel?.focus({ preventScroll: true })
+    }
+  }, [hash])
 
   useEffect(() => {
     let active = true

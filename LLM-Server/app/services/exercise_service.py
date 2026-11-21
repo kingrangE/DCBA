@@ -1,9 +1,12 @@
 import json
 import os
+import time
 from collections import deque
 from dotenv import load_dotenv
 from app.services.nvidia_generator import NvidiaGenerator
 from app.models.exercise import Exercise, ExerciseRequest, GeneratedExercise, SUBJECT_LABELS, LEVEL_LABELS
+from app.services.generation_workflow import GenerationRejected, generate, search
+from app.services.generation_privacy import contains_identifier
 
 load_dotenv()
 
@@ -44,6 +47,59 @@ class ExerciseService:
             return GeneratedExercise.model_validate(value)
         except (ValueError, RecursionError):
             return None
+
+    def format_answer(self, parsed):
+        concepts = "\n".join(f"- **{item.term}** — {item.explanation}" for item in parsed.concepts)
+        return f"{parsed.answer}\n\n##### 이 문제를 풀기 위해 알아야 할 개념\n\n{concepts}"
+
+    def run_queued(self, task_id, request, reserve_call):
+        from app.repositories.exercise_repository import exercise_repository
+        deadline = time.monotonic() + 180
+
+        def budget(kind=None):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or (kind == "embedding" and remaining < 30):
+                raise GenerationRejected("time_limit")
+            if kind is not None:
+                reserve_call(task_id, kind)
+            return min(30, remaining)
+
+        with exercise_repository.generation_lock() as connection:
+            completed = exercise_repository.find_task(task_id, connection)
+            if completed is not None:
+                return Exercise(**completed) if completed["id"] is not None else None
+            budget()
+            if request.learning_intent and contains_identifier(request.learning_intent):
+                raise GenerationRejected("private_input")
+            if not self.deduplication_enabled:
+                raise GenerationRejected("search_configuration")
+
+            def get_search():
+                from app.services.deduplication_service import deduplication_service
+                return deduplication_service
+
+            deduplication = search(get_search)
+            if deduplication is None:
+                raise GenerationRejected("search_configuration")
+            search(deduplication.synchronize, exercise_repository, connection,
+                   before_embedding=lambda: budget("embedding"))
+
+            def recommend(exercise_id):
+                return exercise_repository.save_recommendation(
+                    task_id, request.requester_id, exercise_id, request.subject.value, request.level.value, connection)
+
+            result = generate(self, request, exercise_repository, connection, deduplication, budget, recommend)
+            if isinstance(result, Exercise):
+                return result
+            question, answer, embedding, history = result
+            budget()
+            saved = exercise_repository.save_exercise(
+                request.subject.value, request.level.value, question, answer, task_id=task_id,
+                connection=connection, history=history,
+                requester_id=request.requester_id if request.request_type == "manual" else None,
+            )
+            deduplication.record(saved, embedding)
+            return saved
 
     def generate_and_save(self, subject: str, level: str, task_id=None):
         from app.repositories.exercise_repository import exercise_repository
@@ -100,8 +156,7 @@ class ExerciseService:
             parsed = self.parse_content(content)
             if parsed is None:
                 continue
-            concepts = "\n".join(f"- **{item.term}** — {item.explanation}" for item in parsed.concepts)
-            answer = f"{parsed.answer}\n\n##### 이 문제를 풀기 위해 알아야 할 개념\n\n{concepts}"
+            answer = self.format_answer(parsed)
             embedding = None
             if deduplication is not None:
                 duplicate_document, embedding = deduplication.check_duplicate(

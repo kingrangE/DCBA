@@ -1,7 +1,8 @@
 import json
 from unittest.mock import MagicMock, patch
 import pytest
-from app.models.exercise import Exercise
+from app.models.exercise import Exercise, QueuedExerciseRequest
+from app.repositories.exercise_repository import ExerciseRepository
 from app.services.exercise_service import exercise_service
 from app.services.deduplication_service import DeduplicationService
 
@@ -187,3 +188,37 @@ def test_deleted_problem_is_removed_from_index_before_cleanup_is_acknowledged(tm
 @pytest.fixture(autouse=True)
 def enable_deduplication(monkeypatch):
     monkeypatch.setattr(exercise_service, "deduplication_enabled", True)
+
+
+def test_queued_redelivery_does_not_call_the_model_or_save_again(mocker):
+    repository = mocker.patch("app.repositories.exercise_repository.exercise_repository")
+    saved = Exercise(id=1, subject="DATABASE", level="HARD", question="문제", answer="해설")
+    repository.find_task.return_value = saved.model_dump()
+    reserve = MagicMock()
+    request = QueuedExerciseRequest(subject="DATABASE", level="HARD", request_type="manual", requester_id=1)
+    assert exercise_service.run_queued("reclaimed", request, reserve) == saved
+    reserve.assert_not_called()
+    repository.save_exercise.assert_not_called()
+
+
+@pytest.mark.parametrize("saved_relation_fails", [False, True])
+def test_manual_completion_commits_all_rows_or_rolls_back_together(saved_relation_fails):
+    repository = ExerciseRepository()
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.lastrowid = 7
+    if saved_relation_fails:
+        cursor.execute.side_effect = [None, None, None, RuntimeError("save failed")]
+    args = {"task_id": "request", "connection": connection, "history": ("개념", "목표", "원인 진단", "1"),
+            "requester_id": 3}
+    if saved_relation_fails:
+        with pytest.raises(RuntimeError, match="save failed"):
+            repository.save_exercise("DATABASE", "HARD", "문제", "해설", **args)
+        connection.rollback.assert_called_once()
+        connection.commit.assert_not_called()
+    else:
+        assert repository.save_exercise("DATABASE", "HARD", "문제", "해설", **args).id == 7
+        connection.commit.assert_called_once()
+    assert [call.args[0].split()[2] for call in cursor.execute.call_args_list] == [
+        "exercise", "generation_task", "exercise_generation_history", "selected_exercise"
+    ]

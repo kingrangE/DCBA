@@ -54,4 +54,6 @@ DCBA_REQUIRE_POSTGRES_IMPORT=1 "${pg[@]}" up -d --no-build --wait
 3. 기존 Compose의 MariaDB 마이그레이션을 새 DB에 실행한다. PostgreSQL 오버레이의 마이그레이션 컨테이너에서 `python -m app.transfer_database postgres maria --writers-stopped`를 실행한다. 두 DB의 비밀은 환경 변수에서 전달한다. PostgreSQL에서 새로 생긴 계정의 문자열 비교 충돌이 발견되면 복사는 롤백한다.
 4. 지문과 시퀀스, 인증과 CRUD를 확인한 뒤 `postgres.enabled`를 제거하고 백업 고정본과 함께 기존 Compose로 서비스한다. Redis는 완료 작업 ID를 기준으로 재처리하며, 두 DB에서 같은 문항 ID를 사용하므로 Chroma 참조를 유지할 수 있다.
 
-리허설 실행은 `(cd DCBA && ./gradlew bootJar)`로 JAR을 만든 뒤 저장소 루트에서 `bash scripts/test-postgres-cutover.sh`를 실행한다. Python에는 pymysql, psycopg, pydantic과 httpx가 필요하다. Java CI에서 동일한 리허설을 실행한다.
+리허설 실행은 `(cd DCBA && ./gradlew bootJar)`로 JAR을 만든 뒤 저장소 루트에서 `bash scripts/test-postgres-cutover.sh`를 실행한다. Python에는 pymysql, psycopg, pydantic, httpx와 prometheus-client가 필요하다. Java CI에서 동일한 리허설을 실행한다.
+
+에이전트 출제 릴리스는 PostgreSQL의 두 번째 마이그레이션에서 기존 완료 작업의 알림 필드와 문항 출제 이력을 추가한다. 이후 양방향 복사에서는 두 DB에 최신 마이그레이션을 적용하고, 기존 7개 테이블과 출제 이력 테이블을 함께 검증한다.
