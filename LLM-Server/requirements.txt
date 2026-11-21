@@ -5,6 +5,7 @@ pydantic
 redis
 apscheduler
 pymysql
+psycopg[binary]>=3.2,<4
 openai
 
 # AI & Vector DB

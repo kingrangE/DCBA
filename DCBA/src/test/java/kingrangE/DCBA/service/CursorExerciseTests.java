@@ -15,7 +15,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
 @DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
-@Import(ExerciseService.class)
+@Import({ExerciseService.class, OrderedPostgresSearch.class})
 @org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase(replace = org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace.NONE)
 @org.springframework.test.context.ActiveProfiles("local")
 class CursorExerciseTests {

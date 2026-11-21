@@ -67,6 +67,19 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
     Slice<Exercise> findVisibleExercises(Long userId, Subject subject, Level level, String keyword,
                                          Long before, Long after, Pageable pageable);
 
+    @org.springframework.data.jpa.repository.Query("""
+            select e from Exercise e
+            where (:subject is null or e.subject = :subject)
+              and (:level is null or e.level = :level)
+              and (cast(:keyword as string) is null or lower(e.question) like lower(cast(:keyword as string)) escape '!')
+              and (:before is null or e.id < :before)
+              and (:after is null or e.id > :after)
+              and not exists (select b.id from BannedExercise b
+                              where b.user.id = :userId and b.exercise = e)
+            """)
+    Slice<Exercise> findVisibleExercisesPg(Long userId, Subject subject, Level level, String keyword,
+                                         Long before, Long after, Pageable pageable);
+
     // shortcut: shared head and tail grams still load candidates, probe an interior gram if those terms dominate latency.
     @Query(value = """
             SELECT e.* FROM exercise_search_gram g

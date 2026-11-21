@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
-@Import(ExerciseService.class)
+@Import({ExerciseService.class, OrderedPostgresSearch.class})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("prod")
 @EnabledIfEnvironmentVariable(named = "SEARCH_INDEX_INTEGRATION_TEST", matches = "true")

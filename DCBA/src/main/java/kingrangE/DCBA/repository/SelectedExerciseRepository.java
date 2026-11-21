@@ -17,7 +17,7 @@ import org.springframework.data.jpa.repository.Query;
 public interface SelectedExerciseRepository extends JpaRepository<SelectedExercise, Long> {
     String REVIEW_ROWS = """
             SELECT e.id, e.question, e.answer, e.subject, e.level, e.created_at AS createdAt,
-                   s.review_again AS reviewAgain, r.criteria_json AS criteriaJson
+                   s.review_again AS reviewAgain, CASE WHEN r.criteria_json IS NULL THEN NULL ELSE CONCAT(r.criteria_json) END AS criteriaJson
             FROM selected_exercise s JOIN exercise e ON e.id = s.exercise_id
             LEFT JOIN exercise_feedback_rubric r ON r.exercise_id = e.id
             WHERE s.user_id = :userId AND NOT EXISTS (
@@ -37,12 +37,12 @@ public interface SelectedExerciseRepository extends JpaRepository<SelectedExerci
     }
 
     @Query(value = REVIEW_ROWS + """
-            AND (:subject IS NULL OR e.subject = :subject)
-            AND (:level IS NULL OR e.level = :level)
+            AND (:subject = '' OR e.subject = :subject)
+            AND (:level = '' OR e.level = :level)
             AND (:marked = FALSE OR s.review_again = TRUE)
-            ORDER BY RAND() LIMIT 3
+            ORDER BY MD5(CONCAT(e.id, :seed)) LIMIT 3
             """, nativeQuery = true)
-    List<ReviewRow> sampleReview(Long userId, String subject, String level, boolean marked);
+    List<ReviewRow> sampleReview(Long userId, String subject, String level, boolean marked, String seed);
 
     @Query(value = REVIEW_ROWS + " AND e.id = :exerciseId", nativeQuery = true)
     Optional<ReviewRow> findReview(Long userId, Long exerciseId);
@@ -80,6 +80,19 @@ public interface SelectedExerciseRepository extends JpaRepository<SelectedExerci
               and (:after is null or e.id > :after)
             """)
     Slice<kingrangE.DCBA.domain.Exercise> findExercises(Long userId,
+            kingrangE.DCBA.domain.Subject subject, kingrangE.DCBA.domain.Level level, String keyword,
+            Long before, Long after, Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select e from SelectedExercise preference join preference.exercise e
+            where preference.user.id = :userId
+              and (:subject is null or e.subject = :subject)
+              and (:level is null or e.level = :level)
+              and (cast(:keyword as string) is null or lower(e.question) like lower(cast(:keyword as string)) escape '!')
+              and (:before is null or e.id < :before)
+              and (:after is null or e.id > :after)
+            """)
+    Slice<kingrangE.DCBA.domain.Exercise> findExercisesPg(Long userId,
             kingrangE.DCBA.domain.Subject subject, kingrangE.DCBA.domain.Level level, String keyword,
             Long before, Long after, Pageable pageable);
 
