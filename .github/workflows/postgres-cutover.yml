@@ -1,0 +1,70 @@
+name: DCBA Production PostgreSQL Cutover
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Check readiness or perform the PostgreSQL cutover
+        required: true
+        default: preflight
+        type: choice
+        options:
+          - preflight
+          - cutover
+
+concurrency:
+  group: ec2-release-refs/heads/main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cutover:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ap-northeast-2
+      INSTANCE_ID: ${{ vars.DCBA_EC2_INSTANCE_ID }}
+      MODE: ${{ inputs.mode }}
+      AWS_PAGER: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.DCBA_EC2_ROLE_ARN }}
+      - name: Run verified cutover on EC2
+        run: |
+          test -n "$INSTANCE_ID"
+          case "$MODE" in preflight|cutover) ;; *) exit 2 ;; esac
+          jq -n --arg mode "$MODE" --rawfile script scripts/cutover-postgres-ec2.sh \
+            '{commands: ["bash -s -- " + $mode + " <<\u0027DCBA_CUTOVER\u0027\n" + $script + "\nDCBA_CUTOVER"],
+              executionTimeout: ["1800"]}' > "$RUNNER_TEMP/dcba-cutover.json"
+          command_id=$(aws ssm send-command --document-name AWS-RunShellScript \
+            --instance-ids "$INSTANCE_ID" --timeout-seconds 120 \
+            --parameters "file://$RUNNER_TEMP/dcba-cutover.json" --query 'Command.CommandId' --output text)
+          echo "SSM command $command_id"
+          for _ in {1..375}; do
+            status=$(aws ssm get-command-invocation --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null) || status=Pending
+            case "$status" in
+              Pending|InProgress|Delayed|Cancelling) sleep 5 ;;
+              *)
+                aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+                  --query '{Output:StandardOutputContent,Error:StandardErrorContent}' --output json
+                if [[ "$status" != Success ]]; then
+                  echo "::error::PostgreSQL operation ended with $status"
+                  exit 1
+                fi
+                exit 0
+                ;;
+            esac
+          done
+          echo "::error::SSM status timed out. Inspect the existing command before retrying."
+          exit 1
