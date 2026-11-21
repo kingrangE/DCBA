@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import GenerationNotifications from './GenerationNotifications'
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth()
@@ -30,12 +31,12 @@ export default function Layout({ children }) {
           <NavLink className="wordmark" to="/dashboard">DCBA</NavLink>
           <nav className="main-nav" aria-label="주요 메뉴">
             <NavLink to="/dashboard">문제 풀기</NavLink>
-            <NavLink to="/generation-requests">내 생성 요청</NavLink>
             <NavLink to="/mypage">계정 설정</NavLink>
             {user.admin === true && <NavLink to="/admin">관리자</NavLink>}
           </nav>
           <div className="account-menu">
             <span>{user.name} 님</span>
+            <GenerationNotifications />
             <button className="text-button" type="button" disabled={loggingOut} onClick={handleLogout}>{loggingOut ? '로그아웃 중…' : '로그아웃'}</button>
           </div>
         </div>
