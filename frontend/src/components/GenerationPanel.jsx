@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { completionMessage } from './generationMessages'
 
 export default function GenerationPanel({ options, optionsLoading, optionsError, onRetryOptions }) {
   const [subject, setSubject] = useState('')
@@ -89,7 +87,7 @@ export default function GenerationPanel({ options, optionsLoading, optionsError,
   return (
     <section className="generation-panel" id="generate" tabIndex={-1} aria-labelledby="generation-heading">
       <h2 id="generation-heading">문제 생성 요청</h2>
-      <p className="muted">분야와 난이도를 선택하세요. 완성된 문제는 저장한 문제에 추가돼요.</p>
+      <p className="muted">완료되면 저장한 문제에 추가하고 알림을 보내드려요.</p>
       {optionsError ? (
         <div className="generation-unavailable">
           <p role="status">선택 항목을 불러오지 못했어요.</p>
@@ -113,13 +111,14 @@ export default function GenerationPanel({ options, optionsLoading, optionsError,
               {options.levels.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>
           </label>
-          <label>
-            학습하고 싶은 내용 (선택)
-            <textarea name="learningIntent" rows={3} value={learningIntent} disabled={submitting}
-              aria-invalid={intentError || undefined} aria-describedby={intentError ? 'generation-intent-error' : 'generation-intent-help'}
+          <div className="form-field">
+            <label htmlFor="generation-intent">학습 목표 (선택)</label>
+            <textarea id="generation-intent" name="learningIntent" rows={3} placeholder="예: 교착 상태를 진단하고 싶어요"
+              value={learningIntent} disabled={submitting} aria-invalid={intentError || undefined}
+              aria-describedby={intentError ? 'generation-intent-help generation-intent-error' : 'generation-intent-help'}
               onChange={(event) => setLearningIntent(event.target.value)} />
-            <span id="generation-intent-help" className="muted">공개 가능한 CS 개념이나 학습 목표를 한 문장으로 적어 주세요. 계정이나 이메일 등 개인·조직 정보는 제외해 주세요.</span>
-          </label>
+            <p id="generation-intent-help" className="field-help">공개 가능한 내용만 입력해 주세요. 계정이나 이메일 등 개인·조직 정보는 제외해 주세요.</p>
+          </div>
           {intentError && <p id="generation-intent-error" role="alert" className="form-status form-status--error">양끝 공백을 제외해 200자 이하로 줄여 주세요.</p>}
           <button className="button button--primary" type="submit" disabled={submitting}>
             {submitting ? '요청 접수 중…' : '생성 요청하기'}
@@ -127,16 +126,15 @@ export default function GenerationPanel({ options, optionsLoading, optionsError,
           {status && <p className={`form-status form-status--${status.type}`} role={status.type === 'error' ? 'alert' : 'status'}>{status.text}</p>}
         </form>
       )}
-      {progress && <div className="generation-progress" role={progress.status === 'failed' ? 'alert' : 'status'}>
-        {progress.status === 'queued' && <p>접수됨</p>}
-        {progress.status === 'running' && <p>생성 중</p>}
-        {progress.status === 'unavailable' && <p>진행 상태를 다시 확인하고 있어요.</p>}
-        {progress.status === 'failed' && <p>실패 · {progress.message}</p>}
-        {progress.status === 'completed' && <>
-          <p>완료 · {completionMessage(progress.completionType)}</p>
-          <Link to={`/generation-requests/${requestId}`}>문제 풀기</Link>
-        </>}
-      </div>}
+      {progress && progress.status !== 'completed' && (
+        <p className={`generation-progress notice ${progress.status === 'failed' ? 'notice--error' : ''}`}
+          role={progress.status === 'failed' ? 'alert' : 'status'}>
+          {progress.status === 'queued' && '요청을 접수했어요.'}
+          {progress.status === 'running' && '문제를 만들고 있어요.'}
+          {progress.status === 'unavailable' && '진행 상태를 다시 확인하고 있어요.'}
+          {progress.status === 'failed' && progress.message}
+        </p>
+      )}
     </section>
   )
 }
