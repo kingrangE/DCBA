@@ -44,7 +44,7 @@ jobs:
           test -n "$INSTANCE_ID"
           case "$MODE" in preflight|cutover) ;; *) exit 2 ;; esac
           jq -n --arg mode "$MODE" --rawfile script scripts/cutover-postgres-ec2.sh \
-            '{commands: ["bash -s -- " + $mode + " <<\u0027DCBA_CUTOVER\u0027\n" + $script + "\nDCBA_CUTOVER"],
+            '{commands: ["set -eu\nscript_path=$(mktemp)\ntrap \u0027unlink \"$script_path\"\u0027 EXIT\ncat > \"$script_path\" <<\u0027DCBA_CUTOVER\u0027\n" + $script + "\nDCBA_CUTOVER\nbash \"$script_path\" " + $mode + " </dev/null"],
               executionTimeout: ["1800"]}' > "$RUNNER_TEMP/dcba-cutover.json"
           command_id=$(aws ssm send-command --document-name AWS-RunShellScript \
             --instance-ids "$INSTANCE_ID" --timeout-seconds 120 \
@@ -56,11 +56,21 @@ jobs:
             case "$status" in
               Pending|InProgress|Delayed|Cancelling) sleep 5 ;;
               *)
-                aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
-                  --query '{Output:StandardOutputContent,Error:StandardErrorContent}' --output json
+                result=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+                  --query '{Output:StandardOutputContent,Error:StandardErrorContent}' --output json)
+                printf '%s\n' "$result"
                 if [[ "$status" != Success ]]; then
                   echo "::error::PostgreSQL operation ended with $status"
                   exit 1
+                fi
+                output=$(jq -er '.Output' <<< "$result")
+                if [[ "$MODE" == cutover ]]; then
+                  grep -Eq '^PostgreSQL (activated for release|already active and public API verified)' <<< "$output" || {
+                    echo "::error::SSM ended without confirming PostgreSQL activation"
+                    exit 1
+                  }
+                else
+                  grep -Eq '^(Current release .*MariaDB deployment|PostgreSQL already active and public API verified)' <<< "$output"
                 fi
                 exit 0
                 ;;
